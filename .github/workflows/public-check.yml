@@ -1,0 +1,57 @@
+name: Public Workbench Checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate public repository boundary
+        run: node tools/validate-public-repository.js
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            ai-adapter/ui/v0.1.0/package-lock.json
+
+      - name: Install Server dependencies
+        run: npm ci --prefix server
+
+      - name: Install UI dependencies
+        run: npm ci --prefix ai-adapter/ui/v0.1.0
+
+      - name: Validate reviewed modules
+        run: |
+          node tools/validate-modules.js
+          node modules/project-insights/tests/module.test.js
+          node server/tests/extension-manager.test.js
+          node server/tests/mcp-status.test.js
+
+      - name: Verify English and Chinese UI localization
+        run: npm run test:localization --prefix server
+
+      - name: Check JavaScript syntax
+        run: find server modules tools -name "*.js" -print0 | xargs -0 -n1 node --check
+
+      - name: Verify core descriptor boundary
+        run: node -e "const d=require('./ai-adapter/tool-descriptors.json'); if(d.descriptors.length!==59) throw new Error('Expected 59 core descriptors');"
+
+      - name: Lint and build UI
+        run: |
+          npm run lint --prefix ai-adapter/ui/v0.1.0
+          npm run build --prefix ai-adapter/ui/v0.1.0
+
+      - name: Check whitespace
+        run: git diff --check

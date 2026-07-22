@@ -1,0 +1,9 @@
+* @bleufeng
+
+/modules/registry.json @bleufeng
+/modules/schema/ @bleufeng
+/server/services/extension-manager.js @bleufeng
+/server/services/module-validation.js @bleufeng
+/server/routes/extensions.js @bleufeng
+/ai-adapter/tool-descriptors.json @bleufeng
+/.github/workflows/ @bleufeng

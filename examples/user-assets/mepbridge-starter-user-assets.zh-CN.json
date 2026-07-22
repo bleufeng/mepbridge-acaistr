@@ -1,0 +1,721 @@
+{
+    "schemaVersion":  "user-asset-1",
+    "exportedAt":  "2026-07-15T00:00:00.000+08:00",
+    "appVersion":  "0.1.0",
+    "templates":  [
+                      {
+                          "id":  "tpl-starter-project-overview",
+                          "name":  "读取项目与楼层信息",
+                          "category":  "MEPBridge-读取",
+                          "icon":  "📄",
+                          "description":  "读取当前 Archicad 项目基本信息和楼层结构，用于连接验证与任务前检查。",
+                          "plan":  {
+                                       "title":  "读取项目与楼层信息",
+                                       "warning":  null,
+                                       "isMutation":  false,
+                                       "mepCode":  "GetProjectInfo + GetStories",
+                                       "steps":  [
+                                                     {
+                                                         "id":  "step-project-info",
+                                                         "title":  "读取项目信息",
+                                                         "action":  "GetProjectInfo",
+                                                         "description":  "读取当前项目名称、路径、位置和基础元数据。",
+                                                         "expectedResult":  "返回项目基础信息。",
+                                                         "params":  {
+
+                                                                    },
+                                                         "commandJson":  {
+                                                                             "command":  "API.ExecuteAddOnCommand",
+                                                                             "parameters":  {
+                                                                                                "addOnCommandId":  {
+                                                                                                                       "commandNamespace":  "MEPBridge",
+                                                                                                                       "commandName":  "GetProjectInfo"
+                                                                                                                   },
+                                                                                                "addOnCommandParameters":  {
+
+                                                                                                                           }
+                                                                                            }
+                                                                         },
+                                                         "commandNamespace":  "MEPBridge",
+                                                         "commandName":  "GetProjectInfo",
+                                                         "descriptorName":  "mepbridge.GetProjectInfo",
+                                                         "riskLevel":  "read",
+                                                         "status":  "pending"
+                                                     },
+                                                     {
+                                                         "id":  "step-stories",
+                                                         "title":  "读取楼层列表",
+                                                         "action":  "GetStories",
+                                                         "description":  "读取当前项目楼层结构。",
+                                                         "expectedResult":  "返回楼层索引、名称和标高。",
+                                                         "params":  {
+
+                                                                    },
+                                                         "commandJson":  {
+                                                                             "command":  "API.ExecuteAddOnCommand",
+                                                                             "parameters":  {
+                                                                                                "addOnCommandId":  {
+                                                                                                                       "commandNamespace":  "MEPBridge",
+                                                                                                                       "commandName":  "GetStories"
+                                                                                                                   },
+                                                                                                "addOnCommandParameters":  {
+
+                                                                                                                           }
+                                                                                            }
+                                                                         },
+                                                         "commandNamespace":  "MEPBridge",
+                                                         "commandName":  "GetStories",
+                                                         "descriptorName":  "mepbridge.GetStories",
+                                                         "riskLevel":  "read",
+                                                         "status":  "pending"
+                                                     }
+                                                 ],
+                                       "parameters":  [
+                                                          {
+                                                              "item":  "项目信息",
+                                                              "expected":  "返回 project 字段",
+                                                              "actual":  "待执行",
+                                                              "status":  "warning"
+                                                          },
+                                                          {
+                                                              "item":  "楼层信息",
+                                                              "expected":  "返回 stories 数组",
+                                                              "actual":  "待执行",
+                                                              "status":  "warning"
+                                                          }
+                                                      ]
+                                   },
+                          "riskLevel":  "read",
+                          "createdAt":  "2026-07-15T00:00:00.000+08:00",
+                          "updatedAt":  "2026-07-15T00:00:00.000+08:00",
+                          "tags":  [
+                                       "starter",
+                                       "example",
+                                       "release-preset"
+                                   ],
+                          "usageCount":  0,
+                          "version":  "1.1",
+                          "notes":  "发布包内置示例资源；可通过预设管理导入、重置、复制修改。"
+                      },
+                      {
+                          "id":  "tpl-starter-read-selection",
+                          "name":  "读取当前选择集详情",
+                          "category":  "MEPBridge-读取",
+                          "icon":  "📋",
+                          "description":  "读取当前 Archicad 选择集，包含元素 GUID、类型和 AABB 摘要。",
+                          "plan":  {
+                                       "title":  "读取当前选择集详情",
+                                       "warning":  null,
+                                       "isMutation":  false,
+                                       "mepCode":  "GetSelectedElements",
+                                       "steps":  [
+                                                     {
+                                                         "id":  "step-read-selection",
+                                                         "title":  "读取选中构件",
+                                                         "action":  "GetSelectedElements",
+                                                         "description":  "读取当前 Archicad 选择集详情。",
+                                                         "expectedResult":  "返回选中元素 GUID、类型和几何摘要。",
+                                                         "params":  {
+                                                                        "onlyEditable":  false,
+                                                                        "includeAabb":  true,
+                                                                        "includeMepInfo":  true
+                                                                    },
+                                                         "commandJson":  {
+                                                                             "command":  "API.ExecuteAddOnCommand",
+                                                                             "parameters":  {
+                                                                                                "addOnCommandId":  {
+                                                                                                                       "commandNamespace":  "MEPBridge",
+                                                                                                                       "commandName":  "GetSelectedElements"
+                                                                                                                   },
+                                                                                                "addOnCommandParameters":  {
+                                                                                                                               "onlyEditable":  false,
+                                                                                                                               "includeAabb":  true,
+                                                                                                                               "includeMepInfo":  true
+                                                                                                                           }
+                                                                                            }
+                                                                         },
+                                                         "commandNamespace":  "MEPBridge",
+                                                         "commandName":  "GetSelectedElements",
+                                                         "descriptorName":  "mepbridge.GetSelectedElements",
+                                                         "riskLevel":  "read",
+                                                         "status":  "pending"
+                                                     }
+                                                 ],
+                                       "parameters":  [
+                                                          {
+                                                              "item":  "选择集",
+                                                              "expected":  "返回 elements 数组",
+                                                              "actual":  "待执行",
+                                                              "status":  "warning"
+                                                          }
+                                                      ]
+                                   },
+                          "riskLevel":  "read",
+                          "createdAt":  "2026-07-15T00:00:00.000+08:00",
+                          "updatedAt":  "2026-07-15T00:00:00.000+08:00",
+                          "tags":  [
+                                       "starter",
+                                       "example",
+                                       "release-preset"
+                                   ],
+                          "usageCount":  0,
+                          "version":  "1.1",
+                          "notes":  "发布包内置示例资源；可通过预设管理导入、重置、复制修改。"
+                      },
+                      {
+                          "id":  "tpl-starter-room-walls",
+                          "name":  "创建示例 6×4m 房间墙体",
+                          "category":  "Building",
+                          "icon":  "🏠",
+                          "description":  "在 X=20m 附近创建 4 面 6×4m 示例房间墙体，使用 4 个 CreateWall 单步，避免批量封装参数不兼容。",
+                          "plan":  {
+                                       "title":  "创建示例 6×4m 房间墙体",
+                                       "warning":  "此模板会写入 Archicad 模型；AI 自动模式直接执行，监督/手动模式需确认。",
+                                       "isMutation":  true,
+                                       "mepCode":  "CreateWall × 4",
+                                       "steps":  [
+                                                     {
+                                                         "id":  "step-wall-south",
+                                                         "title":  "创建南墙 6m",
+                                                         "action":  "CreateWall",
+                                                         "description":  "创建南侧墙体。",
+                                                         "expectedResult":  "生成 1 面 Wall。",
+                                                         "params":  {
+                                                                        "start":  {
+                                                                                      "x":  20,
+                                                                                      "y":  0
+                                                                                  },
+                                                                        "end":  {
+                                                                                    "x":  26,
+                                                                                    "y":  0
+                                                                                },
+                                                                        "thickness":  0.24,
+                                                                        "height":  3,
+                                                                        "dryRun":  false,
+                                                                        "confirmRequired":  true
+                                                                    },
+                                                         "commandJson":  {
+                                                                             "command":  "API.ExecuteAddOnCommand",
+                                                                             "parameters":  {
+                                                                                                "addOnCommandId":  {
+                                                                                                                       "commandNamespace":  "MEPBridge",
+                                                                                                                       "commandName":  "CreateWall"
+                                                                                                                   },
+                                                                                                "addOnCommandParameters":  {
+                                                                                                                               "start":  {
+                                                                                                                                             "x":  20,
+                                                                                                                                             "y":  0
+                                                                                                                                         },
+                                                                                                                               "end":  {
+                                                                                                                                           "x":  26,
+                                                                                                                                           "y":  0
+                                                                                                                                       },
+                                                                                                                               "thickness":  0.24,
+                                                                                                                               "height":  3,
+                                                                                                                               "dryRun":  false,
+                                                                                                                               "confirmRequired":  true
+                                                                                                                           }
+                                                                                            }
+                                                                         },
+                                                         "commandNamespace":  "MEPBridge",
+                                                         "commandName":  "CreateWall",
+                                                         "descriptorName":  "mepbridge.CreateWall",
+                                                         "riskLevel":  "low-mutation",
+                                                         "status":  "pending"
+                                                     },
+                                                     {
+                                                         "id":  "step-wall-east",
+                                                         "title":  "创建东墙 4m",
+                                                         "action":  "CreateWall",
+                                                         "description":  "创建东侧墙体。",
+                                                         "expectedResult":  "生成 1 面 Wall。",
+                                                         "params":  {
+                                                                        "start":  {
+                                                                                      "x":  26,
+                                                                                      "y":  0
+                                                                                  },
+                                                                        "end":  {
+                                                                                    "x":  26,
+                                                                                    "y":  4
+                                                                                },
+                                                                        "thickness":  0.24,
+                                                                        "height":  3,
+                                                                        "dryRun":  false,
+                                                                        "confirmRequired":  true
+                                                                    },
+                                                         "commandJson":  {
+                                                                             "command":  "API.ExecuteAddOnCommand",
+                                                                             "parameters":  {
+                                                                                                "addOnCommandId":  {
+                                                                                                                       "commandNamespace":  "MEPBridge",
+                                                                                                                       "commandName":  "CreateWall"
+                                                                                                                   },
+                                                                                                "addOnCommandParameters":  {
+                                                                                                                               "start":  {
+                                                                                                                                             "x":  26,
+                                                                                                                                             "y":  0
+                                                                                                                                         },
+                                                                                                                               "end":  {
+                                                                                                                                           "x":  26,
+                                                                                                                                           "y":  4
+                                                                                                                                       },
+                                                                                                                               "thickness":  0.24,
+                                                                                                                               "height":  3,
+                                                                                                                               "dryRun":  false,
+                                                                                                                               "confirmRequired":  true
+                                                                                                                           }
+                                                                                            }
+                                                                         },
+                                                         "commandNamespace":  "MEPBridge",
+                                                         "commandName":  "CreateWall",
+                                                         "descriptorName":  "mepbridge.CreateWall",
+                                                         "riskLevel":  "low-mutation",
+                                                         "status":  "pending"
+                                                     },
+                                                     {
+                                                         "id":  "step-wall-north",
+                                                         "title":  "创建北墙 6m",
+                                                         "action":  "CreateWall",
+                                                         "description":  "创建北侧墙体。",
+                                                         "expectedResult":  "生成 1 面 Wall。",
+                                                         "params":  {
+                                                                        "start":  {
+                                                                                      "x":  26,
+                                                                                      "y":  4
+                                                                                  },
+                                                                        "end":  {
+                                                                                    "x":  20,
+                                                                                    "y":  4
+                                                                                },
+                                                                        "thickness":  0.24,
+                                                                        "height":  3,
+                                                                        "dryRun":  false,
+                                                                        "confirmRequired":  true
+                                                                    },
+                                                         "commandJson":  {
+                                                                             "command":  "API.ExecuteAddOnCommand",
+                                                                             "parameters":  {
+                                                                                                "addOnCommandId":  {
+                                                                                                                       "commandNamespace":  "MEPBridge",
+                                                                                                                       "commandName":  "CreateWall"
+                                                                                                                   },
+                                                                                                "addOnCommandParameters":  {
+                                                                                                                               "start":  {
+                                                                                                                                             "x":  26,
+                                                                                                                                             "y":  4
+                                                                                                                                         },
+                                                                                                                               "end":  {
+                                                                                                                                           "x":  20,
+                                                                                                                                           "y":  4
+                                                                                                                                       },
+                                                                                                                               "thickness":  0.24,
+                                                                                                                               "height":  3,
+                                                                                                                               "dryRun":  false,
+                                                                                                                               "confirmRequired":  true
+                                                                                                                           }
+                                                                                            }
+                                                                         },
+                                                         "commandNamespace":  "MEPBridge",
+                                                         "commandName":  "CreateWall",
+                                                         "descriptorName":  "mepbridge.CreateWall",
+                                                         "riskLevel":  "low-mutation",
+                                                         "status":  "pending"
+                                                     },
+                                                     {
+                                                         "id":  "step-wall-west",
+                                                         "title":  "创建西墙 4m",
+                                                         "action":  "CreateWall",
+                                                         "description":  "创建西侧墙体。",
+                                                         "expectedResult":  "生成 1 面 Wall。",
+                                                         "params":  {
+                                                                        "start":  {
+                                                                                      "x":  20,
+                                                                                      "y":  4
+                                                                                  },
+                                                                        "end":  {
+                                                                                    "x":  20,
+                                                                                    "y":  0
+                                                                                },
+                                                                        "thickness":  0.24,
+                                                                        "height":  3,
+                                                                        "dryRun":  false,
+                                                                        "confirmRequired":  true
+                                                                    },
+                                                         "commandJson":  {
+                                                                             "command":  "API.ExecuteAddOnCommand",
+                                                                             "parameters":  {
+                                                                                                "addOnCommandId":  {
+                                                                                                                       "commandNamespace":  "MEPBridge",
+                                                                                                                       "commandName":  "CreateWall"
+                                                                                                                   },
+                                                                                                "addOnCommandParameters":  {
+                                                                                                                               "start":  {
+                                                                                                                                             "x":  20,
+                                                                                                                                             "y":  4
+                                                                                                                                         },
+                                                                                                                               "end":  {
+                                                                                                                                           "x":  20,
+                                                                                                                                           "y":  0
+                                                                                                                                       },
+                                                                                                                               "thickness":  0.24,
+                                                                                                                               "height":  3,
+                                                                                                                               "dryRun":  false,
+                                                                                                                               "confirmRequired":  true
+                                                                                                                           }
+                                                                                            }
+                                                                         },
+                                                         "commandNamespace":  "MEPBridge",
+                                                         "commandName":  "CreateWall",
+                                                         "descriptorName":  "mepbridge.CreateWall",
+                                                         "riskLevel":  "low-mutation",
+                                                         "status":  "pending"
+                                                     }
+                                                 ],
+                                       "parameters":  [
+                                                          {
+                                                              "item":  "墙体数量",
+                                                              "expected":  "4 面 Wall",
+                                                              "actual":  "待执行",
+                                                              "status":  "warning"
+                                                          },
+                                                          {
+                                                              "item":  "尺寸",
+                                                              "expected":  "6m × 4m，高 3m，厚 0.24m",
+                                                              "actual":  "待执行",
+                                                              "status":  "warning"
+                                                          }
+                                                      ]
+                                   },
+                          "riskLevel":  "low-mutation",
+                          "createdAt":  "2026-07-15T00:00:00.000+08:00",
+                          "updatedAt":  "2026-07-15T00:00:00.000+08:00",
+                          "tags":  [
+                                       "starter",
+                                       "example",
+                                       "release-preset"
+                                   ],
+                          "usageCount":  0,
+                          "version":  "1.1",
+                          "notes":  "发布包内置示例资源；可通过预设管理导入、重置、复制修改。"
+                      },
+                      {
+                          "id":  "tpl-starter-scan-structure",
+                          "name":  "扫描墙柱梁 AABB",
+                          "category":  "MEPBridge-读取",
+                          "icon":  "🔍",
+                          "description":  "读取墙、柱、梁结构元素的 AABB，用于建模前检查；不写入模型。",
+                          "plan":  {
+                                       "title":  "扫描墙柱梁 AABB",
+                                       "warning":  null,
+                                       "isMutation":  false,
+                                       "mepCode":  "ScanStructuralElements",
+                                       "steps":  [
+                                                     {
+                                                         "id":  "step-scan-structure",
+                                                         "title":  "扫描墙柱梁 AABB",
+                                                         "action":  "ScanStructuralElements",
+                                                         "description":  "扫描当前模型中的墙、柱、梁 AABB 边界。",
+                                                         "expectedResult":  "返回结构构件 AABB 列表。",
+                                                         "params":  {
+                                                                        "types":  [
+                                                                                      "Wall",
+                                                                                      "Column",
+                                                                                      "Beam"
+                                                                                  ]
+                                                                    },
+                                                         "commandJson":  {
+                                                                             "command":  "API.ExecuteAddOnCommand",
+                                                                             "parameters":  {
+                                                                                                "addOnCommandId":  {
+                                                                                                                       "commandNamespace":  "MEPBridge",
+                                                                                                                       "commandName":  "ScanStructuralElements"
+                                                                                                                   },
+                                                                                                "addOnCommandParameters":  {
+                                                                                                                               "types":  [
+                                                                                                                                             "Wall",
+                                                                                                                                             "Column",
+                                                                                                                                             "Beam"
+                                                                                                                                         ]
+                                                                                                                           }
+                                                                                            }
+                                                                         },
+                                                         "commandNamespace":  "MEPBridge",
+                                                         "commandName":  "ScanStructuralElements",
+                                                         "descriptorName":  "mepbridge.ScanStructuralElements",
+                                                         "riskLevel":  "read",
+                                                         "status":  "pending"
+                                                     }
+                                                 ],
+                                       "parameters":  [
+                                                          {
+                                                              "item":  "结构元素",
+                                                              "expected":  "返回 Wall/Column/Beam AABB",
+                                                              "actual":  "待执行",
+                                                              "status":  "warning"
+                                                          }
+                                                      ]
+                                   },
+                          "riskLevel":  "read",
+                          "createdAt":  "2026-07-15T00:00:00.000+08:00",
+                          "updatedAt":  "2026-07-15T00:00:00.000+08:00",
+                          "tags":  [
+                                       "starter",
+                                       "example",
+                                       "release-preset"
+                                   ],
+                          "usageCount":  0,
+                          "version":  "1.2",
+                          "notes":  "替代原柱网创建示例：当前 AC28 CreateColumn 返回 API 错误，starter 改为稳定只读扫描。"
+                      },
+                      {
+                          "id":  "tpl-starter-partition-walls",
+                          "name":  "创建 2 道示例隔墙",
+                          "category":  "Building",
+                          "icon":  "┤",
+                          "description":  "在 X=44m 附近创建 2 道 3m 示例隔墙，使用已验证的 CreateWall 原子命令。",
+                          "plan":  {
+                                       "title":  "创建 2 道示例隔墙",
+                                       "warning":  "此模板会写入 Archicad 模型；AI 自动模式直接执行，监督/手动模式需确认。",
+                                       "isMutation":  true,
+                                       "mepCode":  "CreateWall × 2",
+                                       "steps":  [
+                                                     {
+                                                         "id":  "step-partition-a",
+                                                         "title":  "创建 3m 横向隔墙",
+                                                         "action":  "CreateWall",
+                                                         "description":  "创建一段 3m 横向示例隔墙。",
+                                                         "expectedResult":  "生成 1 面 Wall。",
+                                                         "params":  {
+                                                                        "start":  {
+                                                                                      "x":  44,
+                                                                                      "y":  0
+                                                                                  },
+                                                                        "end":  {
+                                                                                    "x":  47,
+                                                                                    "y":  0
+                                                                                },
+                                                                        "thickness":  0.12,
+                                                                        "height":  3,
+                                                                        "dryRun":  false,
+                                                                        "confirmRequired":  true
+                                                                    },
+                                                         "commandJson":  {
+                                                                             "command":  "API.ExecuteAddOnCommand",
+                                                                             "parameters":  {
+                                                                                                "addOnCommandId":  {
+                                                                                                                       "commandNamespace":  "MEPBridge",
+                                                                                                                       "commandName":  "CreateWall"
+                                                                                                                   },
+                                                                                                "addOnCommandParameters":  {
+                                                                                                                               "start":  {
+                                                                                                                                             "x":  44,
+                                                                                                                                             "y":  0
+                                                                                                                                         },
+                                                                                                                               "end":  {
+                                                                                                                                           "x":  47,
+                                                                                                                                           "y":  0
+                                                                                                                                       },
+                                                                                                                               "thickness":  0.12,
+                                                                                                                               "height":  3,
+                                                                                                                               "dryRun":  false,
+                                                                                                                               "confirmRequired":  true
+                                                                                                                           }
+                                                                                            }
+                                                                         },
+                                                         "commandNamespace":  "MEPBridge",
+                                                         "commandName":  "CreateWall",
+                                                         "descriptorName":  "mepbridge.CreateWall",
+                                                         "riskLevel":  "low-mutation",
+                                                         "status":  "pending"
+                                                     },
+                                                     {
+                                                         "id":  "step-partition-b",
+                                                         "title":  "创建 3m 纵向隔墙",
+                                                         "action":  "CreateWall",
+                                                         "description":  "创建一段 3m 纵向示例隔墙。",
+                                                         "expectedResult":  "生成 1 面 Wall。",
+                                                         "params":  {
+                                                                        "start":  {
+                                                                                      "x":  44,
+                                                                                      "y":  0
+                                                                                  },
+                                                                        "end":  {
+                                                                                    "x":  44,
+                                                                                    "y":  3
+                                                                                },
+                                                                        "thickness":  0.12,
+                                                                        "height":  3,
+                                                                        "dryRun":  false,
+                                                                        "confirmRequired":  true
+                                                                    },
+                                                         "commandJson":  {
+                                                                             "command":  "API.ExecuteAddOnCommand",
+                                                                             "parameters":  {
+                                                                                                "addOnCommandId":  {
+                                                                                                                       "commandNamespace":  "MEPBridge",
+                                                                                                                       "commandName":  "CreateWall"
+                                                                                                                   },
+                                                                                                "addOnCommandParameters":  {
+                                                                                                                               "start":  {
+                                                                                                                                             "x":  44,
+                                                                                                                                             "y":  0
+                                                                                                                                         },
+                                                                                                                               "end":  {
+                                                                                                                                           "x":  44,
+                                                                                                                                           "y":  3
+                                                                                                                                       },
+                                                                                                                               "thickness":  0.12,
+                                                                                                                               "height":  3,
+                                                                                                                               "dryRun":  false,
+                                                                                                                               "confirmRequired":  true
+                                                                                                                           }
+                                                                                            }
+                                                                         },
+                                                         "commandNamespace":  "MEPBridge",
+                                                         "commandName":  "CreateWall",
+                                                         "descriptorName":  "mepbridge.CreateWall",
+                                                         "riskLevel":  "low-mutation",
+                                                         "status":  "pending"
+                                                     }
+                                                 ],
+                                       "parameters":  [
+                                                          {
+                                                              "item":  "隔墙数量",
+                                                              "expected":  "2 面 Wall",
+                                                              "actual":  "待执行",
+                                                              "status":  "warning"
+                                                          },
+                                                          {
+                                                              "item":  "尺寸",
+                                                              "expected":  "每段 3m，高 3m，厚 0.12m",
+                                                              "actual":  "待执行",
+                                                              "status":  "warning"
+                                                          }
+                                                      ]
+                                   },
+                          "riskLevel":  "low-mutation",
+                          "createdAt":  "2026-07-15T00:00:00.000+08:00",
+                          "updatedAt":  "2026-07-15T00:00:00.000+08:00",
+                          "tags":  [
+                                       "starter",
+                                       "example",
+                                       "release-preset"
+                                   ],
+                          "usageCount":  0,
+                          "version":  "1.2",
+                          "notes":  "替代原 Beam 示例：当前 AC28 CreateBeam 返回 API 错误，starter 改为稳定 CreateWall 示例。"
+                      }
+                  ],
+    "commands":  [
+                     {
+                         "id":  "cmd-starter-ping",
+                         "triggers":  [
+                                          "测试插件连接",
+                                          "检查 MEPBridge 连接",
+                                          "ping mepbridge"
+                                      ],
+                         "singleStep":  {
+                                            "action":  "Ping",
+                                            "params":  {
+
+                                                       },
+                                            "riskLevel":  "read"
+                                        },
+                         "priority":  100,
+                         "enabled":  true,
+                         "createdAt":  "2026-07-15T00:00:00.000+08:00",
+                         "description":  "无 LLM 连接时也可用的本地连接测试命令。",
+                         "usageCount":  0
+                     },
+                     {
+                         "id":  "cmd-starter-read-selection",
+                         "triggers":  [
+                                          "读取选择集",
+                                          "查看选中构件",
+                                          "当前选择详情"
+                                      ],
+                         "singleStep":  {
+                                            "action":  "GetSelectedElements",
+                                            "params":  {
+                                                           "onlyEditable":  false,
+                                                           "includeAabb":  true,
+                                                           "includeMepInfo":  true
+                                                       },
+                                            "riskLevel":  "read"
+                                        },
+                         "priority":  95,
+                         "enabled":  true,
+                         "createdAt":  "2026-07-15T00:00:00.000+08:00",
+                         "description":  "读取当前 Archicad 选择集。",
+                         "usageCount":  0
+                     },
+                     {
+                         "id":  "cmd-starter-list-walls",
+                         "triggers":  [
+                                          "列出所有墙",
+                                          "查询墙体",
+                                          "墙体列表"
+                                      ],
+                         "singleStep":  {
+                                            "action":  "GetElementsByType",
+                                            "params":  {
+                                                           "elementType":  "Wall",
+                                                           "includeAabb":  true
+                                                       },
+                                            "riskLevel":  "read"
+                                        },
+                         "priority":  90,
+                         "enabled":  true,
+                         "createdAt":  "2026-07-15T00:00:00.000+08:00",
+                         "description":  "查询当前模型中的墙元素。",
+                         "usageCount":  0
+                     },
+                     {
+                         "id":  "cmd-starter-scan-structure",
+                         "triggers":  [
+                                          "扫描结构障碍",
+                                          "读取结构 AABB",
+                                          "检查墙柱梁"
+                                      ],
+                         "singleStep":  {
+                                            "action":  "ScanStructuralElements",
+                                            "params":  {
+                                                           "types":  [
+                                                                         "Wall",
+                                                                         "Column",
+                                                                         "Beam"
+                                                                     ]
+                                                       },
+                                            "riskLevel":  "read"
+                                        },
+                         "priority":  85,
+                         "enabled":  true,
+                         "createdAt":  "2026-07-15T00:00:00.000+08:00",
+                         "description":  "扫描墙柱梁 AABB，用于建模前检查。",
+                         "usageCount":  0
+                     },
+                     {
+                         "id":  "cmd-starter-viewport-capture",
+                         "triggers":  [
+                                          "捕获视口",
+                                          "查看当前视图元素",
+                                          "视口快照"
+                                      ],
+                         "singleStep":  {
+                                            "action":  "ViewportCapture",
+                                            "params":  {
+                                                           "includeAabb":  true,
+                                                           "includeImage":  false,
+                                                           "maxElements":  120
+                                                       },
+                                            "riskLevel":  "read"
+                                        },
+                         "priority":  80,
+                         "enabled":  true,
+                         "createdAt":  "2026-07-15T00:00:00.000+08:00",
+                         "description":  "读取当前视口可见元素摘要，不抓取图片。",
+                         "usageCount":  0
+                     }
+                 ],
+    "notes":  "MEPbridge ACAIstr starter 示例资源 v1.2：仅保留当前 AC28 实测稳定的读取和 CreateWall 写入模板；自定义 NL 命令偏无 LLM 的手动单步读取查询。"
+}

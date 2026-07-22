@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "mepbridge-module-registry-1",
+  "modules": [
+    {
+      "id": "project-insights",
+      "path": "project-insights",
+      "enabled": true,
+      "trusted": true,
+      "distribution": "official"
+    }
+  ]
+}

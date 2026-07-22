@@ -1,0 +1,587 @@
+{
+  "schemaVersion": "user-asset-1",
+  "exportedAt": "2026-07-22T00:00:00.000+08:00",
+  "appVersion": "0.1.0",
+  "templates": [
+    {
+      "id": "tpl-starter-project-overview",
+      "name": "Read project and story information",
+      "category": "MEPBridge-Read",
+      "icon": "INFO",
+      "description": "Reads the current Archicad project metadata and story structure for connection and task preflight checks.",
+      "plan": {
+        "title": "Read project and story information",
+        "warning": null,
+        "isMutation": false,
+        "mepCode": "GetProjectInfo + GetStories",
+        "steps": [
+          {
+            "id": "step-project-info",
+            "title": "Read project information",
+            "action": "GetProjectInfo",
+            "description": "Read the current project name, path, location, and basic metadata.",
+            "expectedResult": "Returns the project metadata.",
+            "params": {},
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "GetProjectInfo"
+                },
+                "addOnCommandParameters": {}
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetProjectInfo",
+            "descriptorName": "mepbridge.GetProjectInfo",
+            "riskLevel": "read",
+            "status": "pending"
+          },
+          {
+            "id": "step-stories",
+            "title": "Read story list",
+            "action": "GetStories",
+            "description": "Read the current project story structure.",
+            "expectedResult": "Returns story indexes, names, and elevations.",
+            "params": {},
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "GetStories"
+                },
+                "addOnCommandParameters": {}
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetStories",
+            "descriptorName": "mepbridge.GetStories",
+            "riskLevel": "read",
+            "status": "pending"
+          }
+        ],
+        "parameters": [
+          {
+            "item": "Project information",
+            "expected": "A project object is returned",
+            "actual": "Pending execution",
+            "status": "warning"
+          },
+          {
+            "item": "Story information",
+            "expected": "A stories array is returned",
+            "actual": "Pending execution",
+            "status": "warning"
+          }
+        ]
+      },
+      "riskLevel": "read",
+      "createdAt": "2026-07-22T00:00:00.000+08:00",
+      "updatedAt": "2026-07-22T00:00:00.000+08:00",
+      "tags": ["starter", "example", "release-preset", "en-US"],
+      "usageCount": 0,
+      "version": "1.2",
+      "notes": "Packaged starter example. It can be imported, reset, copied, and edited from Preset Management."
+    },
+    {
+      "id": "tpl-starter-read-selection",
+      "name": "Read selected elements",
+      "category": "MEPBridge-Read",
+      "icon": "SELECT",
+      "description": "Reads selected Archicad elements with GUID, type, AABB, and MEP summary.",
+      "plan": {
+        "title": "Read selected elements",
+        "warning": null,
+        "isMutation": false,
+        "mepCode": "GetSelectedElements",
+        "steps": [
+          {
+            "id": "step-read-selection",
+            "title": "Read the current selection",
+            "action": "GetSelectedElements",
+            "description": "Read the current Archicad selection.",
+            "expectedResult": "Returns selected element GUIDs, types, and geometry summaries.",
+            "params": {
+              "onlyEditable": false,
+              "includeAabb": true,
+              "includeMepInfo": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "GetSelectedElements"
+                },
+                "addOnCommandParameters": {
+                  "onlyEditable": false,
+                  "includeAabb": true,
+                  "includeMepInfo": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetSelectedElements",
+            "descriptorName": "mepbridge.GetSelectedElements",
+            "riskLevel": "read",
+            "status": "pending"
+          }
+        ],
+        "parameters": [
+          {
+            "item": "Selection",
+            "expected": "An elements array is returned",
+            "actual": "Pending execution",
+            "status": "warning"
+          }
+        ]
+      },
+      "riskLevel": "read",
+      "createdAt": "2026-07-22T00:00:00.000+08:00",
+      "updatedAt": "2026-07-22T00:00:00.000+08:00",
+      "tags": ["starter", "example", "release-preset", "en-US"],
+      "usageCount": 0,
+      "version": "1.2",
+      "notes": "Packaged starter example. It can be imported, reset, copied, and edited from Preset Management."
+    },
+    {
+      "id": "tpl-starter-room-walls",
+      "name": "Create a sample 6 x 4m room",
+      "category": "Building",
+      "icon": "ROOM",
+      "description": "Creates four walls for a 6 x 4m sample room near X=20m using four compatible CreateWall steps.",
+      "plan": {
+        "title": "Create a sample 6 x 4m room",
+        "warning": "This template writes to the Archicad model. Auto mode executes directly; supervised and manual modes require confirmation.",
+        "isMutation": true,
+        "mepCode": "CreateWall x 4",
+        "steps": [
+          {
+            "id": "step-wall-south",
+            "title": "Create the 6m south wall",
+            "action": "CreateWall",
+            "description": "Create the south wall.",
+            "expectedResult": "Creates one Wall element.",
+            "params": {
+              "start": { "x": 20, "y": 0 },
+              "end": { "x": 26, "y": 0 },
+              "thickness": 0.24,
+              "height": 3,
+              "dryRun": false,
+              "confirmRequired": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateWall"
+                },
+                "addOnCommandParameters": {
+                  "start": { "x": 20, "y": 0 },
+                  "end": { "x": 26, "y": 0 },
+                  "thickness": 0.24,
+                  "height": 3,
+                  "dryRun": false,
+                  "confirmRequired": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateWall",
+            "descriptorName": "mepbridge.CreateWall",
+            "riskLevel": "low-mutation",
+            "status": "pending"
+          },
+          {
+            "id": "step-wall-east",
+            "title": "Create the 4m east wall",
+            "action": "CreateWall",
+            "description": "Create the east wall.",
+            "expectedResult": "Creates one Wall element.",
+            "params": {
+              "start": { "x": 26, "y": 0 },
+              "end": { "x": 26, "y": 4 },
+              "thickness": 0.24,
+              "height": 3,
+              "dryRun": false,
+              "confirmRequired": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateWall"
+                },
+                "addOnCommandParameters": {
+                  "start": { "x": 26, "y": 0 },
+                  "end": { "x": 26, "y": 4 },
+                  "thickness": 0.24,
+                  "height": 3,
+                  "dryRun": false,
+                  "confirmRequired": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateWall",
+            "descriptorName": "mepbridge.CreateWall",
+            "riskLevel": "low-mutation",
+            "status": "pending"
+          },
+          {
+            "id": "step-wall-north",
+            "title": "Create the 6m north wall",
+            "action": "CreateWall",
+            "description": "Create the north wall.",
+            "expectedResult": "Creates one Wall element.",
+            "params": {
+              "start": { "x": 26, "y": 4 },
+              "end": { "x": 20, "y": 4 },
+              "thickness": 0.24,
+              "height": 3,
+              "dryRun": false,
+              "confirmRequired": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateWall"
+                },
+                "addOnCommandParameters": {
+                  "start": { "x": 26, "y": 4 },
+                  "end": { "x": 20, "y": 4 },
+                  "thickness": 0.24,
+                  "height": 3,
+                  "dryRun": false,
+                  "confirmRequired": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateWall",
+            "descriptorName": "mepbridge.CreateWall",
+            "riskLevel": "low-mutation",
+            "status": "pending"
+          },
+          {
+            "id": "step-wall-west",
+            "title": "Create the 4m west wall",
+            "action": "CreateWall",
+            "description": "Create the west wall.",
+            "expectedResult": "Creates one Wall element.",
+            "params": {
+              "start": { "x": 20, "y": 4 },
+              "end": { "x": 20, "y": 0 },
+              "thickness": 0.24,
+              "height": 3,
+              "dryRun": false,
+              "confirmRequired": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateWall"
+                },
+                "addOnCommandParameters": {
+                  "start": { "x": 20, "y": 4 },
+                  "end": { "x": 20, "y": 0 },
+                  "thickness": 0.24,
+                  "height": 3,
+                  "dryRun": false,
+                  "confirmRequired": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateWall",
+            "descriptorName": "mepbridge.CreateWall",
+            "riskLevel": "low-mutation",
+            "status": "pending"
+          }
+        ],
+        "parameters": [
+          {
+            "item": "Wall count",
+            "expected": "4 Wall elements",
+            "actual": "Pending execution",
+            "status": "warning"
+          },
+          {
+            "item": "Room size",
+            "expected": "6 x 4m; height 3m; thickness 0.24m",
+            "actual": "Pending execution",
+            "status": "warning"
+          }
+        ]
+      },
+      "riskLevel": "low-mutation",
+      "createdAt": "2026-07-22T00:00:00.000+08:00",
+      "updatedAt": "2026-07-22T00:00:00.000+08:00",
+      "tags": ["starter", "example", "release-preset", "en-US"],
+      "usageCount": 0,
+      "version": "1.2",
+      "notes": "Uses four CreateWall steps to avoid incompatible batch-wrapper parameters."
+    },
+    {
+      "id": "tpl-starter-scan-structure",
+      "name": "Scan wall, column, and beam AABBs",
+      "category": "MEPBridge-Read",
+      "icon": "SCAN",
+      "description": "Scans wall, column, and beam AABB boundaries for model inspection before creation or routing.",
+      "plan": {
+        "title": "Scan wall, column, and beam AABBs",
+        "warning": null,
+        "isMutation": false,
+        "mepCode": "ScanStructuralElements",
+        "steps": [
+          {
+            "id": "step-scan-structure",
+            "title": "Scan structural AABBs",
+            "action": "ScanStructuralElements",
+            "description": "Scan wall, column, and beam AABB boundaries in the current model.",
+            "expectedResult": "Returns a list of structural element AABBs.",
+            "params": {
+              "types": ["Wall", "Column", "Beam"]
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "ScanStructuralElements"
+                },
+                "addOnCommandParameters": {
+                  "types": ["Wall", "Column", "Beam"]
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "ScanStructuralElements",
+            "descriptorName": "mepbridge.ScanStructuralElements",
+            "riskLevel": "read",
+            "status": "pending"
+          }
+        ],
+        "parameters": [
+          {
+            "item": "Element types",
+            "expected": "Wall, Column, Beam",
+            "actual": "Pending execution",
+            "status": "warning"
+          }
+        ]
+      },
+      "riskLevel": "read",
+      "createdAt": "2026-07-22T00:00:00.000+08:00",
+      "updatedAt": "2026-07-22T00:00:00.000+08:00",
+      "tags": ["starter", "example", "release-preset", "en-US"],
+      "usageCount": 0,
+      "version": "1.2",
+      "notes": "Packaged read-only structural scan example."
+    },
+    {
+      "id": "tpl-starter-partition-walls",
+      "name": "Create two sample partition walls",
+      "category": "Building",
+      "icon": "WALL",
+      "description": "Creates two stable 3m sample partition walls near X=44m.",
+      "plan": {
+        "title": "Create two sample partition walls",
+        "warning": "This template writes to the Archicad model. Auto mode executes directly; supervised and manual modes require confirmation.",
+        "isMutation": true,
+        "mepCode": "CreateWall x 2",
+        "steps": [
+          {
+            "id": "step-partition-a",
+            "title": "Create a 3m horizontal partition",
+            "action": "CreateWall",
+            "description": "Create one 3m horizontal sample partition wall.",
+            "expectedResult": "Creates one Wall element.",
+            "params": {
+              "start": { "x": 44, "y": 0 },
+              "end": { "x": 47, "y": 0 },
+              "thickness": 0.12,
+              "height": 3,
+              "dryRun": false,
+              "confirmRequired": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateWall"
+                },
+                "addOnCommandParameters": {
+                  "start": { "x": 44, "y": 0 },
+                  "end": { "x": 47, "y": 0 },
+                  "thickness": 0.12,
+                  "height": 3,
+                  "dryRun": false,
+                  "confirmRequired": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateWall",
+            "descriptorName": "mepbridge.CreateWall",
+            "riskLevel": "low-mutation",
+            "status": "pending"
+          },
+          {
+            "id": "step-partition-b",
+            "title": "Create a 3m vertical partition",
+            "action": "CreateWall",
+            "description": "Create one 3m vertical sample partition wall.",
+            "expectedResult": "Creates one Wall element.",
+            "params": {
+              "start": { "x": 44, "y": 0 },
+              "end": { "x": 44, "y": 3 },
+              "thickness": 0.12,
+              "height": 3,
+              "dryRun": false,
+              "confirmRequired": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateWall"
+                },
+                "addOnCommandParameters": {
+                  "start": { "x": 44, "y": 0 },
+                  "end": { "x": 44, "y": 3 },
+                  "thickness": 0.12,
+                  "height": 3,
+                  "dryRun": false,
+                  "confirmRequired": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateWall",
+            "descriptorName": "mepbridge.CreateWall",
+            "riskLevel": "low-mutation",
+            "status": "pending"
+          }
+        ],
+        "parameters": [
+          {
+            "item": "Partition count",
+            "expected": "2 Wall elements",
+            "actual": "Pending execution",
+            "status": "warning"
+          },
+          {
+            "item": "Dimensions",
+            "expected": "Each wall is 3m long, 3m high, and 0.12m thick",
+            "actual": "Pending execution",
+            "status": "warning"
+          }
+        ]
+      },
+      "riskLevel": "low-mutation",
+      "createdAt": "2026-07-22T00:00:00.000+08:00",
+      "updatedAt": "2026-07-22T00:00:00.000+08:00",
+      "tags": ["starter", "example", "release-preset", "en-US"],
+      "usageCount": 0,
+      "version": "1.2",
+      "notes": "Uses the stable CreateWall command for the packaged mutation example."
+    }
+  ],
+  "commands": [
+    {
+      "id": "cmd-starter-ping",
+      "triggers": ["test plugin connection", "check mepbridge connection", "ping mepbridge"],
+      "singleStep": {
+        "action": "Ping",
+        "params": {},
+        "riskLevel": "read"
+      },
+      "priority": 100,
+      "enabled": true,
+      "createdAt": "2026-07-22T00:00:00.000+08:00",
+      "description": "Local connection test available without an LLM.",
+      "usageCount": 0
+    },
+    {
+      "id": "cmd-starter-read-selection",
+      "triggers": ["read selection", "show selected elements", "selection details"],
+      "singleStep": {
+        "action": "GetSelectedElements",
+        "params": {
+          "onlyEditable": false,
+          "includeAabb": true,
+          "includeMepInfo": true
+        },
+        "riskLevel": "read"
+      },
+      "priority": 95,
+      "enabled": true,
+      "createdAt": "2026-07-22T00:00:00.000+08:00",
+      "description": "Reads the current Archicad selection.",
+      "usageCount": 0
+    },
+    {
+      "id": "cmd-starter-list-walls",
+      "triggers": ["list all walls", "query walls", "wall list"],
+      "singleStep": {
+        "action": "GetElementsByType",
+        "params": {
+          "elementType": "Wall",
+          "includeAabb": true
+        },
+        "riskLevel": "read"
+      },
+      "priority": 90,
+      "enabled": true,
+      "createdAt": "2026-07-22T00:00:00.000+08:00",
+      "description": "Lists wall elements in the current model.",
+      "usageCount": 0
+    },
+    {
+      "id": "cmd-starter-scan-structure",
+      "triggers": ["scan structural obstacles", "read structural AABBs", "check walls columns and beams"],
+      "singleStep": {
+        "action": "ScanStructuralElements",
+        "params": {
+          "types": ["Wall", "Column", "Beam"]
+        },
+        "riskLevel": "read"
+      },
+      "priority": 85,
+      "enabled": true,
+      "createdAt": "2026-07-22T00:00:00.000+08:00",
+      "description": "Scans wall, column, and beam AABBs before modeling.",
+      "usageCount": 0
+    },
+    {
+      "id": "cmd-starter-viewport-capture",
+      "triggers": ["capture viewport", "show visible elements", "viewport snapshot"],
+      "singleStep": {
+        "action": "ViewportCapture",
+        "params": {
+          "includeAabb": true,
+          "includeImage": false,
+          "maxElements": 120
+        },
+        "riskLevel": "read"
+      },
+      "priority": 80,
+      "enabled": true,
+      "createdAt": "2026-07-22T00:00:00.000+08:00",
+      "description": "Reads a summary of elements visible in the current viewport without capturing an image.",
+      "usageCount": 0
+    }
+  ],
+  "notes": "MEPbridge ACAIstr v0.1.0 English starter assets v1.2. Includes five templates and five local NL commands for read-only checks and stable CreateWall examples."
+}

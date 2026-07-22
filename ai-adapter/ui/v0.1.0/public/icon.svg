@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0b0f19"/>
+  <rect x="48" y="48" width="416" height="416" rx="72" fill="none" stroke="#6366f1" stroke-width="4" opacity="0.3"/>
+  <g transform="translate(256, 256)">
+    <circle r="120" fill="none" stroke="#6366f1" stroke-width="8" opacity="0.4"/>
+    <circle r="80" fill="none" stroke="#818cf8" stroke-width="6" opacity="0.6"/>
+    <circle r="40" fill="#6366f1"/>
+    <text x="0" y="14" font-family="monospace" font-size="56" font-weight="bold" fill="#0b0f19" text-anchor="middle">MB</text>
+  </g>
+  <text x="256" y="440" font-family="monospace" font-size="36" font-weight="bold" fill="#818cf8" text-anchor="middle" opacity="0.7">ACAIstr</text>
+</svg>

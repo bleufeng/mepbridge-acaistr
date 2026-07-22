@@ -1,0 +1,28 @@
+# Third-Party Notices
+
+MEPbridge ACAIstr includes the following third-party software:
+
+## Archicad API Development Kit
+- **License**: Graphisoft Developer License
+- **Usage**: Archicad native API (ACAPI_*, MEP API, Element API)
+- **Note**: Required for compilation; not bundled in releases
+- **Distribution**: Release packages include only the compiled Add-On binaries and do not redistribute the Archicad API Development Kit.
+
+## Node.js Dependencies (server/)
+All Node.js dependencies use permissive licenses (MIT/Apache/BSD):
+- **express** — MIT License
+- **axios** — MIT License
+- **cors** — MIT License
+
+## React UI Dependencies (ai-adapter/ui/)
+All frontend dependencies use permissive licenses:
+- **react** / **react-dom** — MIT License
+- **vite** — MIT License
+- **lucide-react** — ISC License
+- **tailwindcss** — MIT License
+
+## Trademarks
+Archicad is a trademark of Graphisoft SE. This project is not affiliated with or endorsed by Graphisoft.
+
+## Knowledge Base Content
+Built-in building/MEP/material rules are simplified engineering aids for local validation prompts. They are not official code text, legal advice, or a substitute for project-specific professional review. Users must verify applicable GB, IBC, ASHRAE, NEC, NFPA, Graphisoft, and local requirements before production use.

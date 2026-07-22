@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MEPbridge ACAIstr 使用反馈</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+      background: #0f0f10;
+      color: #e4e4e7;
+      line-height: 1.7;
+    }
+    a { color: #93c5fd; }
+    code {
+      color: #c4b5fd;
+      font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+      overflow-wrap: anywhere;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 24px;
+      border-bottom: 1px solid #3f3f46;
+      background: #18181b;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark {
+      display: flex;
+      width: 40px;
+      height: 40px;
+      flex: 0 0 40px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      background: #4f46e5;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    h1 { margin: 0; color: #f4f4f5; font-size: 17px; }
+    .meta { margin-top: 2px; color: #a1a1aa; font-size: 11px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .btn {
+      display: inline-flex;
+      min-height: 36px;
+      align-items: center;
+      justify-content: center;
+      padding: 7px 13px;
+      border: 1px solid #52525b;
+      border-radius: 6px;
+      background: #27272a;
+      color: #e4e4e7;
+      font-size: 13px;
+      text-decoration: none;
+    }
+    .btn:hover { background: #3f3f46; border-color: #71717a; }
+    main { width: min(760px, 100%); margin: 0 auto; padding: 34px 24px 48px; }
+    .intro { margin-bottom: 22px; }
+    .intro h2 { margin: 0 0 8px; color: #c7d2fe; font-size: 22px; }
+    .intro p, .panel p { margin: 0 0 10px; color: #d4d4d8; font-size: 14px; text-align: left; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 18px 0 24px; }
+    .panel {
+      padding: 16px;
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      background: #18181b;
+    }
+    .panel strong { display: block; margin-bottom: 5px; color: #f4f4f5; font-size: 13px; }
+    .panel a { overflow-wrap: anywhere; font-size: 14px; }
+    .steps {
+      display: grid;
+      gap: 8px;
+      margin: 0 0 20px;
+      padding: 0;
+      list-style: none;
+      counter-reset: feedback-step;
+    }
+    .steps li {
+      position: relative;
+      display: block;
+      padding-left: 36px;
+      color: #d4d4d8;
+      font-size: 14px;
+      text-align: left;
+    }
+    .steps li::before {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 28px;
+      counter-increment: feedback-step;
+      content: counter(feedback-step) ".";
+      color: #a5b4fc;
+      font-weight: 700;
+      text-align: right;
+    }
+    .note {
+      padding: 12px 15px;
+      border-left: 3px solid #f59e0b;
+      border-radius: 0 6px 6px 0;
+      background: #1c1917;
+      color: #fcd34d;
+      font-size: 13px;
+    }
+    footer {
+      padding: 20px 24px;
+      border-top: 1px solid #27272a;
+      color: #71717a;
+      font-size: 12px;
+      text-align: center;
+    }
+    @media (max-width: 680px) {
+      .topbar { align-items: flex-start; padding: 14px 16px; }
+      .actions { flex-direction: column; align-items: stretch; }
+      .btn { min-width: 88px; }
+      main { padding: 26px 16px 38px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">MA</div>
+      <div>
+        <h1>MEPbridge ACAIstr 使用反馈</h1>
+        <div class="meta">v0.1.0 · zh-CN</div>
+      </div>
+    </div>
+    <div class="actions">
+      <a class="btn" href="help.html">返回使用指南</a>
+      <a class="btn" href="./">打开工作台</a>
+      <a class="btn" href="feedback.en-US.html">English</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="intro">
+      <h2>联系与反馈</h2>
+      <p>请通过以下方式报告问题、提出建议或反馈使用体验。提交前请先移除模型隐私、API Key 和个人数据。</p>
+    </section>
+
+    <section class="grid" aria-label="联系方式">
+      <div class="panel">
+        <strong>联系邮箱</strong>
+        <a href="mailto:aizuxa@agent.qq.com">aizuxa@agent.qq.com</a>
+      </div>
+      <div class="panel">
+        <strong>GitHub 项目与问题反馈</strong>
+        <a href="https://github.com/bleufeng" target="_blank" rel="noopener noreferrer">https://github.com/bleufeng</a>
+      </div>
+    </section>
+
+    <ol class="steps">
+      <li>提供 Archicad 版本和 MEPbridge ACAIstr 版本。</li>
+      <li>说明操作路径、命令名称、输入参数和预期结果。</li>
+      <li>附上错误信息、截图或脱敏后的响应内容。</li>
+      <li>说明是否可以通过 Ping，以及问题是否能稳定复现。</li>
+    </ol>
+
+    <div class="note">本项目与 Graphisoft 及 Archicad 官方无任何关联，由个人利用业余时间维护，仅供学习和研究用途，欢迎建筑数字化、AI Loop 领域同行技术探讨。</div>
+  </main>
+
+  <footer>MEPbridge ACAIstr (MACAI) v0.1.0 · MIT License</footer>
+</body>
+</html>

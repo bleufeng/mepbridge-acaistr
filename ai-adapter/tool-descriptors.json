@@ -1,0 +1,4726 @@
+{
+  "schemaVersion": "2026-06-d3-p1-1",
+  "description": "MEP Bridge lightweight tool descriptor registry for AI Adapter, Workbench, SDK and CLI discovery.",
+  "descriptors": [
+    {
+      "name": "mepbridge.get_selected_element_details",
+      "title": "MEPBridge get selected element details",
+      "description": "Read details for the current Archicad selection through MEPBridge, including type, recognition metadata and AABB geometry, with official selection readback available for comparison.",
+      "domain": "Building",
+      "status": "offline-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetSelectedElements",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "读取选中",
+          "选中构件",
+          "选择集",
+          "获取选中",
+          "查看选中",
+          "读取选择",
+          "查询选中",
+          "查询选中构件",
+          "读取选中构件"
+        ],
+        "en": [
+          "read selected",
+          "get selected",
+          "list selected",
+          "query selection",
+          "read selection",
+          "query selected"
+        ]
+      },
+      "paramExtractors": {},
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetSelectedElements"
+          },
+          "addOnCommandParameters": {
+            "onlyEditable": false,
+            "includeAabb": true,
+            "includeMepInfo": true
+          }
+        }
+      },
+      "fallbackReadbacks": [
+        {
+          "name": "official.get_selected_elements",
+          "executionKind": "official-archicad-json-command",
+          "commandJson": {
+            "command": "API.GetSelectedElements",
+            "parameters": {}
+          }
+        }
+      ],
+      "postChecks": [
+        "mepbridge-detail-readback",
+        "mepbridge-aabb-readback",
+        "official-selection-compare"
+      ]
+    },
+    {
+      "name": "mepbridge.move_selected_elements",
+      "title": "MEPBridge move selected elements",
+      "description": "Move the current Archicad selection by a delta offset (small displacement <= 5000mm per axis). This is D3 P0 confirmed-run mutation: requires dry-run → user confirmation → execute → readback → reverse restore.",
+      "domain": "Building",
+      "status": "d3-p0-complete",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "MoveSelectedElements",
+      "riskLevel": "low-mutation",
+      "automationModes": [
+        "manual-preview",
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "inverse-command",
+      "nlTriggers": {
+        "zh": [
+          "移动",
+          "平移",
+          "偏移",
+          "挪动",
+          "位移",
+          "抬",
+          "抬高",
+          "上移",
+          "下移",
+          "升高",
+          "降低",
+          "移动选中",
+          "移动选中构件",
+          "移动所有",
+          "移动所有水管",
+          "移动水管",
+          "上移水管"
+        ],
+        "en": [
+          "move",
+          "shift",
+          "translate",
+          "displace",
+          "offset",
+          "move selected",
+          "move all pipes",
+          "move pipes"
+        ]
+      },
+      "paramExtractors": {
+        "deltaMm": {
+          "type": "delta3d",
+          "description": "Extract x/y/z displacement from text, supports 'x=300,y=-200,z=100' and directional words like '上/下/左/右/前/后'",
+          "directionMapping": {
+            "上|up|抬高": "z+",
+            "下|down|降低": "z-",
+            "左|left": "x-",
+            "右|right": "x+",
+            "前|forward": "y+",
+            "后|backward": "y-"
+          }
+        }
+      },
+      "targetResolution": {
+        "strategy": "selected-elements",
+        "selectionRequired": true,
+        "allowedTypes": [
+          "MEPRoute",
+          "Wall",
+          "Column",
+          "Beam",
+          "Slab",
+          "Roof"
+        ]
+      },
+      "safetyConstraints": {
+        "maxDisplacementMm": 5000,
+        "reason": "D3 P0 limits small displacement to <= 5000mm per axis to reduce risk.",
+        "validation": "Pre-flight check accepts |deltaMm.x| <= 5000, |deltaMm.y| <= 5000, |deltaMm.z| <= 5000."
+      },
+      "operationPlanExample": "ai-adapter/examples/d3-p0-move-element-small-displacement.operation-plan.confirmed-run.json",
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "MoveSelectedElements"
+          },
+          "addOnCommandParameters": {
+            "useCurrentSelection": true,
+            "allowedTypes": [
+              "MEPRoute",
+              "Wall",
+              "Column",
+              "Beam",
+              "Slab",
+              "Roof"
+            ],
+            "deltaMm": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "dryRun": true,
+            "confirmRequired": true
+          }
+        }
+      },
+      "preState": {
+        "required": true,
+        "captureCommands": [
+          {
+            "name": "mepbridge.get_selected_element_details",
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "GetSelectedElements"
+                },
+                "addOnCommandParameters": {
+                  "onlyEditable": false,
+                  "includeAabb": true,
+                  "includeMepInfo": true
+                }
+              }
+            }
+          }
+        ],
+        "mustCapture": [
+          "selectedGuids",
+          "elementTypes",
+          "beforeAabb"
+        ]
+      },
+      "executionFlow": {
+        "steps": [
+          {
+            "step": 1,
+            "phase": "pre-state-capture",
+            "description": "Read current selection with AABB (preState)"
+          },
+          {
+            "step": 2,
+            "phase": "safety-check",
+            "description": "Validate displacement <= 5000mm per axis"
+          },
+          {
+            "step": 3,
+            "phase": "dry-run",
+            "description": "Execute MoveSelectedElements with dryRun=true"
+          },
+          {
+            "step": 4,
+            "phase": "user-confirmation",
+            "description": "Show dry-run result to user, require explicit confirmation"
+          },
+          {
+            "step": 5,
+            "phase": "execute",
+            "description": "Execute MoveSelectedElements with dryRun=false (user confirmed)"
+          },
+          {
+            "step": 6,
+            "phase": "readback",
+            "description": "Read selection again and verify AABB offset matches deltaMm"
+          },
+          {
+            "step": 7,
+            "phase": "reverse-restore",
+            "description": "Execute inverse move (-deltaMm) to restore original position"
+          },
+          {
+            "step": 8,
+            "phase": "restore-verification",
+            "description": "Read selection final AABB and verify it matches preState"
+          }
+        ]
+      },
+      "rollbackPlan": {
+        "type": "inverse-command",
+        "commandJson": {
+          "command": "API.ExecuteAddOnCommand",
+          "parameters": {
+            "addOnCommandId": {
+              "commandNamespace": "MEPBridge",
+              "commandName": "MoveSelectedElements"
+            },
+            "addOnCommandParameters": {
+              "useCurrentSelection": true,
+              "allowedTypes": [
+                "MEPRoute",
+                "Wall",
+                "Column",
+                "Beam",
+                "Slab",
+                "Roof"
+              ],
+              "deltaMm": {
+                "x": "-(original.deltaMm.x)",
+                "y": "-(original.deltaMm.y)",
+                "z": "-(original.deltaMm.z)"
+              },
+              "dryRun": false,
+              "confirmRequired": true
+            }
+          }
+        },
+        "notes": [
+          "Rollback uses inverse deltaMm: -dx, -dy, -dz",
+          "Selection must remain the same or be re-resolved from preState GUIDs",
+          "Rollback is also a confirmed-run operation"
+        ]
+      },
+      "postChecks": [
+        "readback-aabb-offset-match",
+        "readback-guid-consistency",
+        "restore-aabb-match-prestate"
+      ],
+      "unitPolicy": {
+        "userDistanceUnit": "mm",
+        "modelDistanceUnit": "m",
+        "deltaFields": [
+          "deltaMm"
+        ],
+        "notes": [
+          "User input uses mm (building default unit).",
+          "MEPBridge.MoveSelectedElements converts deltaMm to meters internally."
+        ]
+      }
+    },
+    {
+      "name": "mepbridge.modify_properties_selected_elements",
+      "title": "MEPBridge modify properties of selected elements",
+      "description": "Modify non-structural Archicad Properties of the current selection. This is D3 P1 confirmed-run mutation: requires preState capture → safety check → dry-run → user confirmation → execute → readback → restore to original values.",
+      "domain": "Building",
+      "status": "d3-p1-implementation",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "EditSelectedElements",
+      "riskLevel": "low-mutation",
+      "automationModes": [
+        "manual-preview",
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "prestate-restore",
+      "nlTriggers": {
+        "zh": [
+          "编辑属性",
+          "修改属性",
+          "设置属性",
+          "属性编辑",
+          "备注"
+        ],
+        "en": [
+          "edit property",
+          "modify property",
+          "set property",
+          "edit attributes"
+        ]
+      },
+      "paramExtractors": {
+        "properties": {
+          "type": "keyValuePairs",
+          "description": "Extract property name/value pairs from text"
+        }
+      },
+      "targetResolution": {
+        "strategy": "selected-elements",
+        "selectionRequired": true,
+        "allowedTypes": [
+          "MEPRoute",
+          "Wall",
+          "Column",
+          "Beam",
+          "Slab",
+          "Roof"
+        ]
+      },
+      "safetyConstraints": {
+        "allowedPropertyTypes": [
+          "string",
+          "integer",
+          "number",
+          "boolean",
+          "length"
+        ],
+        "excludedProperties": [
+          "GDL Parameters (structural)",
+          "Element Type (structural)",
+          "Geometry Properties (structural)",
+          "System Properties (read-only)"
+        ],
+        "reason": "D3 P1 limits modifications to non-structural Archicad Properties only.",
+        "validation": "Pre-flight check enforces property type whitelist and existence validation."
+      },
+      "operationPlanExample": "ai-adapter/examples/d3-p1-modify-properties-confirmed-run.operation-plan.json",
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "EditSelectedElements"
+          },
+          "addOnCommandParameters": {
+            "useCurrentSelection": true,
+            "allowedTypes": [
+              "MEPRoute",
+              "Wall",
+              "Column",
+              "Beam",
+              "Slab",
+              "Roof"
+            ],
+            "properties": {},
+            "dryRun": true,
+            "confirmRequired": true
+          }
+        }
+      },
+      "preState": {
+        "required": true,
+        "captureCommands": [
+          {
+            "name": "mepbridge.get_selected_elements_with_properties",
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "GetSelectedElements"
+                },
+                "addOnCommandParameters": {
+                  "onlyEditable": false,
+                  "includeAabb": false,
+                  "includeMepInfo": true,
+                  "includeProperties": true
+                }
+              }
+            }
+          }
+        ],
+        "mustCapture": [
+          "selectedGuids",
+          "elementTypes",
+          "originalProperties"
+        ]
+      },
+      "executionFlow": {
+        "steps": [
+          {
+            "step": 1,
+            "phase": "pre-state-capture",
+            "description": "Read current selection with properties (preState)",
+            "command": "MEPBridge.GetSelectedElements",
+            "parameters": {
+              "includeProperties": true
+            }
+          },
+          {
+            "step": 2,
+            "phase": "safety-check",
+            "description": "Validate property types (whitelist) and existence",
+            "validation": {
+              "check": "All properties in whitelist and exist on elements",
+              "pass": "All properties valid",
+              "fail": "Reject with property type error"
+            }
+          },
+          {
+            "step": 3,
+            "phase": "dry-run",
+            "description": "Execute EditSelectedElements with dryRun=true",
+            "command": "MEPBridge.EditSelectedElements",
+            "parameters": {
+              "dryRun": true,
+              "confirmRequired": false
+            }
+          },
+          {
+            "step": 4,
+            "phase": "user-confirmation",
+            "description": "Show property changes (before → after), require explicit confirmation",
+            "userAction": "User approves or rejects property modifications",
+            "uiComponent": "PropertyChangeConfirmationDialog"
+          },
+          {
+            "step": 5,
+            "phase": "execute",
+            "description": "Execute EditSelectedElements with dryRun=false (user confirmed)",
+            "command": "MEPBridge.EditSelectedElements",
+            "parameters": {
+              "dryRun": false,
+              "confirmRequired": true
+            }
+          },
+          {
+            "step": 6,
+            "phase": "readback",
+            "description": "Read selection properties again and verify values match expected",
+            "command": "MEPBridge.GetSelectedElements",
+            "parameters": {
+              "includeProperties": true
+            },
+            "validation": {
+              "check": "afterProperties match expected new values",
+              "pass": "Property modifications verified",
+              "fail": "Property modification failed"
+            }
+          },
+          {
+            "step": 7,
+            "phase": "reverse-restore",
+            "description": "Execute EditSelectedElements to restore original property values",
+            "command": "MEPBridge.EditSelectedElements",
+            "parameters": {
+              "properties": "original values from preState",
+              "dryRun": false,
+              "confirmRequired": true
+            }
+          },
+          {
+            "step": 8,
+            "phase": "restore-verification",
+            "description": "Read selection properties final and verify they match preState",
+            "command": "MEPBridge.GetSelectedElements",
+            "parameters": {
+              "includeProperties": true
+            },
+            "validation": {
+              "check": "finalProperties match originalProperties from preState",
+              "pass": "Successfully restored to original values, D3 P1 round-trip passed",
+              "fail": "Restore failed"
+            }
+          }
+        ]
+      },
+      "rollbackPlan": {
+        "type": "prestate-restore",
+        "commandJson": {
+          "command": "API.ExecuteAddOnCommand",
+          "parameters": {
+            "addOnCommandId": {
+              "commandNamespace": "MEPBridge",
+              "commandName": "EditSelectedElements"
+            },
+            "addOnCommandParameters": {
+              "useCurrentSelection": true,
+              "allowedTypes": [
+                "MEPRoute",
+                "Wall",
+                "Column",
+                "Beam",
+                "Slab",
+                "Roof"
+              ],
+              "properties": "{ restored from preState originalProperties }",
+              "dryRun": false,
+              "confirmRequired": true
+            }
+          }
+        },
+        "notes": [
+          "Rollback uses originalProperties from preState",
+          "Selection must remain the same or be re-resolved from preState GUIDs",
+          "Rollback is also a confirmed-run operation"
+        ]
+      },
+      "postChecks": [
+        "readback-properties-match",
+        "readback-guid-consistency",
+        "restore-properties-match-prestate"
+      ]
+    },
+    {
+      "name": "mepbridge.copy_elements_confirmed",
+      "title": "MEPBridge copy elements with confirmation",
+      "description": "Copy selected elements (< 10 elements) with full confirmed-run loop: preState → safety check → dry-run → user confirmation → execute → readback → cleanup (rollback) → cleanup verification. This is D3 P2 confirmed-run mutation.",
+      "domain": "Building",
+      "status": "d3-p2-implementation",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CopyElements",
+      "riskLevel": "low-mutation",
+      "automationModes": [
+        "manual-preview",
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "复制",
+          "复制选中构件",
+          "复制这些构件",
+          "拷贝",
+          "克隆",
+          "副本"
+        ],
+        "en": [
+          "copy",
+          "duplicate",
+          "clone",
+          "replicate"
+        ]
+      },
+      "paramExtractors": {
+        "offsetMm": {
+          "type": "delta3d",
+          "description": "Extract x/y/z offset from text"
+        }
+      },
+      "targetResolution": {
+        "strategy": "selected-elements",
+        "selectionRequired": true,
+        "allowedTypes": [
+          "MEPRoute",
+          "Wall",
+          "Column",
+          "Beam",
+          "Slab",
+          "Roof"
+        ]
+      },
+      "dynamicParameters": {
+        "sourceGuids": {
+          "source": "current-archicad-selection",
+          "resolver": "server.services.dynamic-command-resolver.resolveDynamicCommandParameters",
+          "selectionCommand": "MEPBridge.GetSelectedElements",
+          "required": true,
+          "minCount": 1,
+          "maxCountExclusive": 10,
+          "allowedTypes": [
+            "MEPRoute",
+            "Wall",
+            "Column",
+            "Beam",
+            "Slab",
+            "Roof"
+          ]
+        }
+      },
+      "safetyConstraints": {
+        "maxCopyCount": 10,
+        "reason": "D3 P2 limits small batch copy to < 10 elements to reduce risk.",
+        "validation": "Pre-flight check enforces source element count < 10."
+      },
+      "operationPlanExample": "ai-adapter/examples/d3-p2-copy-elements-confirmed-run.operation-plan.json",
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CopyElements"
+          },
+          "addOnCommandParameters": {
+            "sourceGuids": [],
+            "offsetMm": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "dryRun": true,
+            "confirmRequired": true
+          }
+        }
+      },
+      "preState": {
+        "required": true,
+        "captureCommands": [
+          {
+            "name": "mepbridge.get_selected_elements_with_aabb",
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "GetSelectedElements"
+                },
+                "addOnCommandParameters": {
+                  "onlyEditable": false,
+                  "includeAabb": true,
+                  "includeMepInfo": true
+                }
+              }
+            }
+          }
+        ],
+        "mustCapture": [
+          "sourceGuids",
+          "elementTypes",
+          "sourceAabb"
+        ]
+      },
+      "executionFlow": {
+        "steps": [
+          {
+            "step": 1,
+            "phase": "pre-state-capture",
+            "description": "Read current selection as source elements (preState)",
+            "command": "MEPBridge.GetSelectedElements",
+            "parameters": {
+              "includeAabb": true
+            }
+          },
+          {
+            "step": 2,
+            "phase": "safety-check",
+            "description": "Validate source element count < 10",
+            "validation": {
+              "check": "sourceGuids.length < 10",
+              "pass": "Source count within limit",
+              "fail": "Reject with TOO_MANY_ELEMENTS error"
+            }
+          },
+          {
+            "step": 3,
+            "phase": "dry-run",
+            "description": "Execute CopyElements with dryRun=true (if supported) or simulate preview",
+            "command": "MEPBridge.CopyElements",
+            "parameters": {
+              "dryRun": true,
+              "confirmRequired": false
+            },
+            "note": "If CopyElements doesn't support dry-run, simulate by showing offset preview"
+          },
+          {
+            "step": 4,
+            "phase": "user-confirmation",
+            "description": "Show copy details (source → target offset), require explicit confirmation",
+            "userAction": "User approves or rejects copy operation",
+            "uiComponent": "CopyElementsConfirmationDialog"
+          },
+          {
+            "step": 5,
+            "phase": "execute",
+            "description": "Execute CopyElements with dryRun=false (user confirmed)",
+            "command": "MEPBridge.CopyElements",
+            "parameters": {
+              "dryRun": false,
+              "confirmRequired": true
+            },
+            "expectedOutput": "createdGuids array"
+          },
+          {
+            "step": 6,
+            "phase": "readback",
+            "description": "Read created elements and verify GUIDs exist",
+            "command": "MEPBridge.GetElements",
+            "parameters": {
+              "guids": "createdGuids from step 5",
+              "includeAabb": true
+            },
+            "validation": {
+              "check": "All createdGuids exist and have valid AABB",
+              "pass": "Copy operation verified",
+              "fail": "Copy failed, some GUIDs not found"
+            }
+          },
+          {
+            "step": 7,
+            "phase": "cleanup-rollback",
+            "description": "Execute DeleteElements to remove created elements",
+            "command": "MEPBridge.DeleteElements",
+            "parameters": {
+              "guids": "createdGuids from step 5",
+              "confirmRequired": true
+            }
+          },
+          {
+            "step": 8,
+            "phase": "cleanup-verification",
+            "description": "Verify created elements are deleted and source elements intact",
+            "command": "MEPBridge.GetElements",
+            "parameters": {
+              "guids": "createdGuids + sourceGuids"
+            },
+            "validation": {
+              "check": "createdGuids not found, sourceGuids still exist",
+              "pass": "Successfully cleaned up, D3 P2 round-trip passed",
+              "fail": "Cleanup failed"
+            }
+          }
+        ]
+      },
+      "rollbackPlan": {
+        "type": "created-guid-cleanup",
+        "commandJson": {
+          "command": "API.ExecuteAddOnCommand",
+          "parameters": {
+            "addOnCommandId": {
+              "commandNamespace": "MEPBridge",
+              "commandName": "DeleteElements"
+            },
+            "addOnCommandParameters": {
+              "guids": "{ createdGuids from execute step }",
+              "confirmRequired": true
+            }
+          }
+        },
+        "notes": [
+          "Rollback uses DeleteElements to remove all created GUIDs",
+          "Created GUIDs must be captured during execute step",
+          "Cleanup is also a confirmed-run operation"
+        ]
+      },
+      "postChecks": [
+        "readback-created-guids-exist",
+        "readback-aabb-valid",
+        "cleanup-created-guids-deleted",
+        "cleanup-source-guids-intact"
+      ]
+    },
+    {
+      "name": "mepbridge.ping",
+      "title": "MEPBridge Ping",
+      "description": "Check MEPBridge Add-On connection status.",
+      "domain": "Building",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "Ping",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "ping",
+          "连接",
+          "连通",
+          "心跳",
+          "状态检测",
+          "健康检查"
+        ],
+        "en": [
+          "ping",
+          "connection",
+          "health",
+          "alive",
+          "heartbeat"
+        ]
+      },
+      "paramExtractors": {},
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "Ping"
+          },
+          "addOnCommandParameters": {}
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_project_info",
+      "title": "MEPBridge get project info",
+      "description": "Get current Archicad project metadata (name, path, location, story structure etc.). Read-only native query.",
+      "domain": "Project",
+      "status": "offline-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetProjectInfo",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "项目信息",
+          "项目元信息",
+          "查询项目",
+          "项目名称",
+          "项目路径"
+        ],
+        "en": [
+          "project info",
+          "project metadata",
+          "project name",
+          "project path"
+        ]
+      },
+      "paramExtractors": {},
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetProjectInfo"
+          },
+          "addOnCommandParameters": {}
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_stories",
+      "title": "MEPBridge get stories",
+      "description": "Get all stories (floor levels) in the current Archicad project. Read-only native query.",
+      "domain": "Project",
+      "status": "offline-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetStories",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "楼层",
+          "楼层列表",
+          "所有楼层",
+          "查询楼层",
+          "标高"
+        ],
+        "en": [
+          "stories",
+          "story list",
+          "all stories",
+          "floor levels",
+          "get stories"
+        ]
+      },
+      "paramExtractors": {},
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetStories"
+          },
+          "addOnCommandParameters": {}
+        }
+      }
+    },
+    {
+      "name": "mepbridge.set_stories",
+      "title": "MEPBridge batch rename stories",
+      "description": "Batch rename existing Archicad stories by index. Prevalidates the full request, supports dry-run and confirmation, and restores earlier names if a later rename fails.",
+      "domain": "Project",
+      "status": "code-complete-pending-runtime",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "SetStories",
+      "riskLevel": "medium-mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "previous-name-restore",
+      "nlTriggers": {
+        "zh": [
+          "重命名楼层",
+          "修改楼层名称",
+          "设置楼层名称",
+          "批量重命名楼层",
+          "楼层改名",
+          "修改层名"
+        ],
+        "en": [
+          "rename stories",
+          "rename floors",
+          "set story names",
+          "change story names",
+          "batch rename stories"
+        ]
+      },
+      "paramExtractors": {
+        "stories": {
+          "type": "raw",
+          "description": "Non-empty array of {index,name} objects for existing stories"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "SetStories"
+          },
+          "addOnCommandParameters": {
+            "stories": [
+              {
+                "index": 0,
+                "name": "Ground Floor"
+              }
+            ],
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_libraries",
+      "title": "MEPBridge get libraries",
+      "description": "Get all loaded Archicad libraries in the current project. Read-only native query.",
+      "domain": "Project",
+      "status": "offline-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetLibraries",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "图库",
+          "图库列表",
+          "所有图库",
+          "查询图库",
+          "加载图库"
+        ],
+        "en": [
+          "libraries",
+          "library list",
+          "all libraries",
+          "loaded libraries",
+          "get libraries"
+        ]
+      },
+      "paramExtractors": {},
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetLibraries"
+          },
+          "addOnCommandParameters": {}
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_hotlinks",
+      "title": "MEPBridge get hotlinks",
+      "description": "Get all hotlinks in the current Archicad project. Read-only native query.",
+      "domain": "Project",
+      "status": "offline-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetHotlinks",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "热链接",
+          "热链接列表",
+          "所有热链接",
+          "查询热链接"
+        ],
+        "en": [
+          "hotlinks",
+          "hotlink list",
+          "all hotlinks",
+          "get hotlinks"
+        ]
+      },
+      "paramExtractors": {},
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetHotlinks"
+          },
+          "addOnCommandParameters": {}
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_grid_elements",
+      "title": "MEPBridge get grid elements",
+      "description": "Enumerate all grid elements (axis/grid lines) in the Archicad project. Grid elements are Object variants identified by APIVarId_GridElement ('GREL'), not a separate ElemTypeID. Returns guid/type/floorIndex/variationId/layerName per element, with optional AABB. Read-only native query. Language-agnostic (no layer name dependency).",
+      "domain": "Building",
+      "status": "code-complete-pending-compile",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetGridElements",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "轴网",
+          "轴线",
+          "轴网元素",
+          "所有轴线",
+          "查询轴网",
+          "查询轴线",
+          "获取轴网",
+          "获取轴线"
+        ],
+        "en": [
+          "grid",
+          "grid element",
+          "axis",
+          "axes",
+          "grid lines",
+          "all grids",
+          "get grid",
+          "get axes",
+          "enumerate grid"
+        ]
+      },
+      "paramExtractors": {
+        "includeAabb": {
+          "type": "boolean",
+          "description": "Include bounding box (default false)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetGridElements"
+          },
+          "addOnCommandParameters": {
+            "includeAabb": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.scan_structural_elements",
+      "title": "MEPBridge scan structural elements",
+      "description": "Read-only scan of Wall/Column/Beam/Slab/Roof elements and return AABB geometry. Does not modify the model.",
+      "domain": "Building",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "ScanStructuralElements",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "扫描",
+          "结构",
+          "障碍物",
+          "结构扫描",
+          "扫描一层",
+          "扫描一层墙体",
+          "扫描墙体",
+          "扫描结构构件",
+          "扫描障碍物"
+        ],
+        "en": [
+          "scan",
+          "structural",
+          "obstacle",
+          "scan structure",
+          "scan walls",
+          "scan columns"
+        ]
+      },
+      "paramExtractors": {
+        "types": {
+          "type": "elementTypeList",
+          "description": "Optional element type filter, defaults to [Wall,Column,Beam,Slab,Roof]"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "ScanStructuralElements"
+          },
+          "addOnCommandParameters": {
+            "types": [
+              "Wall",
+              "Column",
+              "Beam",
+              "Slab",
+              "Roof"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_available_sizes",
+      "title": "MEPBridge get available pipe sizes",
+      "description": "Query available pipe sizes / diameter reference table for a given MEP domain (Piping by default).",
+      "domain": "MEP",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetAvailableSizes",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "管径",
+          "直径",
+          "尺寸表",
+          "管径表",
+          "可用尺寸",
+          "管道尺寸"
+        ],
+        "en": [
+          "pipe size",
+          "diameter",
+          "available size",
+          "pipe diameter",
+          "size table"
+        ]
+      },
+      "paramExtractors": {
+        "domain": {
+          "type": "enum",
+          "description": "MEP domain, defaults to Piping",
+          "default": "Piping",
+          "allowed": [
+            "Piping",
+            "Ventilation",
+            "CableCarrier"
+          ]
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetAvailableSizes"
+          },
+          "addOnCommandParameters": {
+            "domain": "Piping"
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_available_systems",
+      "title": "MEPBridge get available MEP systems",
+      "description": "Query available MEP systems across Piping / Ventilation / CableCarrier domains.",
+      "domain": "MEP",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetAvailableSystems",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "系统",
+          "MEP系统",
+          "系统列表",
+          "可用系统",
+          "管道系统",
+          "Piping系统"
+        ],
+        "en": [
+          "system",
+          "available system",
+          "mep system",
+          "piping system",
+          "system list"
+        ]
+      },
+      "paramExtractors": {},
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetAvailableSystems"
+          },
+          "addOnCommandParameters": {}
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_element_property_definitions",
+      "title": "MEPBridge get element property definitions",
+      "description": "Query available Archicad Property definitions for the current selection. Read-only.",
+      "domain": "Building",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetElementPropertyDefinitions",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "属性定义",
+          "属性列表",
+          "可用属性",
+          "属性查询",
+          "构件属性"
+        ],
+        "en": [
+          "property definition",
+          "property list",
+          "available property",
+          "element property"
+        ]
+      },
+      "paramExtractors": {},
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetElementPropertyDefinitions"
+          },
+          "addOnCommandParameters": {}
+        }
+      }
+    },
+    {
+      "name": "mepbridge.delete_mep_elements",
+      "title": "MEPBridge delete MEP route elements",
+      "description": "Delete specified MEP route elements by GUID. Only works for MEP Routing Elements (pipes/ducts/cable carriers). For deleting architectural elements (walls/columns/beams/slabs/roofs/doors/windows), use mepbridge.delete_elements instead. Irreversible mutation, requires confirmation.",
+      "domain": "MEP",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "DeleteMEPElements",
+      "riskLevel": "high-mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "not-supported",
+      "nlTriggers": {
+        "zh": [
+          "删除管路",
+          "删除管道",
+          "删除MEP",
+          "清除管路",
+          "移除管道",
+          "删掉管路"
+        ],
+        "en": [
+          "delete mep",
+          "delete pipe",
+          "delete route",
+          "remove mep",
+          "remove pipe"
+        ]
+      },
+      "paramExtractors": {
+        "guids": {
+          "type": "guidList",
+          "description": "MEP route element GUIDs to delete"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "DeleteMEPElements"
+          },
+          "addOnCommandParameters": {
+            "dryRun": true,
+            "confirmRequired": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.delete_elements",
+      "title": "MEPBridge delete elements (universal)",
+      "description": "Delete any type of Archicad element by GUID (walls/columns/beams/slabs/roofs/doors/windows/MEP routes/etc). Universal deletion command - unlike DeleteMEPElements which only works for MEP routes. Added 2026-06-29 after AI auto-drawing floorplan found DeleteMEPElements cannot delete architectural walls. Irreversible high-risk mutation, requires confirmation.",
+      "domain": "Building",
+      "status": "code-complete-pending-compile",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "DeleteElements",
+      "riskLevel": "high-mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "not-supported",
+      "nlTriggers": {
+        "zh": [
+          "删除",
+          "清除",
+          "移除",
+          "删掉",
+          "去掉",
+          "删除元素",
+          "删除构件",
+          "删除墙",
+          "删除柱",
+          "删除梁",
+          "删除板",
+          "删除屋顶",
+          "删除门",
+          "删除窗"
+        ],
+        "en": [
+          "delete",
+          "remove",
+          "erase",
+          "destroy",
+          "delete element",
+          "delete wall",
+          "delete elements"
+        ]
+      },
+      "paramExtractors": {
+        "guids": {
+          "type": "guidList",
+          "description": "Element GUIDs to delete (any type: Wall/Column/Beam/Slab/Roof/Door/Window/MEP Route)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "DeleteElements"
+          },
+          "addOnCommandParameters": {
+            "guids": [],
+            "dryRun": true,
+            "confirmRequired": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_pipe",
+      "title": "MEPBridge create pipe",
+      "description": "Create a new MEP pipe route between two 3D points. Mutation, requires confirmation.",
+      "domain": "MEP",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreatePipe",
+      "riskLevel": "mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "创建管道",
+          "新建管道",
+          "创建管",
+          "创建DN",
+          "创建水管",
+          "铺管",
+          "画管",
+          "绘制水管",
+          "绘制管道",
+          "沿墙体四周绘制水管",
+          "画一根水管",
+          "沿墙",
+          "四周绘制",
+          "绘制水管",
+          "铺管",
+          "画水管",
+          "布管",
+          "接管",
+          "走管",
+          "安装管道",
+          "新建供水管",
+          "铺设管道",
+          "沿墙布管",
+          "从A点到B",
+          "两点之间"
+        ],
+        "en": [
+          "create pipe",
+          "create dn",
+          "lay pipe",
+          "new pipe",
+          "draw pipe",
+          "draw water pipe",
+          "run pipe",
+          "install pipe",
+          "piping route",
+          "water pipe from",
+          "between point"
+        ]
+      },
+      "paramExtractors": {
+        "waypoints": {
+          "type": "point3dList",
+          "description": "Pipe route waypoints [{x,y,z}] in Archicad model coordinates; start/end input is normalized to waypoints by the server"
+        },
+        "start": {
+          "type": "point3d",
+          "description": "Legacy start point [x,y,z]; normalized to waypoints"
+        },
+        "end": {
+          "type": "point3d",
+          "description": "Legacy end point [x,y,z]; normalized to waypoints"
+        },
+        "referenceId": {
+          "type": "string",
+          "description": "Pipe diameter reference ID from GetAvailableSizes"
+        },
+        "diameterMm": {
+          "type": "number",
+          "description": "Pipe diameter in millimeters, extracted from '100mm水管' / 'DN20' / '直径100mm' etc. Falls back to 22.0mm if not specified."
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreatePipe"
+          },
+          "addOnCommandParameters": {
+            "waypoints": [
+              {
+                "x": 0,
+                "y": 0,
+                "z": 3
+              },
+              {
+                "x": 5,
+                "y": 0,
+                "z": 3
+              }
+            ],
+            "diameterMm": 22.0
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_pipe_system",
+      "title": "MEPBridge create pipe system (main + branches)",
+      "description": "Create a complete piping system with main route and multiple branch routes in one request. Mutation, requires confirmation.",
+      "domain": "MEP",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreatePipeSystem",
+      "riskLevel": "mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "创建管道系统",
+          "新建管道系统",
+          "主管支管",
+          "布管系统",
+          "管道系统",
+          "创建供水系统",
+          "铺设管网",
+          "多管段",
+          "主管加支管",
+          "创建水系统"
+        ],
+        "en": [
+          "create pipe system",
+          "pipe system",
+          "main and branches",
+          "piping system",
+          "multi-route",
+          "branch pipe"
+        ]
+      },
+      "paramExtractors": {
+        "waypoints": {
+          "type": "point3dList",
+          "description": "Main route waypoints [{x,y,z}] in meters"
+        },
+        "branches": {
+          "type": "raw",
+          "description": "Branch array with tapPoint/endPoint/diameterMm"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreatePipeSystem"
+          },
+          "addOnCommandParameters": {
+            "mainRoute": {
+              "waypoints": [
+                {
+                  "x": 0,
+                  "y": 0,
+                  "z": 3
+                },
+                {
+                  "x": 5,
+                  "y": 0,
+                  "z": 3
+                }
+              ],
+              "diameterMm": 22
+            },
+            "branches": []
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_mep_element_info",
+      "title": "MEPBridge get MEP element info",
+      "description": "Read back MEP Routing Element info by GUID: domain, polyline, segments, referenceId, etc.",
+      "domain": "MEP",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetMEPElementInfo",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "读取管道信息",
+          "管道详情",
+          "路由信息",
+          "MEP信息",
+          "读回管道",
+          "查看管道"
+        ],
+        "en": [
+          "pipe info",
+          "route info",
+          "mep element info",
+          "read back pipe",
+          "pipe details"
+        ]
+      },
+      "paramExtractors": {
+        "routeGuid": {
+          "type": "string",
+          "description": "MEP route GUID to query"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetMEPElementInfo"
+          },
+          "addOnCommandParameters": {
+            "routeGuid": ""
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_duct",
+      "title": "MEPBridge create duct (HVAC)",
+      "description": "Create a new MEP duct route between two 3D points using rectangular cross section. Mutation, requires confirmation.",
+      "domain": "MEP",
+      "status": "v2-candidate",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateDuct",
+      "riskLevel": "mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "创建风管",
+          "新建风管",
+          "创建 duct",
+          "画风管",
+          "绘制风管",
+          "铺设风管",
+          "安装风管",
+          "暖通风管",
+          "通风管",
+          "HVAC风管",
+          "矩形风管"
+        ],
+        "en": [
+          "create duct",
+          "new duct",
+          "draw duct",
+          "hvac duct",
+          "ventilation duct",
+          "rectangular duct"
+        ]
+      },
+      "paramExtractors": {
+        "waypoints": {
+          "type": "point3dList",
+          "description": "Duct route waypoints [{x,y,z}] in Archicad model coordinates"
+        },
+        "width": {
+          "type": "number",
+          "description": "Duct width in meters, e.g. from '300mm风管' or '宽300高200'"
+        },
+        "height": {
+          "type": "number",
+          "description": "Duct height in meters"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateDuct"
+          },
+          "addOnCommandParameters": {
+            "waypoints": [
+              {
+                "x": 0,
+                "y": 0,
+                "z": 3
+              },
+              {
+                "x": 5,
+                "y": 0,
+                "z": 3
+              }
+            ],
+            "width": 0.3,
+            "height": 0.2
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_cable_carrier",
+      "title": "MEPBridge create cable carrier / tray",
+      "description": "Create a new MEP cable carrier (tray/ladder) route between two 3D points using rectangular cross section. Mutation, requires confirmation.",
+      "domain": "MEP",
+      "status": "v2-candidate",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateCableCarrier",
+      "riskLevel": "mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "创建桥架",
+          "新建桥架",
+          "电缆桥架",
+          " cable tray",
+          "cable carrier",
+          "梯架",
+          "绘制桥架",
+          "铺设桥架",
+          "安装桥架",
+          "电气桥架",
+          "线槽",
+          "走线架"
+        ],
+        "en": [
+          "create cable tray",
+          "create cable carrier",
+          "cable ladder",
+          "tray",
+          "new tray",
+          "install tray"
+        ]
+      },
+      "paramExtractors": {
+        "waypoints": {
+          "type": "point3dList",
+          "description": "Cable carrier route waypoints [{x,y,z}] in Archicad model coordinates"
+        },
+        "width": {
+          "type": "number",
+          "description": "Carrier width in meters, e.g. from '300mm桥架'"
+        },
+        "height": {
+          "type": "number",
+          "description": "Carrier height in meters"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateCableCarrier"
+          },
+          "addOnCommandParameters": {
+            "waypoints": [
+              {
+                "x": 0,
+                "y": 0,
+                "z": 2.8
+              },
+              {
+                "x": 5,
+                "y": 0,
+                "z": 2.8
+              }
+            ],
+            "width": 0.15,
+            "height": 0.08
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_wall",
+      "title": "MEPBridge create wall (architectural)",
+      "description": "Create a straight wall between two 2D points using native Archicad API (API_WallID). Architectural element, not MEP. Supports dryRun preview and confirmRequired execution. V2 H1.1 channel A (MEPBridge C++ preferred).",
+      "domain": "Building",
+      "status": "v2-h1",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateWall",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "建墙",
+          "创建墙",
+          "新建墙",
+          "画墙",
+          "绘制墙",
+          "加一面墙",
+          "建一面墙",
+          "墙体",
+          "直墙",
+          "砌墙",
+          "添加墙"
+        ],
+        "en": [
+          "create wall",
+          "new wall",
+          "draw wall",
+          "add wall",
+          "build wall",
+          "straight wall",
+          "place wall"
+        ]
+      },
+      "paramExtractors": {
+        "start": {
+          "type": "point2d",
+          "description": "Wall start point {x,y} in meters (Archicad model coords)"
+        },
+        "end": {
+          "type": "point2d",
+          "description": "Wall end point {x,y} in meters"
+        },
+        "thickness": {
+          "type": "number",
+          "description": "Wall thickness in meters, e.g. from '240mm墙' → 0.24"
+        },
+        "height": {
+          "type": "number",
+          "description": "Wall height in meters relative to floor, e.g. from '3米高墙' → 3.0"
+        },
+        "floorIndex": {
+          "type": "integer",
+          "description": "Story index (0-based), defaults to current story"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateWall"
+          },
+          "addOnCommandParameters": {
+            "start": {
+              "x": 0,
+              "y": 0
+            },
+            "end": {
+              "x": 4,
+              "y": 0
+            },
+            "thickness": 0.24,
+            "height": 3.0,
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_column",
+      "title": "MEPBridge create column (architectural)",
+      "description": "Create a vertical column at a 2D position using native Archicad API (API_ColumnID). Supports height and rotation. V2 H1.1 channel A.",
+      "domain": "Building",
+      "status": "v2-h1",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateColumn",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "建柱",
+          "创建柱",
+          "新建柱",
+          "画柱",
+          "加柱",
+          "柱子",
+          "立柱",
+          "添加柱"
+        ],
+        "en": [
+          "create column",
+          "new column",
+          "add column",
+          "place column",
+          "draw column"
+        ]
+      },
+      "paramExtractors": {
+        "position": {
+          "type": "point2d",
+          "description": "Column position {x,y} in meters"
+        },
+        "height": {
+          "type": "number",
+          "description": "Column height in meters"
+        },
+        "rotationAngle": {
+          "type": "number",
+          "description": "Rotation angle in radians"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateColumn"
+          },
+          "addOnCommandParameters": {
+            "position": {
+              "x": 0,
+              "y": 0
+            },
+            "height": 3.0,
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_beam",
+      "title": "MEPBridge create beam (architectural)",
+      "description": "Create a straight beam between two 2D points using native Archicad API (API_BeamID). V2 H1.1 channel A.",
+      "domain": "Building",
+      "status": "v2-h1",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateBeam",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "建梁",
+          "创建梁",
+          "新建梁",
+          "画梁",
+          "加梁",
+          "添加梁"
+        ],
+        "en": [
+          "create beam",
+          "new beam",
+          "add beam",
+          "draw beam",
+          "place beam"
+        ]
+      },
+      "paramExtractors": {
+        "start": {
+          "type": "point2d",
+          "description": "Beam start point {x,y} in meters"
+        },
+        "end": {
+          "type": "point2d",
+          "description": "Beam end point {x,y} in meters"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateBeam"
+          },
+          "addOnCommandParameters": {
+            "start": {
+              "x": 0,
+              "y": 0
+            },
+            "end": {
+              "x": 4,
+              "y": 0
+            },
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_slab",
+      "title": "MEPBridge create slab (architectural)",
+      "description": "Create a slab from a polygon outline using native Archicad API (API_SlabID). Requires at least 3 vertices. V2 H1.1 channel A.",
+      "domain": "Building",
+      "status": "v2-h1",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateSlab",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "建板",
+          "创建板",
+          "新建板",
+          "画板",
+          "楼板",
+          "添加板",
+          "创建楼板",
+          "新建楼板",
+          "地板",
+          "创建地板"
+        ],
+        "en": [
+          "create slab",
+          "new slab",
+          "add slab",
+          "draw slab",
+          "place slab",
+          "create floor"
+        ]
+      },
+      "paramExtractors": {
+        "polygon": {
+          "type": "point2dList",
+          "description": "Polygon vertices [{x,y}] in meters, at least 3 points"
+        },
+        "thickness": {
+          "type": "number",
+          "description": "Slab thickness in meters"
+        },
+        "level": {
+          "type": "number",
+          "description": "Reference level offset from floor in meters"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateSlab"
+          },
+          "addOnCommandParameters": {
+            "polygon": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 4,
+                "y": 0
+              },
+              {
+                "x": 4,
+                "y": 3
+              },
+              {
+                "x": 0,
+                "y": 3
+              }
+            ],
+            "thickness": 0.15,
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.rotate_selected_elements",
+      "title": "MEPBridge rotate selected elements",
+      "description": "Rotate currently selected elements around a center point by a given angle. Uses APIEdit_Rotate. V2 H1.3 channel A.",
+      "domain": "Building",
+      "status": "v2-h1",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "RotateSelectedElements",
+      "riskLevel": "medium-mutation",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "edit-undo",
+      "nlTriggers": {
+        "zh": [
+          "旋转",
+          "旋转选中",
+          "旋转构件",
+          "转动",
+          "转角度",
+          "选中旋转"
+        ],
+        "en": [
+          "rotate",
+          "rotate selected",
+          "rotate elements",
+          "spin"
+        ]
+      },
+      "paramExtractors": {
+        "center": {
+          "type": "point2d",
+          "description": "Rotation center {x,y} in meters"
+        },
+        "angle": {
+          "type": "number",
+          "description": "Rotation angle in radians (CCW positive)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "RotateSelectedElements"
+          },
+          "addOnCommandParameters": {
+            "center": {
+              "x": 0,
+              "y": 0
+            },
+            "angle": 1.5708,
+            "useCurrentSelection": true,
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.mirror_selected_elements",
+      "title": "MEPBridge mirror selected elements",
+      "description": "Mirror currently selected elements across an axis line. Uses APIEdit_Mirror. Supports copy mode (keep original). V2 H1.3 channel A.",
+      "domain": "Building",
+      "status": "v2-h1",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "MirrorSelectedElements",
+      "riskLevel": "medium-mutation",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "edit-undo",
+      "nlTriggers": {
+        "zh": [
+          "镜像",
+          "镜像选中",
+          "镜像构件",
+          "对称",
+          "翻转",
+          "镜像复制"
+        ],
+        "en": [
+          "mirror",
+          "mirror selected",
+          "mirror elements",
+          "reflect",
+          "flip"
+        ]
+      },
+      "paramExtractors": {
+        "axisStart": {
+          "type": "point2d",
+          "description": "Mirror axis start point {x,y} in meters"
+        },
+        "axisEnd": {
+          "type": "point2d",
+          "description": "Mirror axis end point {x,y} in meters"
+        },
+        "copy": {
+          "type": "boolean",
+          "description": "If true, keep original (mirror copy)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "MirrorSelectedElements"
+          },
+          "addOnCommandParameters": {
+            "axisStart": {
+              "x": 0,
+              "y": 0
+            },
+            "axisEnd": {
+              "x": 0,
+              "y": 10
+            },
+            "copy": true,
+            "useCurrentSelection": true,
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_door",
+      "title": "MEPBridge create door (architectural)",
+      "description": "Create a door opening in an existing wall using native Archicad API (API_WindowID with isWindow=false). Requires a host wall GUID. V2 H1.1 channel A.",
+      "domain": "Building",
+      "status": "v2-h1",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateDoor",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "建门",
+          "创建门",
+          "新建门",
+          "画门",
+          "加门",
+          "开门洞",
+          "门",
+          "添加门",
+          "门洞",
+          "入户门",
+          "卫生间门"
+        ],
+        "en": [
+          "create door",
+          "new door",
+          "add door",
+          "place door",
+          "draw door",
+          "door opening"
+        ]
+      },
+      "paramExtractors": {
+        "owner": {
+          "type": "string",
+          "description": "Host wall GUID string"
+        },
+        "width": {
+          "type": "number",
+          "description": "Door opening width in meters, e.g. '0.9米宽的门' → 0.9"
+        },
+        "height": {
+          "type": "number",
+          "description": "Door opening height in meters, e.g. '2.1米高' → 2.1"
+        },
+        "refPos": {
+          "type": "number",
+          "description": "Position along wall from start point in meters"
+        },
+        "libPartIndex": {
+          "type": "integer",
+          "description": "Library part index for door object"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateDoor"
+          },
+          "addOnCommandParameters": {
+            "owner": "",
+            "width": 0.9,
+            "height": 2.1,
+            "refPos": 0,
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_window",
+      "title": "MEPBridge create window (architectural)",
+      "description": "Create a window opening in an existing wall using native Archicad API (API_WindowID with isWindow=true). Requires a host wall GUID. V2 H1.1 channel A.",
+      "domain": "Building",
+      "status": "v2-h1",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateWindow",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "建窗",
+          "创建窗",
+          "新建窗",
+          "画窗",
+          "加窗",
+          "窗户",
+          "窗口",
+          "开窗",
+          "添加窗",
+          "落地窗",
+          "飘窗"
+        ],
+        "en": [
+          "create window",
+          "new window",
+          "add window",
+          "place window",
+          "draw window",
+          "window opening"
+        ]
+      },
+      "paramExtractors": {
+        "owner": {
+          "type": "string",
+          "description": "Host wall GUID string"
+        },
+        "width": {
+          "type": "number",
+          "description": "Window opening width in meters"
+        },
+        "height": {
+          "type": "number",
+          "description": "Window opening height in meters"
+        },
+        "refPos": {
+          "type": "number",
+          "description": "Position along wall from start point in meters"
+        },
+        "sillHeight": {
+          "type": "number",
+          "description": "Sill height above floor in meters"
+        },
+        "libPartIndex": {
+          "type": "integer",
+          "description": "Library part index for window object"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateWindow"
+          },
+          "addOnCommandParameters": {
+            "owner": "",
+            "width": 1.2,
+            "height": 1.5,
+            "refPos": 0,
+            "sillHeight": 0.9,
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_roof",
+      "title": "MEPBridge create roof (architectural)",
+      "description": "Create a roof from a polygon outline using native Archicad API (API_RoofID) with pitch angle support. Requires at least 3 vertices. V2 H1.1 channel A.",
+      "domain": "Building",
+      "status": "v2-h1",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateRoof",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "建屋顶",
+          "创建屋顶",
+          "新建屋顶",
+          "画屋顶",
+          "屋顶",
+          "坡屋顶",
+          "平屋顶",
+          "盖顶",
+          "加屋顶",
+          "双坡屋顶"
+        ],
+        "en": [
+          "create roof",
+          "new roof",
+          "add roof",
+          "place roof",
+          "draw roof",
+          "pitched roof",
+          "flat roof"
+        ]
+      },
+      "paramExtractors": {
+        "vertices": {
+          "type": "point2dList",
+          "description": "Roof polygon vertices [{x,y}] in meters, at least 3 points forming closed shape"
+        },
+        "pitchAngle": {
+          "type": "number",
+          "description": "Roof pitch angle in degrees (0=flat, default=30)"
+        },
+        "thickness": {
+          "type": "number",
+          "description": "Roof slab thickness in meters"
+        },
+        "baseLevel": {
+          "type": "number",
+          "description": "Base level height in meters"
+        },
+        "floorIndex": {
+          "type": "integer",
+          "description": "Story index (0-based)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateRoof"
+          },
+          "addOnCommandParameters": {
+            "vertices": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 4,
+                "y": 0
+              },
+              {
+                "x": 4,
+                "y": 3
+              },
+              {
+                "x": 0,
+                "y": 3
+              }
+            ],
+            "pitchAngle": 30,
+            "thickness": 0.2,
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_stair",
+      "title": "MEPBridge create stair (architectural)",
+      "description": "Create a stair from baseline + totalHeight + stepNum using native Archicad API (API_StairID). V2 channel A.",
+      "domain": "Building",
+      "status": "v2-extended",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateStair",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "建楼梯",
+          "创建楼梯",
+          "新建楼梯",
+          "画楼梯",
+          "楼梯",
+          "直跑楼梯",
+          "台阶",
+          "阶梯"
+        ],
+        "en": [
+          "create stair",
+          "new stair",
+          "add stair",
+          "place stair",
+          "draw stair",
+          "staircase",
+          "stairs"
+        ]
+      },
+      "paramExtractors": {
+        "start": {
+          "type": "point2d",
+          "description": "Baseline start point {x,y} in meters (used when waypoints not provided)"
+        },
+        "end": {
+          "type": "point2d",
+          "description": "Baseline end point {x,y} in meters (used when waypoints not provided)"
+        },
+        "waypoints": {
+          "type": "point2dList",
+          "description": "Baseline polyline vertices [{x,y}] for U-shaped/curved stair. Overrides start/end when provided (min 2 points)"
+        },
+        "totalHeight": {
+          "type": "number",
+          "description": "Total stair height in meters (e.g. 3.0 for one floor)"
+        },
+        "baseLevel": {
+          "type": "number",
+          "description": "Base plane elevation in meters relative to the home story (optional)"
+        },
+        "stepNum": {
+          "type": "integer",
+          "description": "Number of steps (risers), default 16"
+        },
+        "flightWidth": {
+          "type": "number",
+          "description": "Flight width in meters"
+        },
+        "treadDepth": {
+          "type": "number",
+          "description": "Tread depth in meters"
+        },
+        "floorIndex": {
+          "type": "integer",
+          "description": "Story index"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateStair"
+          },
+          "addOnCommandParameters": {
+            "start": {
+              "x": 0,
+              "y": 0
+            },
+            "end": {
+              "x": 4,
+              "y": 0
+            },
+            "totalHeight": 3.0,
+            "stepNum": 16,
+            "flightWidth": 1.2,
+            "dryRun": true,
+            "confirmRequired": false,
+            "baseLevel": 0.0
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_object",
+      "title": "MEPBridge create object (architectural)",
+      "description": "Create a GDL object at a position with optional library part name and rotation. API_ObjectID. V2 channel A.",
+      "domain": "Building",
+      "status": "v2-extended",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateObject",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "建对象",
+          "创建对象",
+          "新建对象",
+          "放置对象",
+          "家具",
+          "设备",
+          "构件",
+          "GDL对象"
+        ],
+        "en": [
+          "create object",
+          "new object",
+          "place object",
+          "add object",
+          "furniture",
+          "fixture"
+        ]
+      },
+      "paramExtractors": {
+        "position": {
+          "type": "point2d",
+          "description": "Object position {x,y} in meters"
+        },
+        "libPartName": {
+          "type": "string",
+          "description": "Library part name (e.g. 'Table 01')"
+        },
+        "angle": {
+          "type": "number",
+          "description": "Rotation angle in degrees"
+        },
+        "floorIndex": {
+          "type": "integer",
+          "description": "Story index"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateObject"
+          },
+          "addOnCommandParameters": {
+            "position": {
+              "x": 5,
+              "y": 5
+            },
+            "angle": 0,
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_lamp",
+      "title": "MEPBridge create lamp (architectural)",
+      "description": "Create a lamp/light fixture at a position. API_LampID (= API_ObjectType typedef). V2 channel A.",
+      "domain": "Building",
+      "status": "v2-extended",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateLamp",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "建灯",
+          "创建灯",
+          "新建灯",
+          "放置灯",
+          "灯具",
+          "照明",
+          "灯光",
+          "吊灯",
+          "台灯"
+        ],
+        "en": [
+          "create lamp",
+          "new lamp",
+          "place lamp",
+          "add lamp",
+          "light fixture",
+          "lighting"
+        ]
+      },
+      "paramExtractors": {
+        "position": {
+          "type": "point2d",
+          "description": "Lamp position {x,y} in meters"
+        },
+        "libPartName": {
+          "type": "string",
+          "description": "Lamp library part name"
+        },
+        "angle": {
+          "type": "number",
+          "description": "Rotation angle in degrees"
+        },
+        "floorIndex": {
+          "type": "integer",
+          "description": "Story index"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateLamp"
+          },
+          "addOnCommandParameters": {
+            "position": {
+              "x": 3,
+              "y": 3
+            },
+            "angle": 0,
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_mesh",
+      "title": "MEPBridge create mesh (terrain)",
+      "description": "Create a terrain mesh from a polygon outline. API_MeshID. V2 channel A.",
+      "domain": "Building",
+      "status": "v2-extended",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateMesh",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "建地形",
+          "创建地形",
+          "新建地形",
+          "画地形",
+          "地形网格",
+          "mesh",
+          "场地",
+          "地表"
+        ],
+        "en": [
+          "create mesh",
+          "new mesh",
+          "add mesh",
+          "terrain mesh",
+          "site mesh",
+          "topography"
+        ]
+      },
+      "paramExtractors": {
+        "polygon": {
+          "type": "polygon",
+          "description": "Mesh polygon vertices [{x,y}] in meters, at least 3 points"
+        },
+        "level": {
+          "type": "number",
+          "description": "Mesh base level (elevation) in meters"
+        },
+        "floorIndex": {
+          "type": "integer",
+          "description": "Story index"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateMesh"
+          },
+          "addOnCommandParameters": {
+            "polygon": {
+              "points": [
+                {
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "x": 10,
+                  "y": 0
+                },
+                {
+                  "x": 10,
+                  "y": 10
+                },
+                {
+                  "x": 0,
+                  "y": 10
+                }
+              ]
+            },
+            "level": 0,
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_zone",
+      "title": "MEPBridge create zone (room)",
+      "description": "Create a zone/room from a polygon outline with name and height. API_ZoneID. V2 channel A.",
+      "domain": "Building",
+      "status": "v2-extended",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateZone",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "建房间",
+          "创建房间",
+          "新建房间",
+          "画区域",
+          "区域",
+          "房间",
+          "空间",
+          "功能区",
+          "户型"
+        ],
+        "en": [
+          "create zone",
+          "new zone",
+          "add zone",
+          "place zone",
+          "room",
+          "space",
+          "area"
+        ]
+      },
+      "paramExtractors": {
+        "polygon": {
+          "type": "polygon",
+          "description": "Zone polygon vertices [{x,y}] in meters, at least 3 points"
+        },
+        "zoneName": {
+          "type": "string",
+          "description": "Zone name (e.g. 'Living Room')"
+        },
+        "zoneCategory": {
+          "type": "string",
+          "description": "Zone category name"
+        },
+        "height": {
+          "type": "number",
+          "description": "Zone height in meters"
+        },
+        "floorIndex": {
+          "type": "integer",
+          "description": "Story index"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateZone"
+          },
+          "addOnCommandParameters": {
+            "polygon": {
+              "points": [
+                {
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "x": 4,
+                  "y": 0
+                },
+                {
+                  "x": 4,
+                  "y": 3
+                },
+                {
+                  "x": 0,
+                  "y": 3
+                }
+              ]
+            },
+            "zoneName": "Living Room",
+            "height": 2.8,
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.viewport_capture",
+      "title": "MEPBridge viewport capture (visual feedback)",
+      "description": "Capture current viewport as structured visual snapshot (view type + visible elements AABB list + bounds). Used by H4 visual feedback loop for LLM to verify execution results. Read-only, no model modification. V2 H4.1.",
+      "domain": "Building",
+      "status": "v2-h4",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "ViewportCapture",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "截图",
+          "视口截图",
+          "快照",
+          "视觉快照",
+          "截图验证",
+          "看图",
+          "视觉验证",
+          "PNG截图",
+          "图面验证"
+        ],
+        "en": [
+          "viewport capture",
+          "screenshot",
+          "snapshot",
+          "visual snapshot",
+          "capture view",
+          "png screenshot"
+        ]
+      },
+      "paramExtractors": {
+        "maxElements": {
+          "type": "integer",
+          "description": "Maximum elements to capture (1-500, default=100)"
+        },
+        "includeAabb": {
+          "type": "boolean",
+          "description": "Include element AABB bounds (default=true)"
+        },
+        "includeImage": {
+          "type": "boolean",
+          "description": "Capture PNG screenshot as base64 for LLM multimodal vision (default=false, H4.1)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "ViewportCapture"
+          },
+          "addOnCommandParameters": {
+            "maxElements": 100,
+            "includeAabb": true,
+            "includeImage": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_element_mesh",
+      "title": "MEPBridge get element 3D mesh",
+      "description": "Get 3D geometry vertices for specified elements by GUID. Returns AABB + key vertices (wall start/end, column base/top, slab polygon) + thickness/height. Used by H4.4 for precise geometric verification. Read-only. V2 H4.4.",
+      "domain": "Building",
+      "status": "v2-h4",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetElementMesh",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "网格",
+          "顶点",
+          "3D几何",
+          "几何数据",
+          "mesh",
+          "构件网格",
+          "3D网格"
+        ],
+        "en": [
+          "mesh",
+          "vertices",
+          "3d geometry",
+          "element mesh",
+          "get mesh",
+          "3d mesh"
+        ]
+      },
+      "paramExtractors": {
+        "guids": {
+          "type": "guidList",
+          "description": "Element GUIDs to query (max 50)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetElementMesh"
+          },
+          "addOnCommandParameters": {
+            "guids": []
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.auto_route_pipe",
+      "title": "MEPBridge auto route pipe (dry-run obstacle avoidance)",
+      "description": "Auto-route a MEP pipe between waypoints with obstacle avoidance. Dry-run only: computes collision-free plan against structural obstacles, reports blockedBy segments and routing preference. LLM uses this to plan pipe routes that avoid walls/columns/beams. V2 MEP core.",
+      "domain": "MEP",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "AutoRoutePipe",
+      "riskLevel": "high-mutation",
+      "automationModes": [
+        "dry-run-only",
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "自动布管",
+          "自动路由",
+          "自动走管",
+          "智能布管",
+          "避障布管",
+          "绕障布管",
+          "自动铺管",
+          "智能路由管道",
+          "自动规划管路"
+        ],
+        "en": [
+          "auto route",
+          "auto pipe",
+          "auto routing",
+          "automatic pipe route",
+          "route pipe around",
+          "avoid obstacle pipe",
+          "smart routing",
+          "auto route pipe"
+        ]
+      },
+      "paramExtractors": {
+        "waypoints": {
+          "type": "point3dList",
+          "description": "Pipe route waypoints [{x,y,z}] in meters; at least 2 points required"
+        },
+        "start": {
+          "type": "point3d",
+          "description": "Start point [x,y,z]; normalized to waypoints"
+        },
+        "end": {
+          "type": "point3d",
+          "description": "End point [x,y,z]; normalized to waypoints"
+        },
+        "clearanceMm": {
+          "type": "number",
+          "description": "Clearance distance from obstacles in mm (required, >=0). Extracted from '避让50mm' / 'clearance 100mm'"
+        },
+        "diameterMm": {
+          "type": "number",
+          "description": "Pipe diameter in mm, extracted from 'DN20' / '100mm管'"
+        },
+        "referenceId": {
+          "type": "integer",
+          "description": "Pipe cross-section reference ID from GetAvailableSizes"
+        },
+        "mepSystemName": {
+          "type": "string",
+          "description": "MEP system name, e.g. 'Domestic Cold Water'"
+        },
+        "routingPreference": {
+          "type": "string",
+          "description": "Routing strategy: minimizeTurns|minimizeLength|preferOrthogonal|manualWaypointsFirst (default)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "AutoRoutePipe"
+          },
+          "addOnCommandParameters": {
+            "mode": "dry-run",
+            "waypoints": [
+              {
+                "x": 0,
+                "y": 0,
+                "z": 3
+              },
+              {
+                "x": 5,
+                "y": 0,
+                "z": 3
+              }
+            ],
+            "clearanceMm": 50,
+            "confirmRequired": true,
+            "routingPreference": "manualWaypointsFirst"
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.solve_connections",
+      "title": "MEPBridge solve pipe connections (merge/tee/cross detection)",
+      "description": "Detect and optionally apply logical connections between MEP piping routes at shared points. Supports merge (2 routes), tee (3 routes), cross (4 routes, dry-run only). LLM uses this to connect independently-created pipe segments into a network. V2 MEP core.",
+      "domain": "MEP",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "SolveConn",
+      "riskLevel": "medium-mutation",
+      "automationModes": [
+        "dry-run-only",
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "logical-only",
+      "nlTriggers": {
+        "zh": [
+          "连接管道",
+          "管道连接",
+          "连通管道",
+          "求解连接",
+          "合并管道",
+          "三通连接",
+          "四通连接",
+          "接管",
+          "连接管路",
+          "管道连通",
+          "连接",
+          "连通",
+          "合并管"
+        ],
+        "en": [
+          "solve connection",
+          "connect pipes",
+          "merge pipes",
+          "pipe junction",
+          "tee connection",
+          "cross connection",
+          "connect routes",
+          "join pipes",
+          "connect",
+          "join pipe"
+        ]
+      },
+      "paramExtractors": {
+        "routeGuids": {
+          "type": "guidList",
+          "description": "Array of route GUIDs to connect (min 2). Extracted from selection or explicit GUIDs"
+        },
+        "routeGuid": {
+          "type": "string",
+          "description": "Single route GUID (legacy, normalized to routeGuids)"
+        },
+        "apply": {
+          "type": "boolean",
+          "description": "If true, apply merge/tee connections; if false (default), dry-run detect only"
+        },
+        "crossMode": {
+          "type": "string",
+          "description": "Cross fitting mode: none|dry-run|place (place not implemented)"
+        },
+        "tol": {
+          "type": "number",
+          "description": "Tolerance for grouping nearby route endpoints (default 0.001m)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "SolveConn"
+          },
+          "addOnCommandParameters": {
+            "routeGuids": [],
+            "apply": false,
+            "crossMode": "dry-run",
+            "tol": 0.001
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_element_properties",
+      "title": "MEPBridge get element properties by GUID",
+      "description": "Read Archicad Properties of a route/element by GUID. Returns property values with definition names, groups, and types. LLM uses this to inspect element attributes (material, fire rating, system tag, etc.) before deciding modifications. V2 property readback core.",
+      "domain": "Building",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetElementProperties",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "查询属性",
+          "读取属性",
+          "属性值",
+          "构件属性",
+          "属性详情",
+          "查看属性",
+          "属性列表",
+          "材质属性",
+          "防火等级",
+          "查询构件属性",
+          "这个构件属性",
+          "的属性"
+        ],
+        "en": [
+          "get properties",
+          "read properties",
+          "element properties",
+          "property values",
+          "list properties",
+          "query attributes",
+          "get element properties"
+        ]
+      },
+      "paramExtractors": {
+        "routeGuid": {
+          "type": "string",
+          "description": "Route/element GUID to query (required). Extracted from selection or explicit GUID"
+        },
+        "filter": {
+          "type": "string",
+          "description": "Property filter: All|UserDefined|BuiltIn (default All)"
+        },
+        "propertyGuids": {
+          "type": "guidList",
+          "description": "Optional specific property definition GUIDs to query"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetElementProperties"
+          },
+          "addOnCommandParameters": {
+            "routeGuid": "",
+            "filter": "All"
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.set_element_property",
+      "title": "MEPBridge set single element property",
+      "description": "Set a single Archicad Property on a route/element by GUID. Supports lookup by propertyGuid or by groupName+propertyName. Returns previous and new value. LLM uses this for targeted single-attribute modifications (e.g. set fire rating, update material tag). V2 property write core.",
+      "domain": "Building",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "SetElementProperty",
+      "riskLevel": "low-mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "previous-value-restore",
+      "nlTriggers": {
+        "zh": [
+          "设置属性",
+          "修改单个属性",
+          "更新属性",
+          "设置材质",
+          "设置防火等级",
+          "改属性",
+          "赋值属性",
+          "设定属性值",
+          "修改属性"
+        ],
+        "en": [
+          "set property",
+          "update property",
+          "change property",
+          "set attribute",
+          "modify single property",
+          "assign property",
+          "set fire rating",
+          "set material"
+        ]
+      },
+      "paramExtractors": {
+        "routeGuid": {
+          "type": "string",
+          "description": "Route/element GUID (required). Extracted from selection or explicit GUID"
+        },
+        "propertyGuid": {
+          "type": "string",
+          "description": "Property definition GUID (optional, alternative to propertyName)"
+        },
+        "propertyName": {
+          "type": "string",
+          "description": "Property name (e.g. 'Fire Rating'). Used with groupName for name-based lookup"
+        },
+        "groupName": {
+          "type": "string",
+          "description": "Property group name (e.g. 'General'). Used with propertyName"
+        },
+        "valueString": {
+          "type": "string",
+          "description": "New property value as string (required). e.g. 'REI-60', 'Steel', 'true'"
+        },
+        "filter": {
+          "type": "string",
+          "description": "Property filter: All|UserDefined|BuiltIn (default All)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "SetElementProperty"
+          },
+          "addOnCommandParameters": {
+            "routeGuid": "",
+            "propertyName": "",
+            "groupName": "",
+            "valueString": "",
+            "filter": "All"
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.set_element_properties",
+      "title": "MEPBridge batch set element properties",
+      "description": "Batch set multiple Archicad Properties on a route/element by GUID in one atomic operation. Each item supports propertyGuid or groupName+propertyName lookup. Returns previous+new values per item. LLM uses this for multi-attribute updates in a single undoable transaction (e.g. set material+fire rating+system tag together). V2 property write core.",
+      "domain": "Building",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "SetElementProperties",
+      "riskLevel": "low-mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "previous-value-restore",
+      "nlTriggers": {
+        "zh": [
+          "批量设置属性",
+          "批量修改属性",
+          "同时设置多个属性",
+          "批量更新属性",
+          "一次性改属性",
+          "多属性修改",
+          "批量修改",
+          "批量设置"
+        ],
+        "en": [
+          "batch set properties",
+          "set multiple properties",
+          "batch update properties",
+          "bulk set attributes",
+          "multi-property update",
+          "batch set"
+        ]
+      },
+      "paramExtractors": {
+        "routeGuid": {
+          "type": "string",
+          "description": "Route/element GUID (required). Extracted from selection or explicit GUID"
+        },
+        "properties": {
+          "type": "keyValuePairs",
+          "description": "Array of {propertyGuid|groupName+propertyName, valueString} items (min 1)"
+        },
+        "filter": {
+          "type": "string",
+          "description": "Property filter: All|UserDefined|BuiltIn (default All)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "SetElementProperties"
+          },
+          "addOnCommandParameters": {
+            "routeGuid": "",
+            "filter": "All",
+            "properties": [
+              {
+                "propertyName": "",
+                "groupName": "",
+                "valueString": ""
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.find_routes_by_property",
+      "title": "MEPBridge find routes by single property",
+      "description": "Find MEP routing elements matching a single property value (e.g. find all pipes with fireRating=REI-60). Supports Piping/Ventilation/CableCarrier/All domains. LLM uses this for property-based MEP route queries. V2 MEP query core.",
+      "domain": "MEP",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "FindRoutesByProperty",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "查找路由",
+          "按属性查找",
+          "查找管道",
+          "搜索路由",
+          "按属性搜索",
+          "查找符合属性",
+          "按属性查",
+          "查找符合条件的管"
+        ],
+        "en": [
+          "find routes",
+          "find by property",
+          "search routes",
+          "find pipes by",
+          "search by property",
+          "filter routes"
+        ]
+      },
+      "paramExtractors": {
+        "propertyGuid": {
+          "type": "string",
+          "description": "Property definition GUID (optional, alternative to propertyName)"
+        },
+        "propertyName": {
+          "type": "string",
+          "description": "Property name for name-based lookup"
+        },
+        "groupName": {
+          "type": "string",
+          "description": "Property group name for name-based lookup"
+        },
+        "valueString": {
+          "type": "string",
+          "description": "Property value to match (required). e.g. 'REI-60'"
+        },
+        "domain": {
+          "type": "string",
+          "description": "Search domain: Piping|Ventilation|CableCarrier|All (default Piping)"
+        },
+        "filter": {
+          "type": "string",
+          "description": "Property filter: All|UserDefined|BuiltIn (default All)"
+        },
+        "includeProperty": {
+          "type": "boolean",
+          "description": "Include matched property in results (default true)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "FindRoutesByProperty"
+          },
+          "addOnCommandParameters": {
+            "valueString": "",
+            "domain": "Piping",
+            "filter": "All",
+            "includeProperty": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.find_routes_by_properties",
+      "title": "MEPBridge find routes by multiple properties (AND/OR)",
+      "description": "Find MEP routing elements matching multiple property conditions with AND/OR match mode. Supports export to rows/csv. LLM uses this for complex multi-criteria MEP queries (e.g. find pipes with fireRating=REI-60 AND material=Steel). V2 MEP query core.",
+      "domain": "MEP",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "FindRoutesByProperties",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "多属性查找",
+          "组合查找路由",
+          "组合查找管道",
+          "条件查找管道",
+          "多条件搜索",
+          "复合查询路由",
+          "按多个属性查找",
+          "同时满足多个属性"
+        ],
+        "en": [
+          "find by multiple properties",
+          "multi-criteria search",
+          "find routes matching all",
+          "find routes matching any",
+          "complex property query"
+        ]
+      },
+      "paramExtractors": {
+        "conditions": {
+          "type": "raw",
+          "description": "Array of {propertyGuid|groupName+propertyName, valueString} conditions (min 1)"
+        },
+        "domain": {
+          "type": "string",
+          "description": "Search domain: Piping|Ventilation|CableCarrier|All (default Piping)"
+        },
+        "match": {
+          "type": "string",
+          "description": "Match mode: all (AND, default) | any (OR)"
+        },
+        "filter": {
+          "type": "string",
+          "description": "Property filter: All|UserDefined|BuiltIn (default All)"
+        },
+        "export": {
+          "type": "string",
+          "description": "Export mode: none|rows|csv|both (default none)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "FindRoutesByProperties"
+          },
+          "addOnCommandParameters": {
+            "conditions": [
+              {
+                "propertyName": "",
+                "groupName": "",
+                "valueString": ""
+              }
+            ],
+            "domain": "Piping",
+            "match": "all",
+            "filter": "All",
+            "export": "none"
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.set_routes_properties",
+      "title": "MEPBridge batch set properties on multiple routes",
+      "description": "Batch set properties on multiple MEP routing elements in one atomic operation. Each route item contains routeGuid + properties array. LLM uses this for bulk MEP route attribute updates (e.g. set systemCode on all selected pipes). V2 MEP write core.",
+      "domain": "MEP",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "SetRoutesProperties",
+      "riskLevel": "medium-mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "previous-value-restore",
+      "nlTriggers": {
+        "zh": [
+          "批量设置路由属性",
+          "批量修改管路属性",
+          "多管路属性修改",
+          "批量更新路由属性",
+          "批量设置多条管"
+        ],
+        "en": [
+          "batch set route properties",
+          "bulk update route properties",
+          "set properties on multiple routes",
+          "batch modify routes"
+        ]
+      },
+      "paramExtractors": {
+        "routes": {
+          "type": "raw",
+          "description": "Array of {routeGuid, properties:[{propertyGuid|groupName+propertyName, valueString}]} items (min 1)"
+        },
+        "filter": {
+          "type": "string",
+          "description": "Property filter: All|UserDefined|BuiltIn (default All)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "SetRoutesProperties"
+          },
+          "addOnCommandParameters": {
+            "filter": "All",
+            "routes": [
+              {
+                "routeGuid": "",
+                "properties": [
+                  {
+                    "propertyName": "",
+                    "groupName": "",
+                    "valueString": ""
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.ensure_property_definitions",
+      "title": "MEPBridge ensure property definitions exist",
+      "description": "Ensure MEP metadata property definitions exist for route elements (externalId/systemCode/routeName/floor/discipline/source/Note). Creates property group + string definitions if missing. LLM uses this as a prerequisite before setting custom metadata on routes. V2 MEP property workflow.",
+      "domain": "MEP",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "EnsurePropertyDefinitions",
+      "riskLevel": "low-mutation",
+      "automationModes": [
+        "confirmed-run",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "保障属性定义",
+          "确保属性定义",
+          "创建属性定义",
+          "初始化属性",
+          "属性定义检查",
+          "准备MEP属性"
+        ],
+        "en": [
+          "ensure property definitions",
+          "create property definitions",
+          "init properties",
+          "prepare mep properties",
+          "ensure definitions"
+        ]
+      },
+      "paramExtractors": {
+        "propertyNames": {
+          "type": "raw",
+          "description": "Array of property name strings to ensure (default: externalId/systemCode/routeName/floor/discipline/source/Note)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "EnsurePropertyDefinitions"
+          },
+          "addOnCommandParameters": {
+            "propertyNames": [
+              "externalId",
+              "systemCode",
+              "routeName",
+              "floor",
+              "discipline",
+              "source",
+              "Note"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.move_elements",
+      "title": "MEPBridge move elements by GUID",
+      "description": "Move MEP routing elements by explicit GUID list with delta offset (mm). Requires confirmRequired=true. LLM uses this when it has specific route GUIDs (not current selection) and needs precise positional adjustment. Alternative to MoveSelectedElements for GUID-targeted automation.",
+      "domain": "MEP",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "MoveElements",
+      "riskLevel": "high-mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "reverse-delta",
+      "nlTriggers": {
+        "zh": [
+          "移动构件",
+          "移动路由",
+          "按GUID移动",
+          "偏移构件",
+          "平移构件",
+          "移动指定构件"
+        ],
+        "en": [
+          "move elements",
+          "move routes",
+          "move by guid",
+          "offset elements",
+          "translate elements by guid"
+        ]
+      },
+      "paramExtractors": {
+        "routeGuids": {
+          "type": "guidList",
+          "description": "Array of route GUIDs to move (min 1). Extracted from selection or explicit GUIDs"
+        },
+        "routeGuid": {
+          "type": "string",
+          "description": "Single route GUID (legacy, normalized to routeGuids)"
+        },
+        "deltaMm": {
+          "type": "point3d",
+          "description": "Movement delta in mm {x,y,z} (required, non-zero). Extracted from 'x=300,y=-200,z=100'"
+        },
+        "confirmRequired": {
+          "type": "boolean",
+          "description": "Must be true (required by C++ schema)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "MoveElements"
+          },
+          "addOnCommandParameters": {
+            "routeGuids": [],
+            "deltaMm": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "confirmRequired": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.edit_elements",
+      "title": "MEPBridge edit element properties by GUID",
+      "description": "Edit properties of MEP routing elements by explicit GUID list. Each route gets its own property array. Requires confirmRequired=true. LLM uses this when it has specific route GUIDs (not current selection) and needs to modify their properties. Alternative to EditSelectedElements for GUID-targeted automation.",
+      "domain": "MEP",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "EditElements",
+      "riskLevel": "low-mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "previous-value-restore",
+      "nlTriggers": {
+        "zh": [
+          "编辑构件",
+          "编辑路由",
+          "按GUID编辑",
+          "修改指定构件属性",
+          "编辑指定路由"
+        ],
+        "en": [
+          "edit elements",
+          "edit routes",
+          "edit by guid",
+          "modify elements by guid",
+          "edit route properties"
+        ]
+      },
+      "paramExtractors": {
+        "routeGuids": {
+          "type": "guidList",
+          "description": "Array of route GUIDs to edit (min 1)"
+        },
+        "routeGuid": {
+          "type": "string",
+          "description": "Single route GUID (legacy, normalized to routeGuids)"
+        },
+        "properties": {
+          "type": "keyValuePairs",
+          "description": "Array of {propertyGuid|groupName+propertyName, valueString} items (min 1)"
+        },
+        "filter": {
+          "type": "string",
+          "description": "Property filter: All|UserDefined|BuiltIn (default All)"
+        },
+        "confirmRequired": {
+          "type": "boolean",
+          "description": "Must be true (required by C++ schema)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "EditElements"
+          },
+          "addOnCommandParameters": {
+            "routeGuids": [],
+            "filter": "All",
+            "properties": [
+              {
+                "propertyName": "",
+                "groupName": "",
+                "valueString": ""
+              }
+            ],
+            "confirmRequired": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.change_element_geometry",
+      "title": "MEPBridge change element geometry by GUID",
+      "description": "Modify geometry of an existing element (Wall/Column/Beam) by GUID. Wall: start+end or thickness or height. Column: position or height. Beam: start+end. Uses ACAPI_Element_Change wrapped in UndoableCommand. LLM uses this to resize/reposition existing elements. P3-3, schema extended 2026-07-02.",
+      "domain": "Building",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "ChangeElementGeometry",
+      "riskLevel": "medium-mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "previous-geometry-restore",
+      "nlTriggers": {
+        "zh": [
+          "修改几何",
+          "改几何形状",
+          "延长墙",
+          "延长这面墙",
+          "缩短墙",
+          "移动柱位置",
+          "移动这根柱子位置",
+          "修改梁位置",
+          "修改梁的位置",
+          "改墙长度",
+          "修改这面墙的几何",
+          "改构件位置",
+          "修改墙厚度",
+          "改墙高",
+          "改柱高",
+          "修改厚度",
+          "修改高度"
+        ],
+        "en": [
+          "change geometry",
+          "modify geometry",
+          "resize wall",
+          "extend wall",
+          "move column",
+          "change beam",
+          "reposition element",
+          "shorten wall",
+          "change thickness",
+          "change height"
+        ]
+      },
+      "paramExtractors": {
+        "elementGuid": {
+          "type": "string",
+          "description": "Element GUID to modify (required). Extracted from selection or explicit GUID"
+        },
+        "start": {
+          "type": "point2d",
+          "description": "New start point {x,y} for Wall/Beam (meters, optional)"
+        },
+        "end": {
+          "type": "point2d",
+          "description": "New end point {x,y} for Wall/Beam (meters, optional)"
+        },
+        "position": {
+          "type": "point2d",
+          "description": "New position {x,y} for Column (meters, optional)"
+        },
+        "thickness": {
+          "type": "number",
+          "description": "Wall thickness in meters (optional, Wall only)"
+        },
+        "height": {
+          "type": "number",
+          "description": "Element height in meters (optional, Wall/Column)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "ChangeElementGeometry"
+          },
+          "addOnCommandParameters": {
+            "elementGuid": "",
+            "start": {
+              "x": 0,
+              "y": 0
+            },
+            "end": {
+              "x": 5,
+              "y": 0
+            },
+            "dryRun": true,
+            "confirmRequired": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.batch_create_elements",
+      "title": "MEPBridge batch create elements (atomic, max 500)",
+      "description": "Batch create multiple elements of the same type (Wall/Column/Beam) in a single atomic UndoableCommand. Max 500 items per batch. Partial failures keep successfully created elements. LLM uses this for large-scale modeling (e.g. create 20 columns, build 4 walls of a room). P3-4.",
+      "domain": "Building",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "BatchCreateElements",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "批量创建",
+          "批量建墙",
+          "批量建柱",
+          "批量建梁",
+          "一次创建多个",
+          "批量生成构件",
+          "批量建模",
+          "创建多个",
+          "创建多面",
+          "创建多根",
+          "多面墙",
+          "多根柱"
+        ],
+        "en": [
+          "batch create",
+          "bulk create",
+          "create multiple",
+          "batch walls",
+          "batch columns",
+          "batch elements",
+          "mass create",
+          "create several"
+        ]
+      },
+      "paramExtractors": {
+        "elementType": {
+          "type": "string",
+          "description": "Element type: Wall|Column|Beam (all items must be same type)"
+        },
+        "items": {
+          "type": "raw",
+          "description": "Array of element specs: Wall/Beam items need {start,end}, Column items need {position} (min 2, max 500)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "BatchCreateElements"
+          },
+          "addOnCommandParameters": {
+            "elementType": "Wall",
+            "items": [
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 5,
+                  "y": 0
+                }
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 0,
+                  "y": 3
+                }
+              }
+            ],
+            "dryRun": true,
+            "confirmRequired": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_elements_by_type",
+      "title": "MEPBridge get elements by type",
+      "description": "Query all elements of a specific type from the Archicad model. Returns guid/type/floorIndex/layerIndex per element, with optional AABB. Supports Wall/Column/Beam/Slab/Roof/Door/Window/Object/Stair/MEPRoute. Native element discovery query. P4-2.",
+      "domain": "Building",
+      "status": "code-complete-pending-compile",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetElementsByType",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "查询所有墙",
+          "查询所有柱",
+          "查询所有梁",
+          "查询所有板",
+          "查询所有屋顶",
+          "查询所有门",
+          "查询所有窗",
+          "查询所有对象",
+          "查询所有水管",
+          "查询所有MEP",
+          "列出所有墙",
+          "列出所有柱",
+          "按类型查询",
+          "获取所有墙",
+          "获取所有柱",
+          "查看柱",
+          "查看墙",
+          "查看梁",
+          "查看板",
+          "有多少墙",
+          "有多少柱",
+          "所有墙体",
+          "所有柱子"
+        ],
+        "en": [
+          "get all walls",
+          "get all columns",
+          "get all beams",
+          "get all slabs",
+          "get all roofs",
+          "get all doors",
+          "get all windows",
+          "get all objects",
+          "get all stairs",
+          "get all mep routes",
+          "get walls",
+          "get columns",
+          "get beams",
+          "list walls",
+          "list columns",
+          "list stairs",
+          "list elements by type",
+          "query by type",
+          "find all walls",
+          "find all columns",
+          "how many walls",
+          "how many columns"
+        ]
+      },
+      "paramExtractors": {
+        "elementType": {
+          "type": "enum",
+          "values": [
+            "Wall",
+            "Column",
+            "Beam",
+            "Slab",
+            "Roof",
+            "Door",
+            "Window",
+            "Object",
+            "Stair",
+            "MEPRoute"
+          ],
+          "description": "Element type to query"
+        },
+        "includeAabb": {
+          "type": "boolean",
+          "description": "Include bounding box (default false)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetElementsByType"
+          },
+          "addOnCommandParameters": {
+            "elementType": "Wall",
+            "includeAabb": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.set_selected_elements",
+      "title": "MEPBridge set selection (low-mutation, AI location assist)",
+      "description": "Change the current Archicad selection to the specified element GUIDs. Supports replace/add/remove modes. Helps AI locate problem elements for user confirmation. Does not modify the model. P4-3.",
+      "domain": "Building",
+      "status": "code-complete-pending-compile",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "SetSelectedElements",
+      "riskLevel": "low-mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "selection-restore",
+      "nlTriggers": {
+        "zh": [
+          "选中这些",
+          "选中指定",
+          "选中元素",
+          "高亮这些",
+          "帮我选中",
+          "选中这些墙",
+          "选中这些柱",
+          "取消选中",
+          "添加到选择",
+          "从选择中移除",
+          "选中问题墙",
+          "设置选择集",
+          "改变选择"
+        ],
+        "en": [
+          "select these",
+          "select elements",
+          "highlight these",
+          "select these walls",
+          "select these columns",
+          "add to selection",
+          "remove from selection",
+          "deselect",
+          "set selection",
+          "change selection"
+        ]
+      },
+      "paramExtractors": {
+        "guids": {
+          "type": "raw",
+          "description": "Array of element GUIDs to select (min 1)"
+        },
+        "mode": {
+          "type": "string",
+          "description": "Selection mode: replace (default) | add | remove"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "SetSelectedElements"
+          },
+          "addOnCommandParameters": {
+            "guids": [
+              "AABBCC-DDDD-EEEE-FFFF-000000000001"
+            ],
+            "mode": "replace",
+            "dryRun": true,
+            "confirmRequired": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_element_geometry",
+      "title": "MEPBridge get element precise geometry (read)",
+      "description": "Get precise geometry of a single element by GUID. Returns type-specific fields: Wall→start/end/thickness/height/length, Column→position/height, Beam→start/end/length, Slab→polygon/thickness/level, Roof→polygon/thickness/baseLevel, Door/Window→width/height/owner. P4-5.",
+      "domain": "Building",
+      "status": "code-complete-pending-compile",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetElementGeometry",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "获取几何",
+          "查询几何",
+          "元素几何",
+          "构件几何",
+          "墙的几何",
+          "柱的几何",
+          "梁的几何",
+          "板的形状",
+          "屋顶形状",
+          "顶点坐标",
+          "起终点",
+          "墙的坐标",
+          "获取形状",
+          "查询形状",
+          "墙的坐标是什么"
+        ],
+        "en": [
+          "get geometry",
+          "element geometry",
+          "wall geometry",
+          "column geometry",
+          "beam geometry",
+          "slab shape",
+          "roof shape",
+          "vertex coordinates",
+          "start end points",
+          "get shape",
+          "query geometry",
+          "what are the coordinates"
+        ]
+      },
+      "paramExtractors": {
+        "elementGuid": {
+          "type": "string",
+          "description": "GUID of the element to query (required)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetElementGeometry"
+          },
+          "addOnCommandParameters": {
+            "elementGuid": "AABBCC-DDDD-EEEE-FFFF-000000000001"
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.change_opening_geometry",
+      "title": "MEPBridge change door/window geometry (low-mutation)",
+      "description": "Modify geometry of an existing door or window by GUID. Supports width/height/refPos/sillHeight(Window only)/libPartIndex. Fills the gap of ChangeElementGeometry which only supports Wall/Column/Beam. P4-7.",
+      "domain": "Building",
+      "status": "code-complete-pending-compile",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "ChangeOpeningGeometry",
+      "riskLevel": "low-mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "previous-geometry-restore",
+      "nlTriggers": {
+        "zh": [
+          "修改门",
+          "修改窗",
+          "改门尺寸",
+          "改窗尺寸",
+          "门洞大小",
+          "窗洞大小",
+          "改门宽",
+          "改窗宽",
+          "调整门",
+          "调整窗",
+          "移动门",
+          "移动窗",
+          "更换门窗样式"
+        ],
+        "en": [
+          "change door",
+          "change window",
+          "modify door",
+          "modify window",
+          "resize door",
+          "resize window",
+          "move door",
+          "move window",
+          "door width",
+          "window height",
+          "change opening"
+        ]
+      },
+      "paramExtractors": {
+        "elementGuid": {
+          "type": "string",
+          "description": "GUID of the door/window to modify (required)"
+        },
+        "width": {
+          "type": "number",
+          "description": "New opening width in meters"
+        },
+        "height": {
+          "type": "number",
+          "description": "New opening height in meters"
+        },
+        "refPos": {
+          "type": "number",
+          "description": "New reference position along wall (meters)"
+        },
+        "sillHeight": {
+          "type": "number",
+          "description": "New sill height (Window only, meters)"
+        },
+        "libPartIndex": {
+          "type": "integer",
+          "description": "New library part index for style"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "ChangeOpeningGeometry"
+          },
+          "addOnCommandParameters": {
+            "elementGuid": "AABBCC-DDDD-EEEE-FFFF-000000000001",
+            "width": 0.9,
+            "height": 2.1,
+            "dryRun": true,
+            "confirmRequired": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.change_mep_route_properties",
+      "title": "MEPBridge change MEP route properties (medium-mutation)",
+      "description": "Modify properties of an existing MEP route by GUID. Supports mepSystemIndex/mepSystemName. Uses RoutingElement::Modify API. Does not modify cross-section (diameter), waypoints, or offsetFromHomeStory — those require RoutingSegment/Node level APIs (future). P4-8.",
+      "domain": "Building",
+      "status": "code-complete-pending-compile",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "ChangeMEPRouteProperties",
+      "riskLevel": "medium-mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "previous-properties-restore",
+      "nlTriggers": {
+        "zh": [
+          "修改管路系统",
+          "修改管道系统",
+          "改MEP系统",
+          "换系统",
+          "修改路由属性",
+          "修改管路属性",
+          "调整管路标高",
+          "修改风管系统",
+          "修改桥架系统",
+          "管路换系统"
+        ],
+        "en": [
+          "change mep system",
+          "change route system",
+          "modify route properties",
+          "change pipe system",
+          "change duct system",
+          "change offset",
+          "move route vertically",
+          "reassign system"
+        ]
+      },
+      "paramExtractors": {
+        "routeGuid": {
+          "type": "string",
+          "description": "GUID of the MEP route to modify (required)"
+        },
+        "mepSystemIndex": {
+          "type": "integer",
+          "description": "New MEP system attribute index"
+        },
+        "mepSystemName": {
+          "type": "string",
+          "description": "New MEP system name (alternative to index)"
+        },
+        "offsetFromHomeStory": {
+          "type": "number",
+          "description": "New offset from home story in meters"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "ChangeMEPRouteProperties"
+          },
+          "addOnCommandParameters": {
+            "routeGuid": "AABBCC-DDDD-EEEE-FFFF-000000000001",
+            "mepSystemName": "Domestic Cold Water",
+            "dryRun": true,
+            "confirmRequired": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_mep_all_elements",
+      "title": "MEPBridge get all MEP elements (classified)",
+      "description": "Query all MEP elements in the model and classify by type (RoutingElement/FlexibleSegment/Branch/TakeOff/Other). Returns controlPoints for FlexibleSegments when includeGeometry=true. Uses CollectAllMEPElements() for complete coverage.",
+      "domain": "MEP",
+      "status": "offline-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetMEPAllElements",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "查询所有MEP",
+          "获取所有MEP元素",
+          "列出所有MEP",
+          "MEP全量查询",
+          "查询所有机电元素",
+          "柔性段",
+          "支管"
+        ],
+        "en": [
+          "query all MEP",
+          "get all MEP elements",
+          "list all MEP",
+          "MEP full query",
+          "flexible segment",
+          "takeoff"
+        ]
+      },
+      "paramExtractors": {
+        "includeGeometry": {
+          "type": "boolean",
+          "description": "If true, return spline control points for FlexibleSegments"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetMEPAllElements"
+          },
+          "addOnCommandParameters": {
+            "includeGeometry": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_flexible_segment",
+      "title": "MEPBridge create flexible segment (soft duct/pipe)",
+      "description": "Create an MEP flexible segment (soft hose/spline) with control points. Supports Ventilation (duct flex) and Piping (pipe flex) domains. Geometry defined by 3+ controlPoints (spline curve). Requires startOrientation and endOrientation.",
+      "domain": "MEP",
+      "status": "offline-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateFlexibleSegment",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "创建柔性段",
+          "新建柔性段",
+          "软管",
+          "柔性连接",
+          "创建软管",
+          "风管柔性段",
+          "水管柔性段"
+        ],
+        "en": [
+          "create flexible segment",
+          "new flexible segment",
+          "flex hose",
+          "soft duct",
+          "flex connection",
+          "create soft pipe"
+        ]
+      },
+      "paramExtractors": {
+        "controlPoints": {
+          "type": "point3dList",
+          "description": "Spline control points [{x,y,z}] in meters, min 2 points"
+        },
+        "domain": {
+          "type": "enum",
+          "values": [
+            "Ventilation",
+            "Piping"
+          ],
+          "description": "MEP domain, default Ventilation"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateFlexibleSegment"
+          },
+          "addOnCommandParameters": {
+            "controlPoints": [
+              {
+                "x": 0,
+                "y": 0,
+                "z": 2.4
+              },
+              {
+                "x": 1,
+                "y": 0,
+                "z": 2.15
+              }
+            ],
+            "domain": "Ventilation",
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_takeoff",
+      "title": "MEPBridge create takeoff (branch connector)",
+      "description": "Create a Takeoff (branch connector) on an existing RoutingSegment. Requires either segmentGuid or routeGuid+segmentIndex to identify the host segment, plus distanceFromBeginning along the segment and optional rotationAngle.",
+      "domain": "MEP",
+      "status": "offline-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateTakeOff",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "创建支管",
+          "新建支管",
+          "支管接头",
+          "TakeOff",
+          "三通",
+          "四通",
+          "分支接头",
+          "创建分支"
+        ],
+        "en": [
+          "create takeoff",
+          "new takeoff",
+          "branch connector",
+          "tee",
+          "lateral",
+          "create branch"
+        ]
+      },
+      "paramExtractors": {
+        "segmentGuid": {
+          "type": "guid",
+          "description": "GUID of the host RoutingSegment"
+        },
+        "routeGuid": {
+          "type": "guid",
+          "description": "GUID of the parent RoutingElement (used with segmentIndex)"
+        },
+        "segmentIndex": {
+          "type": "integer",
+          "description": "Segment index within the route (0-based), default 0"
+        },
+        "distanceFromBeginning": {
+          "type": "number",
+          "description": "Distance along segment from start in meters"
+        },
+        "rotationAngle": {
+          "type": "number",
+          "description": "Rotation around segment axis in radians, default 0"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateTakeOff"
+          },
+          "addOnCommandParameters": {
+            "routeGuid": "{route-guid-placeholder}",
+            "segmentIndex": 0,
+            "distanceFromBeginning": 1.5,
+            "rotationAngle": 1.5707963267948966,
+            "domain": "Ventilation",
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    }
+  ]
+}

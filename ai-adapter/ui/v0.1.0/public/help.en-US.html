@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MEPbridge ACAIstr User Guide</title>
+  <style>
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f0f10;
+      color: #e4e4e7;
+      line-height: 1.7;
+    }
+    a { color: #93c5fd; }
+    code {
+      color: #c4b5fd;
+      font-family: "Cascadia Code", Consolas, monospace;
+      overflow-wrap: anywhere;
+    }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 24px;
+      border-bottom: 1px solid #3f3f46;
+      background: rgba(24, 24, 27, 0.96);
+      backdrop-filter: blur(12px);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark {
+      display: flex;
+      width: 40px;
+      height: 40px;
+      flex: 0 0 40px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      background: #4f46e5;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .brand h1 { margin: 0; font-size: 16px; font-weight: 650; }
+    .brand-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
+    .brand-meta span {
+      padding: 1px 7px;
+      border-radius: 4px;
+      background: #27272a;
+      color: #a1a1aa;
+      font-size: 11px;
+    }
+    .top-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+    .btn {
+      display: inline-flex;
+      min-height: 36px;
+      align-items: center;
+      justify-content: center;
+      padding: 7px 13px;
+      border: 1px solid #52525b;
+      border-radius: 6px;
+      background: #27272a;
+      color: #e4e4e7;
+      font-size: 13px;
+      text-decoration: none;
+    }
+    .btn:hover { background: #3f3f46; border-color: #71717a; }
+    .container { width: min(960px, 100%); margin: 0 auto; padding: 28px 24px 44px; }
+    .hero { padding: 12px 0 28px; border-bottom: 1px solid #3f3f46; }
+    .hero h2 { margin: 0 0 10px; color: #f4f4f5; font-size: 24px; }
+    .hero p { max-width: 860px; margin: 0 0 8px; color: #d4d4d8; font-size: 14px; }
+    .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .tech-badges { margin-top: 8px; }
+    .badge { padding: 3px 9px; border-radius: 4px; font-size: 11px; font-weight: 650; }
+    .badge-green { background: #064e3b; color: #6ee7b7; }
+    .badge-blue { background: #172554; color: #93c5fd; }
+    .badge-purple { background: #3b0764; color: #d8b4fe; }
+    .badge-amber { background: #451a03; color: #fcd34d; }
+    .badge-cyan { background: #083344; color: #67e8f9; }
+    .section { padding: 28px 0; border-bottom: 1px solid #27272a; }
+    .section:last-of-type { border-bottom: 0; }
+    .section h2 {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 0 0 16px;
+      color: #c7d2fe;
+      font-size: 18px;
+    }
+    .section h2 .index {
+      display: inline-flex;
+      width: 25px;
+      height: 25px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      background: #312e81;
+      color: #e0e7ff;
+      font-size: 12px;
+    }
+    .section h3 { margin: 18px 0 8px; color: #ddd6fe; font-size: 14px; }
+    .section p { max-width: 860px; margin: 0 0 9px; color: #d4d4d8; font-size: 14px; }
+    .guide-list {
+      display: grid;
+      gap: 7px;
+      margin: 0 0 12px;
+      padding: 0;
+      list-style: none;
+      counter-reset: guide-step;
+    }
+    .guide-list li {
+      position: relative;
+      display: block;
+      padding-left: 36px;
+      margin: 0;
+      color: #d4d4d8;
+      font-size: 14px;
+    }
+    .guide-list li::before {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 28px;
+      counter-increment: guide-step;
+      content: counter(guide-step) ".";
+      color: #a5b4fc;
+      font-weight: 700;
+      text-align: right;
+    }
+    .panel .guide-list li { color: #b4b4bc; font-size: 13px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .panel {
+      padding: 16px;
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      background: #18181b;
+    }
+    .panel h3 { margin: 0 0 8px; color: #a5b4fc; font-size: 14px; }
+    .code-block {
+      overflow-x: auto;
+      margin: 10px 0 12px;
+      padding: 13px 15px;
+      border: 1px solid #3f3f46;
+      border-radius: 6px;
+      background: #09090b;
+      color: #c4b5fd;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.55;
+      white-space: pre;
+    }
+    .table-wrap { overflow-x: auto; }
+    .table { width: 100%; min-width: 680px; border-collapse: collapse; }
+    .table th {
+      padding: 9px 12px;
+      border-bottom: 1px solid #52525b;
+      background: #27272a;
+      color: #a5b4fc;
+      font-size: 12px;
+      text-align: left;
+    }
+    .table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #27272a;
+      color: #d4d4d8;
+      font-size: 13px;
+      vertical-align: top;
+    }
+    .table td:first-child { color: #6ee7b7; font-weight: 600; white-space: nowrap; }
+    .note {
+      margin: 13px 0;
+      padding: 12px 15px;
+      border-left: 3px solid #f59e0b;
+      border-radius: 0 6px 6px 0;
+      background: #1c1917;
+    }
+    .note p { margin: 0; color: #fcd34d; font-size: 13px; }
+    .footer {
+      padding: 24px;
+      border-top: 1px solid #27272a;
+      color: #71717a;
+      font-size: 12px;
+      text-align: center;
+    }
+    .footer p { margin: 2px 0; }
+    @media (max-width: 680px) {
+      .topbar { position: static; align-items: flex-start; padding: 14px 16px; }
+      .top-actions { flex-direction: column; align-items: stretch; }
+      .btn { min-width: 88px; }
+      .container { padding: 22px 16px 36px; }
+      .hero h2 { font-size: 21px; }
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">MA</div>
+      <div>
+        <h1>MEPbridge ACAIstr User Guide</h1>
+        <div class="brand-meta">
+          <span>MACAI</span>
+          <span>v0.1.0</span>
+          <span>en-US</span>
+        </div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <a class="btn" href="./">Open Workbench</a>
+      <a class="btn" href="feedback.en-US.html" target="_blank" rel="noopener noreferrer">Feedback</a>
+      <a class="btn" href="help.html">中文</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h2>Archicad Building and MEP Automation Workbench</h2>
+      <p><strong>MEPbridge ACAIstr (MACAI)</strong> is an Archicad-native Add-On and local MCP / Workbench collaboration system. Its initial focus is to establish safe, controlled, bidirectional interaction between large language models and professional 3D design software, providing natural-language invocation, structured command execution, and autonomous AI Loop capabilities for design workflows. Through Archicad's official JSON API, the <code>MEPBridge.*</code> structured command interfaces, and its safety-controlled execution mechanism, AI can read, create, modify, and validate real 3D models under user confirmation and risk controls, progressively exploring practical paths toward intelligent, multidisciplinary, end-to-end building design workflows.</p>
+      <div class="badges">
+        <span class="badge badge-green">ARCHICAD-NATIVE ADD-ON</span>
+        <span class="badge badge-purple">MODEL READ / WRITE / VALIDATE</span>
+        <span class="badge badge-blue">ARCHICAD 28 / 29 RELEASED</span>
+        <span class="badge badge-amber">LOCAL-ONLY SERVER BY DEFAULT</span>
+      </div>
+      <div class="badges tech-badges" aria-label="Technology architecture">
+        <span class="badge badge-cyan">OPENBIM</span>
+        <span class="badge badge-blue">ARCHICAD JSON API</span>
+        <span class="badge badge-green">C++ ADD-ON</span>
+        <span class="badge badge-purple">AI LOOP</span>
+        <span class="badge badge-amber">MCP SERVER</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2><span class="index">1</span>Install and Start</h2>
+      <ol class="guide-list">
+        <li>Extract <code>MEPbridge-ACAIstr-v0.1.0-win64-zh-CN.zip</code> to a normal writable directory.</li>
+        <li>Close Archicad, double-click <code>Install-MEPBridge.cmd</code> in the extracted package root, and allow Windows administrator permission. The installer copies the APX that matches the detected Archicad version and writes the local configuration required for one-click menu startup.</li>
+        <li>Restart Archicad.</li>
+        <li>In Archicad, choose <strong>MEPbridge ACAIstr -&gt; Open MEPbridge ACAIstr</strong>. The Add-On checks and starts the local Workbench Server, then opens the Workbench page. No separate command window is required.</li>
+      </ol>
+      <h3>Manual Server fallback</h3>
+      <p>Use this only when menu startup fails or when Server logs are needed:</p>
+      <ol class="guide-list">
+        <li>Open the release package root in File Explorer. This is the directory containing <code>server</code>, <code>tools</code>, and the README files.</li>
+        <li>Click the address bar, type <code>powershell</code>, and press Enter. You can also right-click an empty area and choose "Open in Terminal."</li>
+        <li>Run:<div class="code-block">node server\server.js</div></li>
+        <li>Keep the terminal open and browse to <a href="http://127.0.0.1:19780/">http://127.0.0.1:19780/</a>. Press <code>Ctrl+C</code> to stop the Server.</li>
+      </ol>
+      <p>If <code>node</code> is not recognized, install Node.js first. The Server binds to <code>127.0.0.1</code> by default. The Archicad "User Guide" menu command also starts the Server before opening this page.</p>
+      <div class="note"><p>For the first validation, use a test project. Begin with Ping, selection, or project-information reads before creating, moving, editing, or deleting model elements.</p></div>
+    </section>
+
+    <section class="section">
+      <h2><span class="index">2</span>Workbench Modes and Workflow</h2>
+      <div class="grid-2">
+        <div class="panel">
+          <h3>Manual BASE</h3>
+          <ol class="guide-list">
+            <li>Use explicit commands, parameter entry, selection operations, and debugging.</li>
+            <li>The middle workspace includes QUERY, MODIFY, BUILDING, Water, Electrical, and Ventilation modules.</li>
+            <li>Basic flow: choose a module, select a command, enter parameters, confirm, execute, and inspect readback.</li>
+          </ol>
+        </div>
+        <div class="panel">
+          <h3>AI Copilot</h3>
+          <ol class="guide-list">
+            <li>Use natural-language requests, template tasks, and multi-step execution plans.</li>
+            <li>Basic flow: enter a goal, generate a plan, confirm according to risk, execute steps, and inspect readback and audit results.</li>
+            <li>For long plans, the middle execution panel keeps a fixed height and supports mouse-wheel or scrollbar navigation.</li>
+          </ol>
+        </div>
+      </div>
+      <h3>Without an LLM</h3>
+      <ol class="guide-list">
+        <li>Manual BASE, fixed templates, and configured custom natural-language commands remain available.</li>
+        <li>Free-text requests that require model interpretation are unavailable.</li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2><span class="index">3</span>Viewport and Execution Results</h2>
+      <div class="grid-2">
+        <div class="panel">
+          <h3>Real AABB 2D representation</h3>
+          <ol class="guide-list">
+            <li>After Archicad returns selection or command readback, the viewport uses AABB coordinates and dimensions to show position, extent, and relative scale.</li>
+            <li>When the same GUID is moved or resized, the viewport recalculates the scale from the new coordinates.</li>
+            <li>An AABB is a bounding-box representation; it does not show rotated surfaces, openings, stair treads, or complex polygon detail.</li>
+          </ol>
+        </div>
+        <div class="panel">
+          <h3>Plan preview and native screenshot</h3>
+          <ol class="guide-list">
+            <li>When no Archicad geometry readback is available, Copilot shows only a planned workflow preview, not real model geometry.</li>
+            <li>Use the screenshot view to inspect element appearance. A native screenshot is closer to the actual visual result than the AABB view.</li>
+          </ol>
+        </div>
+      </div>
+      <div class="note"><p>To determine whether a command actually succeeded, prioritize the execution response, GUIDs, real readback, and the Archicad model. Do not rely on the plan preview alone.</p></div>
+    </section>
+
+    <section class="section">
+      <h2><span class="index">4</span>Features and Command Boundary</h2>
+      <ol class="guide-list">
+        <li>v0.1.0 registers 61 C++ commands, 59 of which have public descriptors. The Server and MCP Server generate their exposed operations dynamically from those descriptors.</li>
+        <li><code>SwitchStory</code> and <code>ChangeStairGeometry</code> are primarily direct Add-On calls and are not published as full descriptor/MCP tools.</li>
+      </ol>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Capability</th><th>Main scope</th><th>Usage note</th></tr></thead>
+          <tbody>
+            <tr><td>Project and query</td><td>Ping, project information, stories, libraries, hotlinks, grids, selection, element types, geometry, and AABB</td><td>Recommended for initial connection and model-state checks</td></tr>
+            <tr><td>Building creation</td><td>Walls, columns, beams, slabs, roofs, doors, windows, stairs, objects, lamps, meshes, and zones</td><td>Check story, coordinates, units, and host elements first</td></tr>
+            <tr><td>MEP</td><td>Pipes, pipe systems, ducts, cable carriers, flexible segments, branch connections, auto-routing, and system queries</td><td>Requires the corresponding Archicad MEP environment and valid system parameters</td></tr>
+            <tr><td>Edit and properties</td><td>Move, rotate, mirror, copy, delete, geometry changes, batch creation, selection, and property read/write</td><td>Confirm mutation scope and inspect readback</td></tr>
+            <tr><td>Reviewed modules</td><td>Workbench feature modules enabled by <code>modules\registry.json</code></td><td>Modules use declared existing commands and do not load arbitrary code from user directories</td></tr>
+            <tr><td>User assets</td><td>User templates, custom natural-language commands, knowledge, learning memory, audit logs, and proactive suggestions</td><td>Manage them in the Extensions panel according to the controls provided by each tab</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2><span class="index">5</span>MCP and API Integration</h2>
+      <h3>MCP clients</h3>
+      <ol class="guide-list">
+        <li>The MCP Server dynamically generates 59 tools from <code>ai-adapter\tool-descriptors.json</code>.</li>
+        <li>Start the Workbench Server before using MCP.</li>
+      </ol>
+      <div class="code-block">{
+  "mcpServers": {
+    "mepbridge": {
+      "command": "node",
+      "args": ["D:\\MEPbridge-ACAIstr\\tools\\mepbridge-mcp-server.js"],
+      "env": {
+        "MEPBRIDGE_ENDPOINT": "http://127.0.0.1:19780"
+      }
+    }
+  }
+}</div>
+      <p>Configuration formats vary among Claude Desktop, Cursor, Codex Desktop, and CodeBuddy. See <code>INSTALL.md</code> in the release package for complete examples.</p>
+      <h3>Server API</h3>
+      <ol class="guide-list">
+        <li>The UI and MCP enter through the Server's <code>/api/execute</code> endpoint, which then calls Archicad's official JSON API.</li>
+        <li>Common endpoints include <code>/health</code>, <code>/api/ping</code>, <code>/api/execute</code>, <code>/api/copilot/message</code>, and the user-asset endpoints.</li>
+        <li>The Archicad JSON API is detected dynamically on local ports <code>19723-19743</code>; do not assume a single fixed port.</li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2><span class="index">6</span>Safety, Data, and Privacy</h2>
+      <ol class="guide-list">
+        <li>Before write, move, edit, batch, or delete operations, verify target GUIDs, the current selection, units, stories, and coordinates.</li>
+        <li>When a command interface supports <code>dryRun</code>, use it first to preflight structure and parameters. A dry-run does not mean that Archicad created or changed an element.</li>
+        <li>When the UI requests confirmation, review the actual impact scope. After execution, verify the readback and the Archicad model.</li>
+        <li>User templates, custom commands, LLM configuration, learning memory, and audit data are stored under <code>%APPDATA%\MEPBridge</code> by default and can be redirected with <code>MEPBRIDGE_DATA_DIR</code>.</li>
+        <li>Do not submit API keys, user models, runtime logs, or user data to public repositories or feedback reports.</li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2><span class="index">7</span>Version Support and Known Boundaries</h2>
+      <ol class="guide-list">
+        <li><strong>Archicad 28 / Archicad 29:</strong> Both are released. Functional differences will be updated progressively in later versions.</li>
+        <li><strong>Complex geometry:</strong> The AABB viewport is for extent and relative-scale checks only. Use the Archicad model and native screenshots for precise geometry.</li>
+        <li><strong>Mutation operations:</strong> Validate the test release in a copy or test project and back up important models first.</li>
+      </ol>
+    </section>
+
+    <section class="section" id="disclaimer">
+      <h2><span class="index">8</span>Disclaimer</h2>
+      <ol class="guide-list">
+        <li>This Add-On is intended only for lawful and compliant Archicad automation and assisted modeling. Users must ensure that operations, model content, and output files comply with applicable laws, industry standards, project contracts, software licenses, and organizational requirements.</li>
+        <li>Creation, editing, movement, batch processing, and deletion can directly change Archicad files. Users must review parameters, target elements, and impact scope before execution and are responsible for backups, version management, and result verification.</li>
+        <li>Users are responsible for Add-On operations, model changes, generated files, stored data, and resulting consequences. Validate workflows in a test project or file copy and do not rely solely on interface previews.</li>
+        <li>The Add-On is provided as is, without a guarantee that it is error-free, uninterrupted, or suitable for every project. To the extent permitted by applicable law, the developer is not liable for data loss, file corruption, project loss, or indirect loss arising from installation, use, or inability to use the Add-On.</li>
+        <li>By installing or continuing to use this Add-On, the user confirms that these terms have been read, understood, and accepted. Do not install or use it if you do not agree.</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>MEPbridge ACAIstr (MACAI) v0.1.0</p>
+    <p>&copy; 2026 Zuxai Z. · MIT License</p>
+  </footer>
+</body>
+</html>

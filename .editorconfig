@@ -1,0 +1,78 @@
+# EditorConfig is awesome: https://editorconfig.org
+# Top-most EditorConfig file
+root = true
+
+# All files
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# C++ source files
+[*.{cpp,hpp,h,c}]
+indent_style = tab
+indent_size = 4
+tab_width = 4
+
+# CMake
+[CMakeLists.txt]
+indent_style = tab
+indent_size = 4
+
+[{CMakeLists.txt,*.cmake}]
+indent_style = tab
+indent_size = 4
+
+# JSON files
+[*.{json,jsonc}]
+indent_style = tab
+indent_size = 2
+
+# TypeScript / JavaScript / TSX
+[*.{ts,tsx,js,jsx,mjs,cjs}]
+indent_style = tab
+indent_size = 2
+
+# CSS / SCSS
+[*.{css,scss}]
+indent_style = tab
+indent_size = 2
+
+# HTML
+[*.html]
+indent_style = tab
+indent_size = 2
+
+# Markdown
+[*.md]
+trim_trailing_whitespace = false
+indent_style = space
+indent_size = 2
+
+# YAML
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# PowerShell
+[*.{ps1,psm1}]
+indent_style = space
+indent_size = 4
+
+# Batch files
+[*.{bat,cmd}]
+end_of_line = crlf
+indent_style = space
+indent_size = 2
+
+# GRC resource files
+[*.grc]
+end_of_line = crlf
+indent_style = tab
+indent_size = 4
+
+# Shell scripts
+[*.sh]
+indent_style = tab
+indent_size = 4

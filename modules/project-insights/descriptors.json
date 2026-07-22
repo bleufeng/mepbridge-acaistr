@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "mepbridge-module-descriptors-1",
+  "moduleId": "project-insights",
+  "commands": [
+    {
+      "name": "project-insights.get-summary",
+      "displayName": {
+        "zh-CN": "读取项目概览",
+        "en-US": "Read Project Summary"
+      },
+      "description": {
+        "zh-CN": "读取项目元数据和楼层列表，并返回一个组合结果。",
+        "en-US": "Reads project metadata and stories and returns one combined result."
+      },
+      "category": "Project",
+      "commandType": "query",
+      "riskLevel": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /server
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: npm
+    directory: /ai-adapter/ui/v0.1.0
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

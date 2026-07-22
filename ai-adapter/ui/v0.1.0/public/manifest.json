@@ -1,0 +1,18 @@
+{
+  "name": "MEPbridge ACAIstr —— Zuxai Z.",
+  "short_name": "MEPbridge ACAIstr",
+  "description": "AI 驱动的自然语言 BIM 操作平台 — Archicad MEP 协同引擎",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0f19",
+  "theme_color": "#0b0f19",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

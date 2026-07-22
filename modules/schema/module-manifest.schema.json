@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mepbridge.local/schema/module-manifest.schema.json",
+  "title": "MEPbridge C2 Workbench Module Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "version",
+    "apiVersion",
+    "displayName",
+    "description",
+    "riskLevel",
+    "entry",
+    "descriptors",
+    "permissions"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "mepbridge-module-manifest-1" },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$" },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "apiVersion": { "const": "1" },
+    "displayName": { "$ref": "#/$defs/localizedText" },
+    "description": { "$ref": "#/$defs/localizedText" },
+    "riskLevel": { "enum": ["read-only", "low-mutation"] },
+    "entry": { "type": "string" },
+    "descriptors": { "type": "string" },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["archicad", "filesystem", "network"],
+      "properties": {
+        "archicad": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["access", "commands"],
+          "properties": {
+            "access": { "enum": ["none", "read", "write"] },
+            "commands": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "filesystem": { "const": "none" },
+        "network": { "const": "none" }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "nativeWriteApproved": { "type": "boolean" }
+      }
+    }
+  },
+  "$defs": {
+    "localizedText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["zh-CN", "en-US"],
+      "properties": {
+        "zh-CN": { "type": "string", "minLength": 1 },
+        "en-US": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

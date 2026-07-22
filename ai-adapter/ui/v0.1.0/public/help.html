@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MEPbridge ACAIstr 使用指南</title>
+  <style>
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+      background: #0f0f10;
+      color: #e4e4e7;
+      line-height: 1.7;
+    }
+    a { color: #93c5fd; }
+    code {
+      font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+      color: #c4b5fd;
+    }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 24px;
+      background: rgba(24, 24, 27, 0.96);
+      border-bottom: 1px solid #3f3f46;
+      backdrop-filter: blur(12px);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark {
+      display: flex;
+      width: 40px;
+      height: 40px;
+      flex: 0 0 40px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      background: #4f46e5;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .brand h1 { margin: 0; font-size: 16px; font-weight: 650; }
+    .brand-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
+    .brand-meta span {
+      padding: 1px 7px;
+      border-radius: 4px;
+      background: #27272a;
+      color: #a1a1aa;
+      font-size: 11px;
+    }
+    .top-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+    .btn {
+      display: inline-flex;
+      min-height: 36px;
+      align-items: center;
+      justify-content: center;
+      padding: 7px 13px;
+      border: 1px solid #52525b;
+      border-radius: 6px;
+      background: #27272a;
+      color: #e4e4e7;
+      font-size: 13px;
+      text-decoration: none;
+      transition: background .15s, border-color .15s;
+    }
+    .btn:hover { background: #3f3f46; border-color: #71717a; }
+    .container { width: min(960px, 100%); margin: 0 auto; padding: 28px 24px 44px; }
+    .hero {
+      padding: 12px 0 28px;
+      border-bottom: 1px solid #3f3f46;
+    }
+    .hero h2 { margin: 0 0 10px; color: #f4f4f5; font-size: 24px; }
+    .hero p { max-width: 780px; margin: 0 0 8px; color: #d4d4d8; font-size: 14px; }
+    .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .tech-badges { margin-top: 8px; }
+    .badge { padding: 3px 9px; border-radius: 4px; font-size: 11px; font-weight: 650; }
+    .badge-green { background: #064e3b; color: #6ee7b7; }
+    .badge-blue { background: #172554; color: #93c5fd; }
+    .badge-purple { background: #3b0764; color: #d8b4fe; }
+    .badge-amber { background: #451a03; color: #fcd34d; }
+    .badge-cyan { background: #083344; color: #67e8f9; }
+    .section { padding: 28px 0; border-bottom: 1px solid #27272a; }
+    .section:last-of-type { border-bottom: 0; }
+    .section h2 {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 0 0 16px;
+      color: #c7d2fe;
+      font-size: 18px;
+    }
+    .section h2 .index {
+      display: inline-flex;
+      width: 25px;
+      height: 25px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      background: #312e81;
+      color: #e0e7ff;
+      font-size: 12px;
+    }
+    .section h3 { margin: 18px 0 8px; color: #ddd6fe; font-size: 14px; }
+    .section p { max-width: 860px; margin: 0 0 9px; color: #d4d4d8; font-size: 14px; text-align: left; }
+    .guide-list {
+      display: grid;
+      gap: 7px;
+      margin: 0 0 12px;
+      padding: 0;
+      list-style: none;
+      counter-reset: guide-step;
+    }
+    .guide-list li {
+      position: relative;
+      display: block;
+      padding-left: 36px;
+      margin: 0;
+      color: #d4d4d8;
+      font-size: 14px;
+      text-align: left;
+    }
+    .guide-list li::before {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 28px;
+      counter-increment: guide-step;
+      content: counter(guide-step) ".";
+      color: #a5b4fc;
+      font-weight: 700;
+      text-align: right;
+    }
+    .panel .guide-list li { color: #b4b4bc; font-size: 13px; }
+    .section code { overflow-wrap: anywhere; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .panel {
+      padding: 16px;
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      background: #18181b;
+    }
+    .panel h3, .panel h4 { margin: 0 0 8px; color: #a5b4fc; font-size: 14px; }
+    .panel p { margin: 0 0 7px; color: #b4b4bc; font-size: 13px; }
+    .panel p:last-child { margin-bottom: 0; }
+    .code-block {
+      overflow-x: auto;
+      margin: 10px 0 12px;
+      padding: 13px 15px;
+      border: 1px solid #3f3f46;
+      border-radius: 6px;
+      background: #09090b;
+      color: #c4b5fd;
+      font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.55;
+      white-space: pre;
+    }
+    .table-wrap { overflow-x: auto; }
+    .table { width: 100%; min-width: 680px; border-collapse: collapse; }
+    .table th {
+      padding: 9px 12px;
+      border-bottom: 1px solid #52525b;
+      background: #27272a;
+      color: #a5b4fc;
+      font-size: 12px;
+      text-align: left;
+    }
+    .table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #27272a;
+      color: #d4d4d8;
+      font-size: 13px;
+      vertical-align: top;
+    }
+    .table td:first-child { color: #6ee7b7; font-weight: 600; white-space: nowrap; }
+    .note {
+      margin: 13px 0;
+      padding: 12px 15px;
+      border-left: 3px solid #f59e0b;
+      border-radius: 0 6px 6px 0;
+      background: #1c1917;
+    }
+    .note p { margin: 0; color: #fcd34d; font-size: 13px; }
+    .footer {
+      padding: 24px;
+      border-top: 1px solid #27272a;
+      color: #71717a;
+      font-size: 12px;
+      text-align: center;
+    }
+    .footer p { margin: 2px 0; }
+    @media (max-width: 680px) {
+      .topbar { position: static; align-items: flex-start; padding: 14px 16px; }
+      .top-actions { flex-direction: column; align-items: stretch; }
+      .btn { min-width: 88px; }
+      .container { padding: 22px 16px 36px; }
+      .hero h2 { font-size: 21px; }
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">MA</div>
+      <div>
+        <h1>MEPbridge ACAIstr 使用指南</h1>
+        <div class="brand-meta">
+          <span>MACAI</span>
+          <span>v0.1.0</span>
+          <span>zh-CN</span>
+        </div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <a class="btn" href="./">打开工作台</a>
+      <a class="btn" href="feedback.html" target="_blank" rel="noopener noreferrer" title="打开使用反馈页面">使用反馈</a>
+      <a class="btn" href="help.en-US.html" title="Open the English guide">English</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h2>Archicad 建筑与 MEP 自动化工作台</h2>
+      <p><strong>MEPbridge ACAIstr（MACAI）</strong>是一套面向 Archicad 平台的原生 Add-On 与本地 MCP / Workbench 协同系统。基础阶段致力于打通大语言模型与专业三维设计软件之间安全、可控的双向交互，为设计工作提供自然语言对话调用、结构化命令执行与自主循环（AI Loop）能力。通过 Archicad 官方 JSON API、<code>MEPBridge.*</code> 结构化命令接口与安全执行机制，AI 可在用户确认和风险控制下读取、创建、修改并校验真实三维模型，逐步探索建筑设计全流程、全专业智能化的可落地路径。</p>
+      <div class="badges">
+        <span class="badge badge-green">ARCHICAD 原生 ADD-ON</span>
+        <span class="badge badge-purple">模型读取 / 写入 / 校验</span>
+        <span class="badge badge-blue">AC28 / AC29 双版本已发布</span>
+        <span class="badge badge-amber">Server 默认仅本机访问</span>
+      </div>
+      <div class="badges tech-badges" aria-label="技术架构">
+        <span class="badge badge-cyan">OPENBIM</span>
+        <span class="badge badge-blue">ARCHICAD JSON API</span>
+        <span class="badge badge-green">C++ ADD-ON</span>
+        <span class="badge badge-purple">AI LOOP</span>
+        <span class="badge badge-amber">MCP SERVER</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2><span class="index">1</span>安装与启动</h2>
+      <ol class="guide-list">
+        <li>解压 <code>MEPbridge-ACAIstr-v0.1.0-win64-zh-CN.zip</code> 到普通可写目录。</li>
+        <li>关闭 Archicad，在解压后的发布包根目录双击 <code>Install-MEPBridge.cmd</code>，并允许 Windows 管理员权限。安装程序会复制与 Archicad 版本匹配的 APX，并写入菜单一键启动所需的本机配置。</li>
+        <li>重新启动 Archicad。</li>
+        <li>在 Archicad 菜单中点击 <strong>MEPbridge ACAIstr → 打开 MEPbridge ACAIstr</strong>。插件会自动检查并启动本机 Workbench Server，然后打开工作台页面；无需另开命令窗口。</li>
+      </ol>
+      <h3>手动启动备用方式</h3>
+      <p>仅在菜单启动失败或需要查看 Server 日志时使用：</p>
+      <ol class="guide-list">
+        <li>在文件资源管理器中进入发布包根目录，即能看到 <code>server</code>、<code>tools</code> 和 README 文件的目录。</li>
+        <li>点击地址栏，输入 <code>powershell</code> 后按 Enter；也可以右键目录空白处，选择“在终端中打开”。</li>
+        <li>在打开的 PowerShell 或终端中输入：<div class="code-block">node server\server.js</div></li>
+        <li>保持窗口开启，在浏览器打开 <a href="http://127.0.0.1:19780/">http://127.0.0.1:19780/</a>；结束时按 <code>Ctrl+C</code> 停止 Server。</li>
+      </ol>
+      <p>若提示无法识别 <code>node</code>，请先安装 Node.js。Server 默认只绑定 <code>127.0.0.1</code>；Archicad 菜单中的“使用指南”也会自动启动 Server 后打开本页面。</p>
+      <div class="note">
+        <p>首次验证建议使用测试项目，先执行 Ping、读取选择集或项目信息等只读操作，再尝试创建、移动、编辑或删除。</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2><span class="index">2</span>界面模式与操作流程</h2>
+      <div class="grid-2">
+        <div class="panel">
+          <h3>Manual BASE 手动模式</h3>
+          <ol class="guide-list">
+            <li>适合明确命令、参数录入、选择集操作和调试验证。</li>
+            <li>中区模块包括 QUERY、MODIFY、BUILDING、Water、Electrical 和 Ventilation。</li>
+            <li>基本流程：选择模块 → 选择命令 → 填写参数 → 确认 → 执行 → 查看读回。</li>
+          </ol>
+        </div>
+        <div class="panel">
+          <h3>AI Copilot 智能模式</h3>
+          <ol class="guide-list">
+            <li>适合自然语言请求、模板任务和多步计划执行。</li>
+            <li>基本流程：输入目标 → 生成计划 → 按风险策略确认 → 执行步骤 → 查看读回与审计结果。</li>
+            <li>步骤较多时，中区窗口保持固定高度，可用鼠标滚轮或滚动条上下查看。</li>
+          </ol>
+        </div>
+      </div>
+      <h3>无 LLM 时</h3>
+      <ol class="guide-list">
+        <li>Manual BASE、固定模板和已配置的自定义自然语言命令仍可使用。</li>
+        <li>需要模型理解的自由文本自动解析不可用。</li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2><span class="index">3</span>视口与执行结果</h2>
+      <div class="grid-2">
+        <div class="panel">
+          <h3>实际 AABB 二维示意</h3>
+          <ol class="guide-list">
+            <li>Archicad 返回选择集或命令读回数据后，视口按 AABB 坐标和尺寸显示位置、范围与相对比例。</li>
+            <li>同一 GUID 移动或缩放后，视口会按新坐标重新计算比例。</li>
+            <li>AABB 是包围盒示意，不表达旋转面、孔洞、楼梯踏步或复杂多边形细节。</li>
+          </ol>
+        </div>
+        <div class="panel">
+          <h3>计划示意与原生截图</h3>
+          <ol class="guide-list">
+            <li>没有 Archicad 几何读回时，Copilot 只显示计划路径示意，不代表真实模型几何。</li>
+            <li>核对构件外观时，请切换到截图视图；截图比 AABB 更接近实际视觉结果。</li>
+          </ol>
+        </div>
+      </div>
+      <div class="note">
+        <p>判断命令是否真正生效，应优先查看执行返回、GUID、实际读回和 Archicad 模型；不能只根据计划示意判断。</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2><span class="index">4</span>功能与命令边界</h2>
+      <ol class="guide-list">
+        <li>v0.1.0 共注册 61 个 C++ 命令，其中 59 个具有公开 descriptor；Server 和 MCP Server 按 descriptor 动态工作。</li>
+        <li><code>SwitchStory</code> 与 <code>ChangeStairGeometry</code> 主要用于直接 Add-On 调用，不作为完整 descriptor/MCP 工具发布。</li>
+      </ol>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>能力范围</th><th>主要内容</th><th>使用提示</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>项目与查询</td><td>Ping、项目信息、楼层、图库、热链接、轴网、选择集、构件类型、几何与 AABB</td><td>建议作为首次连接和模型状态检查入口</td></tr>
+            <tr><td>建筑创建</td><td>墙、柱、梁、板、屋顶、门、窗、楼梯、对象、灯具、地形和区域</td><td>创建前核对楼层、坐标、单位和宿主构件</td></tr>
+            <tr><td>MEP 专业</td><td>管道、管道系统、风管、桥架、柔性段、支管连接、自动布管与系统查询</td><td>需使用对应 Archicad MEP 环境和有效系统参数</td></tr>
+            <tr><td>编辑与属性</td><td>移动、旋转、镜像、复制、删除、几何修改、批量创建、选择集和属性读写</td><td>写入类操作按风险要求确认并检查读回</td></tr>
+            <tr><td>审核模块</td><td>显示由 <code>modules\registry.json</code> 启用的 Workbench 功能模块</td><td>模块仅通过声明的现有命令工作；不从用户目录加载任意代码</td></tr>
+            <tr><td>用户资产</td><td>用户模板、自定义自然语言命令、知识库、学习记忆、审计日志和主动建议</td><td>在扩展功能面板中查看和管理；模板与自定义命令支持统一导入、导出、备份和重置，其他功能以各自 Tab 的操作为准</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2><span class="index">5</span>MCP 与 API 接入</h2>
+      <h3>MCP 客户端</h3>
+      <ol class="guide-list">
+        <li>MCP Server 从 <code>ai-adapter\tool-descriptors.json</code> 动态生成 59 个工具。</li>
+        <li>使用 MCP 前，先启动 Workbench Server。</li>
+      </ol>
+      <div class="code-block">{
+  "mcpServers": {
+    "mepbridge": {
+      "command": "node",
+      "args": ["D:\\MEPbridge-ACAIstr\\tools\\mepbridge-mcp-server.js"],
+      "env": {
+        "MEPBRIDGE_ENDPOINT": "http://127.0.0.1:19780"
+      }
+    }
+  }
+      }</div>
+      <p>Claude Desktop、Cursor、Codex Desktop 和 CodeBuddy 的配置格式可能不同，完整示例请查看发布包中的 <code>INSTALL.zh-CN.md</code>。</p>
+      <h3>Server API</h3>
+      <ol class="guide-list">
+        <li>UI 和 MCP 统一通过 <code>/api/execute</code> 进入 Server，再由 Server 调用 Archicad 官方 JSON API。</li>
+        <li>常用端点：<code>/health</code>、<code>/api/ping</code>、<code>/api/execute</code>、<code>/api/copilot/message</code> 和用户资产端点。</li>
+        <li>Archicad JSON API 在本机 <code>19723-19743</code> 范围动态探测，不要固定写死单一端口。</li>
+      </ol>
+      <div class="code-block">POST http://127.0.0.1:19780/api/execute
+Content-Type: application/json
+
+{
+  "commandName": "MEPBridge.Ping",
+  "parameters": {}
+}</div>
+    </section>
+
+    <section class="section">
+      <h2><span class="index">6</span>安全、数据与隐私</h2>
+      <ol class="guide-list">
+        <li>写入、移动、编辑、批量和删除操作应先核对目标 GUID、当前选择集、单位、楼层和坐标。</li>
+        <li>命令接口支持 <code>dryRun</code> 时，优先先做结构和参数预检；dry-run 不代表已经在 Archicad 中创建或修改构件。</li>
+        <li>界面提示确认时，应确认实际影响范围；执行后使用读回结果和 Archicad 模型复核。</li>
+        <li>用户模板、自定义命令、LLM 配置、学习记忆和审计数据默认写入 <code>%APPDATA%\MEPBridge</code>，可通过 <code>MEPBRIDGE_DATA_DIR</code> 覆盖。</li>
+        <li>不要把 API Key、用户模型、运行日志或用户数据提交到公开仓库或反馈内容中。</li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2><span class="index">7</span>版本支持与已知边界</h2>
+      <ol class="guide-list">
+        <li><strong>Archicad 28 / Archicad 29：</strong>均已正常发布，功能区别将在后续版本中逐步更新。</li>
+        <li><strong>复杂几何：</strong>AABB 视口仅用于范围和比例核对，精确几何仍以 Archicad 模型与原生截图为准。</li>
+        <li><strong>写入操作：</strong>测试版建议在副本或测试项目中验证，重要模型应先备份。</li>
+      </ol>
+    </section>
+
+    <section class="section" id="disclaimer">
+      <h2><span class="index">8</span>免责声明</h2>
+      <ol class="guide-list">
+        <li>本插件仅供合法、合规的 Archicad 自动化和辅助建模用途。使用者应自行确认操作、模型内容和输出文件符合适用的法律法规、行业规范、项目合同、软件许可及组织管理要求。</li>
+        <li>创建、编辑、移动、批量处理和删除等操作可能直接改变 Archicad 文件。使用者应在执行前检查参数、目标构件和影响范围，并自行完成文件备份、版本管理和结果复核。</li>
+        <li>使用者对插件操作、模型修改、生成文件、数据保存及由此产生的后果自行负责。建议先在测试项目或文件副本中验证，不应仅依据界面示意判断实际模型结果。</li>
+        <li>本插件按现状提供，不保证完全无错误、不中断或适用于所有项目场景。在适用法律允许的范围内，开发者不对因安装、使用或无法使用本插件造成的数据丢失、文件损坏、项目损失或其他间接损失承担责任。</li>
+        <li>安装或继续使用本插件，即表示使用者已阅读、理解并同意上述说明；如不同意，请勿安装或使用。</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>MEPbridge ACAIstr (MACAI) v0.1.0</p>
+    <p>&copy; 2026 Zuxai Z. · MIT License</p>
+  </footer>
+</body>
+</html>
