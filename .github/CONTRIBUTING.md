@@ -56,6 +56,22 @@ npm run build
 
 Also run `node --check` for changed JavaScript files and `git diff --check`.
 
+## Maintainer Synchronization
+
+The public repository must remain reproducible from the reviewed public
+allowlist export.
+
+- Accepted pull-request changes are synchronized into the maintained source
+  workspace before a release or later public export.
+- The next allowlist export must reproduce the accepted public files. A
+  public-only hotfix must not be left outside the maintained source.
+- `node_modules`, generated UI `dist`, APX/ZIP files, project models, logs, and
+  local user data must remain untracked.
+- Public Git commits and `CHANGELOG.md` are the public update record.
+- A public source or documentation update does not by itself replace an
+  existing installation ZIP. Release assets change only when the packaged
+  user payload changes and completes package verification.
+
 ## Pull Requests
 
 - Keep one user-visible change per pull request.
