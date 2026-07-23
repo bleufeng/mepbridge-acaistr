@@ -72,6 +72,38 @@ allowlist export.
   existing installation ZIP. Release assets change only when the packaged
   user payload changes and completes package verification.
 
+## Version and Update Record
+
+`VERSION` is the public product-version source of truth. The source directory
+name `ai-adapter/ui/v0.1.0` is a compatibility path and is not the version
+authority.
+
+Every public pull request must:
+
+- add a concise entry under `CHANGELOG.md` `[Unreleased]`
+- classify version impact as `none`, `patch`, `minor`, or `major`
+- keep `VERSION`, Server/UI package metadata, and English/Chinese public
+  documents synchronized when the product version changes
+- state whether GitHub Release assets remain unchanged or require replacement
+
+Use Semantic Versioning:
+
+- `patch`: backward-compatible fixes or small user-visible improvements
+- `minor`: backward-compatible features or meaningful capability expansion
+- `major`: incompatible public behavior or contract changes
+- `none`: documentation, CI, repository, or collaboration changes that do not
+  change the released product version
+
+Run:
+
+```powershell
+node tools\validate-public-version.js
+```
+
+CI also compares the change with its base commit. If `VERSION` changes, the
+version must increase and all required public version files must change in the
+same pull request.
+
 ## Pull Requests
 
 - Keep one user-visible change per pull request.

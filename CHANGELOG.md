@@ -2,7 +2,24 @@
 
 This file records public user-facing changes. Versions follow Semantic Versioning.
 
-## 0.1.0 - 2026-07-20
+## [Unreleased]
+
+### Added
+
+- Added a public `VERSION` source of truth and an automated version/update
+  record gate for every public pull request and `main` update.
+- Added a mandatory pull-request checklist for changelog, version impact,
+  bilingual documentation, and Release asset impact.
+
+### Changed
+
+- Every public repository update must add a concise entry under
+  `[Unreleased]`.
+- Product version changes must increment Semantic Versioning and synchronize
+  the changelog, English and Chinese public guides, and Server/UI package
+  metadata.
+
+## [0.1.0] - 2026-07-20
 
 ### Added
 

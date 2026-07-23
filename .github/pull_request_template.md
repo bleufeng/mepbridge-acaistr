@@ -10,6 +10,15 @@ Describe the user-visible Workbench or module change.
 - [ ] MCP or descriptor correction
 - [ ] Documentation or example
 
+## Version and Update Record
+
+- [ ] `CHANGELOG.md` contains a concise entry under `[Unreleased]`.
+- [ ] Version impact is selected: `none` / `patch` / `minor` / `major`.
+- [ ] If `VERSION` changed, the new version is greater and all English/Chinese
+      public version documents and Server/UI package metadata were updated.
+- [ ] GitHub Release assets are classified: unchanged / replace after package
+      verification / not applicable.
+
 ## Safety Boundary
 
 - [ ] No arbitrary user-directory code loading
@@ -23,6 +32,7 @@ Describe the user-visible Workbench or module change.
 - Module validator:
 - Module tests:
 - Server checks:
+- Version/update record check:
 - UI lint/build:
 - Package checks:
 - Archicad runtime checks:

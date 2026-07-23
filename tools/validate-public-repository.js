@@ -131,9 +131,11 @@ function checkReadmeLanguageEntrypoints() {
 for (const requiredPath of [
   'README.md',
   'README.zh-CN.md',
+  'VERSION',
   'LICENSE',
   'NOTICE',
   '.github/CONTRIBUTING.md',
+  '.github/pull_request_template.md',
   '.github/SECURITY.md',
   '.github/SUPPORT.md',
   'docs/contributors/MODULE_DEVELOPMENT.md',
@@ -144,6 +146,7 @@ for (const requiredPath of [
   'tools/mepbridge-mcp-server.js',
   'tools/validate-modules.js',
   'tools/validate-public-repository.js',
+  'tools/validate-public-version.js',
 ]) {
   requireFile(requiredPath);
 }

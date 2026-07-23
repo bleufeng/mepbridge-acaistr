@@ -34,6 +34,8 @@ Natural-language tasks and extensible user templates pass through planning and r
 - Server default: `127.0.0.1:19780`
 - Archicad JSON API discovery: local `127.0.0.1:19723-19743`
 
+Public update history: [CHANGELOG.md](CHANGELOG.md).
+
 Download the named `MEPbridge-ACAIstr-v0.1.0-*.zip` asset from GitHub Releases. Do not use GitHub's automatically generated `Source code.zip` or `Source code.tar.gz`; they are not installation packages and do not contain the complete APX and runtime dependencies. The release ZIP contains the matching APX files, Workbench Server, compiled UI, MCP Server, production dependencies, legal files, manifest, and checksums.
 
 The public repository provides the C2 Workbench collaboration surface: React Workbench, Node.js Server, MCP Server, core descriptors, reviewed module SDK and schema, examples, and public documentation. Contributors can build reviewed modules, compose existing Archicad commands into new workflows, extend UI panels and Server services, improve MCP integrations, and contribute examples or documentation.

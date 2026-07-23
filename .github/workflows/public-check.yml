@@ -14,9 +14,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Validate public repository boundary
         run: node tools/validate-public-repository.js
+
+      - name: Validate version and public update record
+        env:
+          VERSION_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: node tools/validate-public-version.js --base "$VERSION_BASE_SHA"
 
       - uses: actions/setup-node@v4
         with:

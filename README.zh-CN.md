@@ -34,6 +34,8 @@
 - Server 默认地址：`127.0.0.1:19780`
 - Archicad JSON API 本机检测范围：`127.0.0.1:19723-19743`
 
+公开更新记录：[CHANGELOG.md](CHANGELOG.md)。
+
 推荐用户从 GitHub Releases 下载命名为 `MEPbridge-ACAIstr-v0.1.0-*.zip` 的完整发布 ZIP。不要下载 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`，它们不是安装包，不包含完整 APX 和运行依赖。正式发布 ZIP 包含 AC28/AC29 APX、Workbench Server、编译后的 UI、MCP Server、生产依赖、法律文件、发布清单和 SHA256 校验和。
 
 公开仓库提供 C2 Workbench 开放协作能力，包括 React Workbench、Node.js Server、MCP Server、核心 descriptor、审核模块 SDK 与 schema、示例和公开文档。开发者可以新增审核模块、组合现有 Archicad 命令形成新工作流、扩展 UI 面板与 Server 服务、完善 MCP 集成，并贡献示例或文档。
