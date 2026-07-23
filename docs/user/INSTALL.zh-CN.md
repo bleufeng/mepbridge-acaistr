@@ -2,7 +2,7 @@
 
 本说明适用于 Archicad 28 和 Archicad 29 的 Windows 发布包。
 
-请从 GitHub Releases 下载命名为 `MEPbridge-ACAIstr-v0.1.0-*.zip` 的发布资产。不要下载 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`，它们不是安装包，不包含完整 APX 和运行依赖。
+中文优先界面请下载 `MEPbridge-ACAIstr-v0.1.0-win64-zh-CN.zip`，英文优先界面请下载 `MEPbridge-ACAIstr-v0.1.0-win64-en-US.zip`。首次安装不要使用独立 APX 更新文件，也不要使用 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`。
 
 ## 环境要求
 
@@ -15,7 +15,7 @@ Server 默认只监听 `127.0.0.1:19780`。Archicad JSON API 在本机 `127.0.0.
 
 ## 版本选择
 
-合并发布包包含：
+两个完整语言包均包含：
 
 ```text
 Archicad-28\MEPBridge.apx
@@ -23,6 +23,10 @@ Archicad-29\MEPBridge.apx
 ```
 
 只能安装与 Archicad 主版本一致的 APX。
+
+`MEPbridge-ACAIstr-v0.1.0-AC28-win64.apx` 和
+`MEPbridge-ACAIstr-v0.1.0-AC29-win64.apx` 只更新原生 Add-On，不包含
+Server、UI、MCP Server、生产依赖和安装脚本，仅适用于已经完成完整安装的用户。
 
 ## 自动安装
 

@@ -2,7 +2,7 @@
 
 ## 1. 安装
 
-请下载命名为 `MEPbridge-ACAIstr-v0.1.0-*.zip` 的 Release 资产，不要下载 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`。
+请下载中文 `win64-zh-CN.zip` 或英文 `win64-en-US.zip` 完整安装包。独立 APX 仅用于已有完整安装的更新，GitHub 自动生成的源码归档不是安装包。
 
 1. 解压完整的 v0.1.0 发布 ZIP。
 2. 关闭 Archicad，双击 `Install-MEPBridge.cmd`。

@@ -139,10 +139,15 @@ let previousVersion = null;
 const resolvedBase = canResolveCommit(base);
 
 if (resolvedBase) {
-  changedFiles = git(['diff', '--name-only', base])
+  const diffFiles = git(['diff', '--name-only', base])
     .split(/\r?\n/)
     .filter(Boolean)
     .map((file) => file.replaceAll('\\', '/'));
+  const untrackedFiles = git(['ls-files', '--others', '--exclude-standard'])
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((file) => file.replaceAll('\\', '/'));
+  changedFiles = [...new Set([...diffFiles, ...untrackedFiles])].sort();
 
   if (changedFiles.length > 0 && !changedFiles.includes('CHANGELOG.md')) {
     failures.push('Every public update must change CHANGELOG.md under [Unreleased].');

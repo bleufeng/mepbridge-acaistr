@@ -2,7 +2,7 @@
 
 This guide applies to the Windows release packages for Archicad 28 and Archicad 29.
 
-Download the named `MEPbridge-ACAIstr-v0.1.0-*.zip` asset from GitHub Releases. Do not use GitHub's automatically generated `Source code.zip` or `Source code.tar.gz`; they are not installation packages and do not contain the complete APX and runtime dependencies.
+Download `MEPbridge-ACAIstr-v0.1.0-win64-en-US.zip` for an English-first installation or `MEPbridge-ACAIstr-v0.1.0-win64-zh-CN.zip` for a Chinese-first installation. Do not use an APX-only update or GitHub's automatically generated `Source code.zip` / `Source code.tar.gz` for first-time installation.
 
 ## Requirements
 
@@ -15,7 +15,7 @@ The Server listens on `127.0.0.1:19780` by default. Archicad's local JSON API is
 
 ## Package Selection
 
-The combined package contains:
+Both full language packages contain:
 
 ```text
 Archicad-28\MEPBridge.apx
@@ -23,6 +23,11 @@ Archicad-29\MEPBridge.apx
 ```
 
 Use only the APX matching the installed Archicad major version.
+
+The standalone `MEPbridge-ACAIstr-v0.1.0-AC28-win64.apx` and
+`MEPbridge-ACAIstr-v0.1.0-AC29-win64.apx` assets update only the native Add-On.
+They do not include the Server, UI, MCP Server, production dependencies, or
+installer and are intended only for an existing complete installation.
 
 ## Automatic Installation
 

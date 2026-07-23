@@ -10,6 +10,8 @@ This file records public user-facing changes. Versions follow Semantic Versionin
   record gate for every public pull request and `main` update.
 - Added a mandatory pull-request checklist for changelog, version impact,
   bilingual documentation, and Release asset impact.
+- Added independent Chinese (`zh-CN`) and English (`en-US`) Windows v0.1.0
+  installation packages and standalone AC28/AC29 APX update assets.
 
 ### Changed
 
@@ -18,6 +20,9 @@ This file records public user-facing changes. Versions follow Semantic Versionin
 - Product version changes must increment Semantic Versioning and synchronize
   the changelog, English and Chinese public guides, and Server/UI package
   metadata.
+- Package locale now controls the initial Workbench language, starter assets,
+  and built-in regional knowledge base while preserving manual language
+  switching.
 
 ## [0.1.0] - 2026-07-20
 

@@ -427,6 +427,31 @@ export default function App() {
   const [lang, setLang] = useState<UiLanguageType>("zh-CN");
   const currentT = t[lang];
 
+  useEffect(() => {
+    let active = true;
+
+    fetch("/ui-config.json")
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then((config) => {
+        if (
+          active &&
+          (config?.language === "zh-CN" || config?.language === "en-US")
+        ) {
+          setLang(config.language);
+        }
+      })
+      .catch((error) => {
+        console.warn("[ui-config] Using the built-in language fallback:", error);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // Mode switch state (NEW: BASE vs AI Copilot)
   const [workbenchMode, setWorkbenchMode] = useState<"base" | "copilot">("copilot");
 

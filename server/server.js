@@ -4,6 +4,7 @@ const bodyParser = require('body-parser');
 const path = require('path');
 const fs = require('fs');
 const extensionManager = require('./services/extension-manager');
+const { resolveReleaseLocale } = require('./services/release-locale');
 
 const app = express();
 const PORT = process.env.PORT || 19780;
@@ -15,6 +16,7 @@ const BUILD_INFO = {
   buildDate: process.env.MEPBRIDGE_BUILD_DATE || null,
   releaseChannel: process.env.MEPBRIDGE_RELEASE_CHANNEL || 'local'
 };
+const RELEASE_LOCALE = resolveReleaseLocale();
 
 function isAllowedCorsOrigin(origin) {
   if (!origin) return true;
@@ -118,7 +120,7 @@ const archicadHost = '127.0.0.1';
 app.get('/ui-config.json', (req, res) => {
   res.json({
     ok: true,
-    language: process.env.UI_LANGUAGE || 'zh-CN',
+    language: RELEASE_LOCALE,
     archicadHost,
     archicadPort: getArchicadPort()
   });

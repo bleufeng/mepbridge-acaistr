@@ -36,7 +36,12 @@ Natural-language tasks and extensible user templates pass through planning and r
 
 Public update history: [CHANGELOG.md](CHANGELOG.md).
 
-Download the named `MEPbridge-ACAIstr-v0.1.0-*.zip` asset from GitHub Releases. Do not use GitHub's automatically generated `Source code.zip` or `Source code.tar.gz`; they are not installation packages and do not contain the complete APX and runtime dependencies. The release ZIP contains the matching APX files, Workbench Server, compiled UI, MCP Server, production dependencies, legal files, manifest, and checksums.
+Download the full package for your language from GitHub Releases:
+
+- `MEPbridge-ACAIstr-v0.1.0-win64-en-US.zip`: English full package.
+- `MEPbridge-ACAIstr-v0.1.0-win64-zh-CN.zip`: Chinese full package.
+
+Do not use GitHub's automatically generated `Source code.zip` or `Source code.tar.gz`; they are not installation packages and do not contain the complete APX and runtime dependencies. Each full ZIP contains both AC28 and AC29 APXs, the Workbench Server, compiled UI, MCP Server, production dependencies, legal files, manifest, and checksums. The standalone AC28/AC29 APX assets are update-only files for users who already have a complete package installed.
 
 The public repository provides the C2 Workbench collaboration surface: React Workbench, Node.js Server, MCP Server, core descriptors, reviewed module SDK and schema, examples, and public documentation. Contributors can build reviewed modules, compose existing Archicad commands into new workflows, extend UI panels and Server services, improve MCP integrations, and contribute examples or documentation.
 
@@ -94,7 +99,7 @@ UI and MCP model operations pass through `/api/execute`. Runtime data such as us
 
 ## Install
 
-1. Download the complete `MEPbridge-ACAIstr-v0.1.0-*.zip` from Releases, not the automatically generated `Source code.zip` or `Source code.tar.gz`.
+1. Download the complete `win64-en-US.zip` or `win64-zh-CN.zip` package from Releases, not an APX-only update or the automatically generated `Source code.zip` / `Source code.tar.gz`.
 2. Extract it to a normal writable directory.
 3. Close Archicad and run `Install-MEPBridge.cmd`.
 4. Restart Archicad.

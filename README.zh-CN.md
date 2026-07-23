@@ -36,7 +36,12 @@
 
 公开更新记录：[CHANGELOG.md](CHANGELOG.md)。
 
-推荐用户从 GitHub Releases 下载命名为 `MEPbridge-ACAIstr-v0.1.0-*.zip` 的完整发布 ZIP。不要下载 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`，它们不是安装包，不包含完整 APX 和运行依赖。正式发布 ZIP 包含 AC28/AC29 APX、Workbench Server、编译后的 UI、MCP Server、生产依赖、法律文件、发布清单和 SHA256 校验和。
+请从 GitHub Releases 按界面语言下载完整安装包：
+
+- `MEPbridge-ACAIstr-v0.1.0-win64-zh-CN.zip`：中文完整安装包。
+- `MEPbridge-ACAIstr-v0.1.0-win64-en-US.zip`：英文完整安装包。
+
+不要下载 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`，它们不是安装包，不包含完整 APX 和运行依赖。每个完整 ZIP 均包含 AC28/AC29 APX、Workbench Server、编译后的 UI、MCP Server、生产依赖、法律文件、发布清单和 SHA256 校验和。单独的 AC28/AC29 APX 仅供已安装完整运行环境的用户更新插件。
 
 公开仓库提供 C2 Workbench 开放协作能力，包括 React Workbench、Node.js Server、MCP Server、核心 descriptor、审核模块 SDK 与 schema、示例和公开文档。开发者可以新增审核模块、组合现有 Archicad 命令形成新工作流、扩展 UI 面板与 Server 服务、完善 MCP 集成，并贡献示例或文档。
 
@@ -94,7 +99,7 @@ UI 和 MCP 的模型操作统一通过 `/api/execute`。用户模板、学习记
 
 ## 安装
 
-1. 从 Releases 下载完整的 `MEPbridge-ACAIstr-v0.1.0-*.zip`，不要下载自动生成的 `Source code.zip` 或 `Source code.tar.gz`。
+1. 从 Releases 下载完整的 `win64-zh-CN.zip` 或 `win64-en-US.zip`，不要把独立 APX 更新文件或自动生成的 `Source code.zip` / `Source code.tar.gz` 当作完整安装包。
 2. 解压到普通可写目录。
 3. 关闭 Archicad，双击 `Install-MEPBridge.cmd`。
 4. 重新启动 Archicad。

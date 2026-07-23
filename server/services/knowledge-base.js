@@ -9,6 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const { ensureDataDir, migrateLegacyFile } = require('./runtime-paths');
+const { resolveReleaseLocale } = require('./release-locale');
 
 const USER_DATA_DIR = ensureDataDir('user-data');
 const USER_KB_FILE = migrateLegacyFile('user-data/knowledge-base.json', 'user-data/knowledge-base.json');
@@ -21,10 +22,12 @@ const USER_KB_FILE = migrateLegacyFile('user-data/knowledge-base.json', 'user-da
   }
 })();
 
-// 加载内置知识库（发布包级别静态加载，非运行时切换）
-// 中文发布包使用 knowledge-base-zh-CN.js
-// 英文发布包打包时替换为 knowledge-base-en-US.js
-const BUILTIN_KB = require('./knowledge-base-zh-CN');
+// Resolve once at Server startup. Package manifest is the default, while an
+// explicit environment setting remains available for development and testing.
+const RELEASE_LOCALE = resolveReleaseLocale();
+const BUILTIN_KB = RELEASE_LOCALE === 'en-US'
+  ? require('./knowledge-base-en-US')
+  : require('./knowledge-base-zh-CN');
 console.log(`[KnowledgeBase] Loaded builtin KB: locale=${BUILTIN_KB.locale}, version=${BUILTIN_KB.version}, ${BUILTIN_KB.buildingCode.length}+${BUILTIN_KB.mepStandard.length}+${BUILTIN_KB.material.length} rules`);
 
 const BUILDING_CODE = BUILTIN_KB.buildingCode;
