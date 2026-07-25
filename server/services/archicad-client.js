@@ -4,6 +4,7 @@ const {
   resolveDynamicCommandParameters
 } = require('./dynamic-command-resolver');
 const { getArchicadEndpoint } = require('./archicad-endpoint');
+const { normalizeCommandSafetyParameters } = require('./command-capabilities');
 
 class ArchicadClient {
   constructor() {
@@ -134,12 +135,7 @@ function normalizeAddOnParameters(commandName, params) {
     }
   }
 
-  if (!supportsDryRunConfirmation(commandName)) {
-    delete normalized.dryRun;
-    delete normalized.confirmRequired;
-  }
-
-  return normalized;
+  return normalizeCommandSafetyParameters(commandName, normalized);
 }
 
 function normalizePoint(point) {
@@ -162,21 +158,6 @@ function normalizePoint(point) {
     y: values[1] / divisor,
     z: values[2] / divisor
   };
-}
-
-function supportsDryRunConfirmation(commandName) {
-  return [
-    'MoveElements', 'MoveSelectedElements', 'EditElements', 'EditSelectedElements',
-    'CopyElements', 'AutoRoutePipe',
-    // V2 H1.1 建筑创建
-    'CreateWall', 'CreateColumn', 'CreateBeam', 'CreateSlab', 'CreateDoor', 'CreateWindow', 'CreateRoof',
-    'CreateStair',
-    // V2 H1.3 变换
-    'RotateSelectedElements', 'MirrorSelectedElements',
-    // MEP 创建命令
-    'CreateDuct', 'CreatePipe', 'CreatePipeSystem', 'CreateCableCarrier',
-    'CreateFlexibleSegment', 'CreateTakeOff'
-  ].includes(commandName);
 }
 
 module.exports = new ArchicadClient();

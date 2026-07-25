@@ -383,7 +383,7 @@
               "Slab",
               "Roof"
             ],
-            "properties": {},
+            "properties": [],
             "dryRun": true,
             "confirmRequired": true
           }
@@ -579,6 +579,10 @@
         "offsetMm": {
           "type": "delta3d",
           "description": "Extract x/y/z offset from text"
+        },
+        "targetStoryIndex": {
+          "type": "story-index",
+          "description": "Optional target story index for story copy requests, e.g. copy to story 2 / copy to second floor / copy to 2F"
         }
       },
       "targetResolution": {
@@ -1311,7 +1315,22 @@
           "element property"
         ]
       },
-      "paramExtractors": {},
+      "paramExtractors": {
+        "elementGuid": {
+          "type": "string",
+          "required": true,
+          "description": "Archicad element GUID to query. The legacy routeGuid alias is still accepted by the Add-On."
+        },
+        "filter": {
+          "type": "enum",
+          "values": [
+            "All",
+            "UserDefined",
+            "BuiltIn"
+          ],
+          "description": "Property filter (default All)"
+        }
+      },
       "commandJson": {
         "command": "API.ExecuteAddOnCommand",
         "parameters": {
@@ -1319,7 +1338,9 @@
             "commandNamespace": "MEPBridge",
             "commandName": "GetElementPropertyDefinitions"
           },
-          "addOnCommandParameters": {}
+          "addOnCommandParameters": {
+            "filter": "All"
+          }
         }
       }
     },
@@ -2099,6 +2120,10 @@
         "level": {
           "type": "number",
           "description": "Reference level offset from floor in meters"
+        },
+        "floorIndex": {
+          "type": "integer",
+          "description": "Story index (0 = home story)"
         }
       },
       "commandJson": {
@@ -2128,6 +2153,8 @@
               }
             ],
             "thickness": 0.15,
+            "level": 0,
+            "floorIndex": 0,
             "dryRun": true,
             "confirmRequired": false
           }
@@ -3313,9 +3340,13 @@
         ]
       },
       "paramExtractors": {
+        "elementGuid": {
+          "type": "string",
+          "description": "Archicad element GUID to query (preferred)"
+        },
         "routeGuid": {
           "type": "string",
-          "description": "Route/element GUID to query (required). Extracted from selection or explicit GUID"
+          "description": "Legacy alias for elementGuid"
         },
         "filter": {
           "type": "string",
@@ -3379,9 +3410,13 @@
         ]
       },
       "paramExtractors": {
+        "elementGuid": {
+          "type": "string",
+          "description": "Archicad element GUID to modify (preferred)"
+        },
         "routeGuid": {
           "type": "string",
-          "description": "Route/element GUID (required). Extracted from selection or explicit GUID"
+          "description": "Legacy alias for elementGuid"
         },
         "propertyGuid": {
           "type": "string",
@@ -3414,7 +3449,6 @@
           "addOnCommandParameters": {
             "routeGuid": "",
             "propertyName": "",
-            "groupName": "",
             "valueString": "",
             "filter": "All"
           }

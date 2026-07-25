@@ -5846,7 +5846,6 @@ export default function App() {
                             className="w-full rounded px-2 py-1.5 text-left text-[10px] text-zinc-300 hover:bg-zinc-800 font-mono flex items-center gap-2"
                             title={tpl.description || tpl.name}
                           >
-                            <span className="flex-shrink-0">{tpl.icon || "📋"}</span>
                             <span className="flex-1 min-w-0">
                               <span className="block truncate text-zinc-200">{tpl.name}</span>
                               {tpl.description && <span className="block truncate text-[8px] text-zinc-600">{tpl.description}</span>}

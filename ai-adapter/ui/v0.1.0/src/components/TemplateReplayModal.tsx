@@ -70,8 +70,7 @@ export const TemplateReplayModal: React.FC<TemplateReplayModalProps> = ({
       <div className="w-full max-w-lg bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
-          <h2 className="text-sm font-semibold font-display tracking-wider uppercase text-zinc-200 flex items-center gap-2">
-            <span className="text-lg">{template.icon || "📋"}</span>
+          <h2 className="text-sm font-semibold font-display tracking-wider uppercase text-zinc-200">
             {template.name}
           </h2>
           <button

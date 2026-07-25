@@ -337,7 +337,6 @@ export function ExtensionPanel({
                 <div className="grid grid-cols-1 gap-2">
                   {filteredTemplates.map(tpl => {
                     const usageCount = tpl.usageCount || 0;
-                    const isHot = usageCount >= 3;
                     return (
                     <div
                       key={tpl.id}
@@ -345,8 +344,6 @@ export function ExtensionPanel({
                     >
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-1.5">
-                          {isHot && <span className="text-[10px]" title={zh ? "热门" : "Hot"}>🔥</span>}
-                          <span className="text-sm">{tpl.icon || "📋"}</span>
                           <span className="text-xs font-semibold text-zinc-200 truncate">{tpl.name}</span>
                         </div>
                         <div className="flex items-center gap-1">

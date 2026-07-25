@@ -1,0 +1,2 @@
+# Do not exempt Markdown from Git whitespace checks.
+# Public-export Markdown must not use trailing spaces for hard line breaks.
