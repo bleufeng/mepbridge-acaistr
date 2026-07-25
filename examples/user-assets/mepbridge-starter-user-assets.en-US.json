@@ -332,84 +332,32 @@
     },
     {
       "id": "tpl-starter-scan-structure",
-      "name": "Scan wall, column, and beam AABBs",
-      "category": "MEPBridge-Read",
-      "icon": "SCAN",
-      "description": "Scans wall, column, and beam AABB boundaries for model inspection before creation or routing.",
-      "plan": {
-        "title": "Scan wall, column, and beam AABBs",
-        "warning": null,
-        "isMutation": false,
-        "mepCode": "ScanStructuralElements",
-        "steps": [
-          {
-            "id": "step-scan-structure",
-            "title": "Scan structural AABBs",
-            "action": "ScanStructuralElements",
-            "description": "Scan wall, column, and beam AABB boundaries in the current model.",
-            "expectedResult": "Returns a list of structural element AABBs.",
-            "params": {
-              "types": ["Wall", "Column", "Beam"]
-            },
-            "commandJson": {
-              "command": "API.ExecuteAddOnCommand",
-              "parameters": {
-                "addOnCommandId": {
-                  "commandNamespace": "MEPBridge",
-                  "commandName": "ScanStructuralElements"
-                },
-                "addOnCommandParameters": {
-                  "types": ["Wall", "Column", "Beam"]
-                }
-              }
-            },
-            "commandNamespace": "MEPBridge",
-            "commandName": "ScanStructuralElements",
-            "descriptorName": "mepbridge.ScanStructuralElements",
-            "riskLevel": "read",
-            "status": "pending"
-          }
-        ],
-        "parameters": [
-          {
-            "item": "Element types",
-            "expected": "Wall, Column, Beam",
-            "actual": "Pending execution",
-            "status": "warning"
-          }
-        ]
-      },
-      "riskLevel": "read",
-      "createdAt": "2026-07-22T00:00:00.000+08:00",
-      "updatedAt": "2026-07-22T00:00:00.000+08:00",
-      "tags": ["starter", "example", "release-preset", "en-US"],
-      "usageCount": 0,
-      "version": "1.2",
-      "notes": "Packaged read-only structural scan example."
-    },
-    {
-      "id": "tpl-starter-partition-walls",
-      "name": "Create two sample partition walls",
+      "name": "Create sample slab",
       "category": "Building",
-      "icon": "WALL",
-      "description": "Creates two stable 3m sample partition walls near X=44m.",
+      "icon": "SLAB",
+      "description": "Creates a 15.55m x 14.55m rectangular sample slab on story 0 at level 0.000m with a thickness of 0.30m, using the verified native source coordinates (same position as the source slab).",
       "plan": {
-        "title": "Create two sample partition walls",
+        "title": "Create sample slab",
         "warning": "This template writes to the Archicad model. Auto mode executes directly; supervised and manual modes require confirmation.",
         "isMutation": true,
-        "mepCode": "CreateWall x 2",
+        "mepCode": "CreateSlab",
         "steps": [
           {
-            "id": "step-partition-a",
-            "title": "Create a 3m horizontal partition",
-            "action": "CreateWall",
-            "description": "Create one 3m horizontal sample partition wall.",
-            "expectedResult": "Creates one Wall element.",
+            "id": "step-create-sample-slab",
+            "title": "Create story-0 sample slab",
+            "action": "CreateSlab",
+            "description": "Create the slab from live-read parameters using the source slab's native coordinates (no offset).",
+            "expectedResult": "Creates one Slab with floorIndex=0, level=0, and thickness=0.30m.",
             "params": {
-              "start": { "x": 44, "y": 0 },
-              "end": { "x": 47, "y": 0 },
-              "thickness": 0.12,
-              "height": 3,
+              "polygon": [
+                { "x": -6.24, "y": -11.37 },
+                { "x": 9.31, "y": -11.37 },
+                { "x": 9.31, "y": 3.18 },
+                { "x": -6.24, "y": 3.18 }
+              ],
+              "thickness": 0.3,
+              "level": 0,
+              "floorIndex": 0,
               "dryRun": false,
               "confirmRequired": true
             },
@@ -418,72 +366,40 @@
               "parameters": {
                 "addOnCommandId": {
                   "commandNamespace": "MEPBridge",
-                  "commandName": "CreateWall"
+                  "commandName": "CreateSlab"
                 },
                 "addOnCommandParameters": {
-                  "start": { "x": 44, "y": 0 },
-                  "end": { "x": 47, "y": 0 },
-                  "thickness": 0.12,
-                  "height": 3,
+                  "polygon": [
+                    { "x": -6.24, "y": -11.37 },
+                    { "x": 9.31, "y": -11.37 },
+                    { "x": 9.31, "y": 3.18 },
+                    { "x": -6.24, "y": 3.18 }
+                  ],
+                  "thickness": 0.3,
+                  "level": 0,
+                  "floorIndex": 0,
                   "dryRun": false,
                   "confirmRequired": true
                 }
               }
             },
             "commandNamespace": "MEPBridge",
-            "commandName": "CreateWall",
-            "descriptorName": "mepbridge.CreateWall",
-            "riskLevel": "low-mutation",
-            "status": "pending"
-          },
-          {
-            "id": "step-partition-b",
-            "title": "Create a 3m vertical partition",
-            "action": "CreateWall",
-            "description": "Create one 3m vertical sample partition wall.",
-            "expectedResult": "Creates one Wall element.",
-            "params": {
-              "start": { "x": 44, "y": 0 },
-              "end": { "x": 44, "y": 3 },
-              "thickness": 0.12,
-              "height": 3,
-              "dryRun": false,
-              "confirmRequired": true
-            },
-            "commandJson": {
-              "command": "API.ExecuteAddOnCommand",
-              "parameters": {
-                "addOnCommandId": {
-                  "commandNamespace": "MEPBridge",
-                  "commandName": "CreateWall"
-                },
-                "addOnCommandParameters": {
-                  "start": { "x": 44, "y": 0 },
-                  "end": { "x": 44, "y": 3 },
-                  "thickness": 0.12,
-                  "height": 3,
-                  "dryRun": false,
-                  "confirmRequired": true
-                }
-              }
-            },
-            "commandNamespace": "MEPBridge",
-            "commandName": "CreateWall",
-            "descriptorName": "mepbridge.CreateWall",
+            "commandName": "CreateSlab",
+            "descriptorName": "mepbridge.CreateSlab",
             "riskLevel": "low-mutation",
             "status": "pending"
           }
         ],
         "parameters": [
           {
-            "item": "Partition count",
-            "expected": "2 Wall elements",
+            "item": "Slab outline",
+            "expected": "15.55m x 14.55m rectangle with four vertices",
             "actual": "Pending execution",
             "status": "warning"
           },
           {
-            "item": "Dimensions",
-            "expected": "Each wall is 3m long, 3m high, and 0.12m thick",
+            "item": "Story and thickness",
+            "expected": "floorIndex=0, level=0.00m, thickness=0.30m",
             "actual": "Pending execution",
             "status": "warning"
           }
@@ -491,11 +407,92 @@
       },
       "riskLevel": "low-mutation",
       "createdAt": "2026-07-22T00:00:00.000+08:00",
-      "updatedAt": "2026-07-22T00:00:00.000+08:00",
+      "updatedAt": "2026-07-24T00:00:00.000+08:00",
       "tags": ["starter", "example", "release-preset", "en-US"],
       "usageCount": 0,
-      "version": "1.2",
-      "notes": "Uses the stable CreateWall command for the packaged mutation example."
+      "version": "1.3",
+      "notes": "Parameters come from the current AC28 story-0 slab read/recreate regression. Coordinates use the source slab's native position (no X offset)."
+    },
+    {
+      "id": "tpl-starter-partition-walls",
+      "name": "Create sample cable tray",
+      "category": "MEP",
+      "icon": "TRAY",
+      "description": "Creates a five-point, four-segment sample cable tray on story 0 at 2.50m above the home story with a 0.20m x 0.10m rectangular cross section.",
+      "plan": {
+        "title": "Create sample cable tray",
+        "warning": "This template writes to the Archicad model. Auto mode executes directly; supervised and manual modes require confirmation.",
+        "isMutation": true,
+        "mepCode": "CreateCableCarrier",
+        "steps": [
+          {
+            "id": "step-create-sample-cable-carrier",
+            "title": "Create story-0 sample cable tray",
+            "action": "CreateCableCarrier",
+            "description": "Create the five-point route from live-read parameters using the source cable tray's native coordinates (no offset).",
+            "expectedResult": "Creates one CableCarrier route using MEP system index 5 and a 0.20m x 0.10m cross section.",
+            "params": {
+              "waypoints": [
+                { "x": 9.06, "y": 0.196854438, "z": 2.5 },
+                { "x": -1.693238115, "y": 0.196854438, "z": 2.5 },
+                { "x": -1.693238115, "y": -7.225874143, "z": 2.5 },
+                { "x": 5.001537618, "y": -7.225874143, "z": 2.5 },
+                { "x": 5.001537618, "y": -11.12, "z": 2.5 }
+              ],
+              "width": 0.2,
+              "height": 0.1,
+              "mepSystemIndex": 5
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateCableCarrier"
+                },
+                "addOnCommandParameters": {
+                  "waypoints": [
+                    { "x": 9.06, "y": 0.196854438, "z": 2.5 },
+                    { "x": -1.693238115, "y": 0.196854438, "z": 2.5 },
+                    { "x": -1.693238115, "y": -7.225874143, "z": 2.5 },
+                    { "x": 5.001537618, "y": -7.225874143, "z": 2.5 },
+                    { "x": 5.001537618, "y": -11.12, "z": 2.5 }
+                  ],
+                  "width": 0.2,
+                  "height": 0.1,
+                  "mepSystemIndex": 5
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateCableCarrier",
+            "descriptorName": "mepbridge.CreateCableCarrier",
+            "riskLevel": "low-mutation",
+            "status": "pending"
+          }
+        ],
+        "parameters": [
+          {
+            "item": "Cable tray route",
+            "expected": "Five waypoints, four rectangular segments, 2.50m above the home story",
+            "actual": "Pending execution",
+            "status": "warning"
+          },
+          {
+            "item": "System and cross section",
+            "expected": "mepSystemIndex=5, width=0.20m, height=0.10m",
+            "actual": "Pending execution",
+            "status": "warning"
+          }
+        ]
+      },
+      "riskLevel": "low-mutation",
+      "createdAt": "2026-07-22T00:00:00.000+08:00",
+      "updatedAt": "2026-07-24T00:00:00.000+08:00",
+      "tags": ["starter", "example", "release-preset", "en-US"],
+      "usageCount": 0,
+      "version": "1.3",
+      "notes": "Parameters come from the current AC28 story-0 CableCarrier read/recreate regression. The path uses the source cable tray's native coordinates (no X offset) while preserving the MEP system, route, and uniform cross section."
     }
   ],
   "commands": [
@@ -583,5 +580,5 @@
       "usageCount": 0
     }
   ],
-  "notes": "MEPbridge ACAIstr v0.1.0 English starter assets v1.2. Includes five templates and five local NL commands for read-only checks and stable CreateWall examples."
+  "notes": "MEPbridge ACAIstr v0.1.0 English starter assets v1.3. Includes five templates and five local NL commands for read-only checks plus verified sample slab and cable tray creation."
 }

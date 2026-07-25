@@ -134,6 +134,7 @@ function extractorSpecToJsonSchema(key, spec = {}, defaultValue) {
     case 'number':
       return { type: 'number', description };
     case 'integer':
+    case 'story-index':
       return { type: 'integer', description };
     case 'boolean':
       return { type: 'boolean', description };
@@ -153,11 +154,26 @@ function extractorSpecToJsonSchema(key, spec = {}, defaultValue) {
     case 'delta3d':
       return pointSchema(3, description, 'offset in millimeters');
     case 'point2dList':
-    case 'polygon':
       return arraySchema(
         pointSchema(2, '2D point', 'coordinate in meters'),
         description
       );
+    case 'polygon': {
+      const pointsSchema = arraySchema(
+        pointSchema(2, '2D point', 'coordinate in meters'),
+        description
+      );
+      if (defaultValue && !Array.isArray(defaultValue) && Array.isArray(defaultValue.points)) {
+        return {
+          type: 'object',
+          description,
+          properties: { points: pointsSchema },
+          required: ['points'],
+          additionalProperties: false,
+        };
+      }
+      return pointsSchema;
+    }
     case 'point3dList':
       return arraySchema(
         pointSchema(3, '3D point', 'coordinate in meters'),
@@ -168,7 +184,17 @@ function extractorSpecToJsonSchema(key, spec = {}, defaultValue) {
     case 'elementTypeList':
       return arraySchema({ type: 'string' }, description);
     case 'keyValuePairs':
-      return arraySchema({ type: 'object', additionalProperties: true }, description);
+      return arraySchema({
+        type: 'object',
+        properties: {
+          propertyGuid: { type: 'string', description: 'Property definition GUID' },
+          groupName: { type: 'string', minLength: 1, description: 'Property group name for name-based lookup' },
+          propertyName: { type: 'string', description: 'Property name for name-based lookup' },
+          valueString: { type: 'string', description: 'New property value encoded as text' },
+        },
+        required: ['valueString'],
+        additionalProperties: false,
+      }, description);
     case 'array':
       return arraySchema({}, description);
     case 'raw':

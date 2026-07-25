@@ -73,7 +73,6 @@ export const UserTemplateGroups: React.FC<UserTemplateGroupsProps> = ({
           onClick={() => onReplay(lastTemplate)}
           className="w-full bg-zinc-800 border border-pink-500/30 hover:border-pink-500/50 rounded py-1.5 px-2.5 text-[10px] text-zinc-200 outline-none font-mono text-left cursor-pointer transition-colors flex items-center gap-2"
         >
-          <span className="text-xs flex-shrink-0">{lastTemplate.icon || "📋"}</span>
           <span className="flex-1 truncate">{lastTemplate.name}</span>
           <span className={`px-1 rounded text-[8px] flex-shrink-0 ${
             lastTemplate.riskLevel === "low-mutation"
@@ -94,7 +93,6 @@ export const UserTemplateGroups: React.FC<UserTemplateGroupsProps> = ({
               onClick={() => onReplay(tpl)}
               className="w-full bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 hover:border-pink-500/30 rounded py-1.5 px-2 text-[10px] text-zinc-200 outline-none font-mono text-left cursor-pointer transition-colors flex items-center gap-2"
             >
-              <span className="text-xs flex-shrink-0">{tpl.icon || "📋"}</span>
               <span className="flex-1 truncate">{tpl.name}</span>
               <span className={`px-1 rounded text-[8px] flex-shrink-0 ${
                 tpl.riskLevel === "low-mutation"

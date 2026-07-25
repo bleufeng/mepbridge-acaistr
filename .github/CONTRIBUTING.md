@@ -54,7 +54,18 @@ npm run lint
 npm run build
 ```
 
-Also run `node --check` for changed JavaScript files and `git diff --check`.
+Also run `node --check` for changed JavaScript files and:
+
+```powershell
+git diff --check
+git diff --cached --check
+node tools\validate-public-repository.js
+```
+
+Changed text files must not contain trailing spaces or extra blank lines at
+EOF. Do not use trailing spaces for Markdown hard line breaks. The repository
+`.editorconfig`, `.gitattributes`, and public boundary validator enforce this
+policy.
 
 ## Maintainer Synchronization
 
@@ -111,6 +122,8 @@ same pull request.
 - List source, Server, UI, package, and Archicad runtime verification separately.
 - Include screenshots for UI changes.
 - State any validation that was not completed.
+- Confirm that changed text files contain no trailing whitespace or extra EOF
+  blank lines.
 - Do not submit PLN files, API keys, user data, unredacted logs, APX files, or DevKits.
 
 If a proposal needs a new native Archicad command, open a feature request first.

@@ -400,102 +400,44 @@
                       },
                       {
                           "id":  "tpl-starter-scan-structure",
-                          "name":  "扫描墙柱梁 AABB",
-                          "category":  "MEPBridge-读取",
-                          "icon":  "🔍",
-                          "description":  "读取墙、柱、梁结构元素的 AABB，用于建模前检查；不写入模型。",
-                          "plan":  {
-                                       "title":  "扫描墙柱梁 AABB",
-                                       "warning":  null,
-                                       "isMutation":  false,
-                                       "mepCode":  "ScanStructuralElements",
-                                       "steps":  [
-                                                     {
-                                                         "id":  "step-scan-structure",
-                                                         "title":  "扫描墙柱梁 AABB",
-                                                         "action":  "ScanStructuralElements",
-                                                         "description":  "扫描当前模型中的墙、柱、梁 AABB 边界。",
-                                                         "expectedResult":  "返回结构构件 AABB 列表。",
-                                                         "params":  {
-                                                                        "types":  [
-                                                                                      "Wall",
-                                                                                      "Column",
-                                                                                      "Beam"
-                                                                                  ]
-                                                                    },
-                                                         "commandJson":  {
-                                                                             "command":  "API.ExecuteAddOnCommand",
-                                                                             "parameters":  {
-                                                                                                "addOnCommandId":  {
-                                                                                                                       "commandNamespace":  "MEPBridge",
-                                                                                                                       "commandName":  "ScanStructuralElements"
-                                                                                                                   },
-                                                                                                "addOnCommandParameters":  {
-                                                                                                                               "types":  [
-                                                                                                                                             "Wall",
-                                                                                                                                             "Column",
-                                                                                                                                             "Beam"
-                                                                                                                                         ]
-                                                                                                                           }
-                                                                                            }
-                                                                         },
-                                                         "commandNamespace":  "MEPBridge",
-                                                         "commandName":  "ScanStructuralElements",
-                                                         "descriptorName":  "mepbridge.ScanStructuralElements",
-                                                         "riskLevel":  "read",
-                                                         "status":  "pending"
-                                                     }
-                                                 ],
-                                       "parameters":  [
-                                                          {
-                                                              "item":  "结构元素",
-                                                              "expected":  "返回 Wall/Column/Beam AABB",
-                                                              "actual":  "待执行",
-                                                              "status":  "warning"
-                                                          }
-                                                      ]
-                                   },
-                          "riskLevel":  "read",
-                          "createdAt":  "2026-07-15T00:00:00.000+08:00",
-                          "updatedAt":  "2026-07-15T00:00:00.000+08:00",
-                          "tags":  [
-                                       "starter",
-                                       "example",
-                                       "release-preset"
-                                   ],
-                          "usageCount":  0,
-                          "version":  "1.2",
-                          "notes":  "替代原柱网创建示例：当前 AC28 CreateColumn 返回 API 错误，starter 改为稳定只读扫描。"
-                      },
-                      {
-                          "id":  "tpl-starter-partition-walls",
-                          "name":  "创建 2 道示例隔墙",
+                          "name":  "创建示例楼板",
                           "category":  "Building",
-                          "icon":  "┤",
-                          "description":  "在 X=44m 附近创建 2 道 3m 示例隔墙，使用已验证的 CreateWall 原子命令。",
+                          "icon":  "SLAB",
+                          "description":  "在首层（±0.000）创建一块 15.55m × 14.55m、厚 0.30m 的矩形示例楼板，使用已验证的实机原始坐标（与源楼板同位）。",
                           "plan":  {
-                                       "title":  "创建 2 道示例隔墙",
+                                       "title":  "创建示例楼板",
                                        "warning":  "此模板会写入 Archicad 模型；AI 自动模式直接执行，监督/手动模式需确认。",
                                        "isMutation":  true,
-                                       "mepCode":  "CreateWall × 2",
+                                       "mepCode":  "CreateSlab",
                                        "steps":  [
                                                      {
-                                                         "id":  "step-partition-a",
-                                                         "title":  "创建 3m 横向隔墙",
-                                                         "action":  "CreateWall",
-                                                         "description":  "创建一段 3m 横向示例隔墙。",
-                                                         "expectedResult":  "生成 1 面 Wall。",
+                                                         "id":  "step-create-sample-slab",
+                                                         "title":  "创建首层示例楼板",
+                                                         "action":  "CreateSlab",
+                                                         "description":  "按实机读取参数创建矩形楼板，使用源楼板原始坐标（不偏移）。",
+                                                         "expectedResult":  "生成 1 块 Slab，floorIndex=0、level=0、thickness=0.30m。",
                                                          "params":  {
-                                                                        "start":  {
-                                                                                      "x":  44,
-                                                                                      "y":  0
-                                                                                  },
-                                                                        "end":  {
-                                                                                    "x":  47,
-                                                                                    "y":  0
-                                                                                },
-                                                                        "thickness":  0.12,
-                                                                        "height":  3,
+                                                                        "polygon":  [
+                                                                                        {
+                                                                                            "x":  -6.24,
+                                                                                            "y":  -11.37
+                                                                                        },
+                                                                                        {
+                                                                                            "x":  9.31,
+                                                                                            "y":  -11.37
+                                                                                        },
+                                                                                        {
+                                                                                            "x":  9.31,
+                                                                                            "y":  3.18
+                                                                                        },
+                                                                                        {
+                                                                                            "x":  -6.24,
+                                                                                            "y":  3.18
+                                                                                        }
+                                                                                    ],
+                                                                        "thickness":  0.3,
+                                                                        "level":  0,
+                                                                        "floorIndex":  0,
                                                                         "dryRun":  false,
                                                                         "confirmRequired":  true
                                                                     },
@@ -504,90 +446,52 @@
                                                                              "parameters":  {
                                                                                                 "addOnCommandId":  {
                                                                                                                        "commandNamespace":  "MEPBridge",
-                                                                                                                       "commandName":  "CreateWall"
+                                                                                                                       "commandName":  "CreateSlab"
                                                                                                                    },
                                                                                                 "addOnCommandParameters":  {
-                                                                                                                               "start":  {
-                                                                                                                                             "x":  44,
-                                                                                                                                             "y":  0
-                                                                                                                                         },
-                                                                                                                               "end":  {
-                                                                                                                                           "x":  47,
-                                                                                                                                           "y":  0
-                                                                                                                                       },
-                                                                                                                               "thickness":  0.12,
-                                                                                                                               "height":  3,
+                                                                                                                               "polygon":  [
+                                                                                                                                               {
+                                                                                                                                                   "x":  -6.24,
+                                                                                                                                                   "y":  -11.37
+                                                                                                                                               },
+                                                                                                                                               {
+                                                                                                                                                   "x":  9.31,
+                                                                                                                                                   "y":  -11.37
+                                                                                                                                               },
+                                                                                                                                               {
+                                                                                                                                                   "x":  9.31,
+                                                                                                                                                   "y":  3.18
+                                                                                                                                               },
+                                                                                                                                               {
+                                                                                                                                                   "x":  -6.24,
+                                                                                                                                                   "y":  3.18
+                                                                                                                                               }
+                                                                                                                                           ],
+                                                                                                                               "thickness":  0.3,
+                                                                                                                               "level":  0,
+                                                                                                                               "floorIndex":  0,
                                                                                                                                "dryRun":  false,
                                                                                                                                "confirmRequired":  true
                                                                                                                            }
                                                                                             }
                                                                          },
                                                          "commandNamespace":  "MEPBridge",
-                                                         "commandName":  "CreateWall",
-                                                         "descriptorName":  "mepbridge.CreateWall",
-                                                         "riskLevel":  "low-mutation",
-                                                         "status":  "pending"
-                                                     },
-                                                     {
-                                                         "id":  "step-partition-b",
-                                                         "title":  "创建 3m 纵向隔墙",
-                                                         "action":  "CreateWall",
-                                                         "description":  "创建一段 3m 纵向示例隔墙。",
-                                                         "expectedResult":  "生成 1 面 Wall。",
-                                                         "params":  {
-                                                                        "start":  {
-                                                                                      "x":  44,
-                                                                                      "y":  0
-                                                                                  },
-                                                                        "end":  {
-                                                                                    "x":  44,
-                                                                                    "y":  3
-                                                                                },
-                                                                        "thickness":  0.12,
-                                                                        "height":  3,
-                                                                        "dryRun":  false,
-                                                                        "confirmRequired":  true
-                                                                    },
-                                                         "commandJson":  {
-                                                                             "command":  "API.ExecuteAddOnCommand",
-                                                                             "parameters":  {
-                                                                                                "addOnCommandId":  {
-                                                                                                                       "commandNamespace":  "MEPBridge",
-                                                                                                                       "commandName":  "CreateWall"
-                                                                                                                   },
-                                                                                                "addOnCommandParameters":  {
-                                                                                                                               "start":  {
-                                                                                                                                             "x":  44,
-                                                                                                                                             "y":  0
-                                                                                                                                         },
-                                                                                                                               "end":  {
-                                                                                                                                           "x":  44,
-                                                                                                                                           "y":  3
-                                                                                                                                       },
-                                                                                                                               "thickness":  0.12,
-                                                                                                                               "height":  3,
-                                                                                                                               "dryRun":  false,
-                                                                                                                               "confirmRequired":  true
-                                                                                                                           }
-                                                                                            }
-                                                                         },
-                                                         "commandNamespace":  "MEPBridge",
-                                                         "commandName":  "CreateWall",
-                                                         "descriptorName":  "mepbridge.CreateWall",
+                                                         "commandName":  "CreateSlab",
+                                                         "descriptorName":  "mepbridge.CreateSlab",
                                                          "riskLevel":  "low-mutation",
                                                          "status":  "pending"
                                                      }
                                                  ],
                                        "parameters":  [
                                                           {
-                                                              "item":  "隔墙数量",
-                                                              "expected":  "2 面 Wall",
+                                                              "item":  "楼板轮廓",
+                                                              "expected":  "15.55m × 14.55m 矩形（4 个顶点）",
                                                               "actual":  "待执行",
                                                               "status":  "warning"
                                                           },
                                                           {
-                                                              "item":  "尺寸",
-                                                              "expected":  "每段 3m，高 3m，厚 0.12m",
+                                                              "item":  "楼层与厚度",
+                                                              "expected":  "floorIndex=0，level=0.00m，thickness=0.30m",
                                                               "actual":  "待执行",
                                                               "status":  "warning"
                                                           }
@@ -595,15 +499,140 @@
                                    },
                           "riskLevel":  "low-mutation",
                           "createdAt":  "2026-07-15T00:00:00.000+08:00",
-                          "updatedAt":  "2026-07-15T00:00:00.000+08:00",
+                          "updatedAt":  "2026-07-24T00:00:00.000+08:00",
                           "tags":  [
                                        "starter",
                                        "example",
                                        "release-preset"
-                                   ],
+                          ],
                           "usageCount":  0,
-                          "version":  "1.2",
-                          "notes":  "替代原 Beam 示例：当前 AC28 CreateBeam 返回 API 错误，starter 改为稳定 CreateWall 示例。"
+                          "version":  "1.3",
+                          "notes":  "参数来自当前 AC28 文件首层楼板的读取与重建回归；坐标使用源楼板原始位置（不偏移）。"
+                      },
+                      {
+                          "id":  "tpl-starter-partition-walls",
+                          "name":  "创建示例电缆桥架",
+                          "category":  "MEP",
+                          "icon":  "TRAY",
+                          "description":  "在首层创建一条 5 点 4 段示例电缆桥架，距本层 2.50m，矩形截面 0.20m × 0.10m。",
+                          "plan":  {
+                                       "title":  "创建示例电缆桥架",
+                                       "warning":  "此模板会写入 Archicad 模型；AI 自动模式直接执行，监督/手动模式需确认。",
+                                       "isMutation":  true,
+                                       "mepCode":  "CreateCableCarrier",
+                                       "steps":  [
+                                                     {
+                                                         "id":  "step-create-sample-cable-carrier",
+                                                         "title":  "创建首层示例电缆桥架",
+                                                         "action":  "CreateCableCarrier",
+                                                         "description":  "按实机读取参数创建 5 点 4 段桥架路径，使用源桥架原始坐标（不偏移）。",
+                                                         "expectedResult":  "生成 1 条 CableCarrier 路由，系统索引 5，截面 0.20m × 0.10m。",
+                                                         "params":  {
+                                                                        "waypoints":  [
+                                                                                          {
+                                                                                              "x":  9.06,
+                                                                                              "y":  0.196854438,
+                                                                                              "z":  2.5
+                                                                                          },
+                                                                                          {
+                                                                                              "x":  -1.693238115,
+                                                                                              "y":  0.196854438,
+                                                                                              "z":  2.5
+                                                                                          },
+                                                                                          {
+                                                                                              "x":  -1.693238115,
+                                                                                              "y":  -7.225874143,
+                                                                                              "z":  2.5
+                                                                                          },
+                                                                                          {
+                                                                                              "x":  5.001537618,
+                                                                                              "y":  -7.225874143,
+                                                                                              "z":  2.5
+                                                                                          },
+                                                                                          {
+                                                                                              "x":  5.001537618,
+                                                                                              "y":  -11.12,
+                                                                                              "z":  2.5
+                                                                                          }
+                                                                                      ],
+                                                                        "width":  0.2,
+                                                                        "height":  0.1,
+                                                                        "mepSystemIndex":  5
+                                                                    },
+                                                         "commandJson":  {
+                                                                             "command":  "API.ExecuteAddOnCommand",
+                                                                             "parameters":  {
+                                                                                                "addOnCommandId":  {
+                                                                                                                       "commandNamespace":  "MEPBridge",
+                                                                                                                       "commandName":  "CreateCableCarrier"
+                                                                                                                   },
+                                                                                                "addOnCommandParameters":  {
+                                                                                                                               "waypoints":  [
+                                                                                                                                                 {
+                                                                                                                                                     "x":  9.06,
+                                                                                                                                                     "y":  0.196854438,
+                                                                                                                                                     "z":  2.5
+                                                                                                                                                 },
+                                                                                                                                                 {
+                                                                                                                                                     "x":  -1.693238115,
+                                                                                                                                                     "y":  0.196854438,
+                                                                                                                                                     "z":  2.5
+                                                                                                                                                 },
+                                                                                                                                                 {
+                                                                                                                                                     "x":  -1.693238115,
+                                                                                                                                                     "y":  -7.225874143,
+                                                                                                                                                     "z":  2.5
+                                                                                                                                                 },
+                                                                                                                                                 {
+                                                                                                                                                     "x":  5.001537618,
+                                                                                                                                                     "y":  -7.225874143,
+                                                                                                                                                     "z":  2.5
+                                                                                                                                                 },
+                                                                                                                                                 {
+                                                                                                                                                     "x":  5.001537618,
+                                                                                                                                                     "y":  -11.12,
+                                                                                                                                                     "z":  2.5
+                                                                                                                                                 }
+                                                                                                                                             ],
+                                                                                                                               "width":  0.2,
+                                                                                                                               "height":  0.1,
+                                                                                                                               "mepSystemIndex":  5
+                                                                                                                           }
+                                                                                            }
+                                                                         },
+                                                         "commandNamespace":  "MEPBridge",
+                                                         "commandName":  "CreateCableCarrier",
+                                                         "descriptorName":  "mepbridge.CreateCableCarrier",
+                                                         "riskLevel":  "low-mutation",
+                                                         "status":  "pending"
+                                                     }
+                                                 ],
+                                       "parameters":  [
+                                                          {
+                                                              "item":  "桥架路径",
+                                                              "expected":  "5 个路径点、4 个矩形截面段，距本层 2.50m",
+                                                              "actual":  "待执行",
+                                                              "status":  "warning"
+                                                          },
+                                                          {
+                                                              "item":  "系统与截面",
+                                                              "expected":  "mepSystemIndex=5，width=0.20m，height=0.10m",
+                                                              "actual":  "待执行",
+                                                              "status":  "warning"
+                                                          }
+                                                      ]
+                                   },
+                          "riskLevel":  "low-mutation",
+                          "createdAt":  "2026-07-15T00:00:00.000+08:00",
+                          "updatedAt":  "2026-07-24T00:00:00.000+08:00",
+                          "tags":  [
+                                       "starter",
+                                       "example",
+                                       "release-preset"
+                          ],
+                          "usageCount":  0,
+                          "version":  "1.3",
+                          "notes":  "参数来自当前 AC28 文件首层电缆桥架的读取与重建回归；路径使用源桥架原始坐标（不偏移），保留系统、路径和统一截面。"
                       }
                   ],
     "commands":  [
@@ -717,5 +746,5 @@
                          "usageCount":  0
                      }
                  ],
-    "notes":  "MEPbridge ACAIstr starter 示例资源 v1.2：仅保留当前 AC28 实测稳定的读取和 CreateWall 写入模板；自定义 NL 命令偏无 LLM 的手动单步读取查询。"
+    "notes":  "MEPbridge ACAIstr starter 示例资源 v1.3：包含当前 AC28 实测稳定的读取、示例楼板和示例电缆桥架模板；自定义 NL 命令保留无 LLM 的手动单步读取查询。"
 }

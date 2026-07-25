@@ -61,6 +61,35 @@ function assertNoCjk(label, value) {
   assert.deepStrictEqual(offenders, [], `${label} contains CJK text: ${offenders.join(' | ')}`);
 }
 
+function getTemplate(assets, templateId) {
+  const template = assets.templates.find((item) => item.id === templateId);
+  assert.ok(template, `Missing starter template: ${templateId}`);
+  return template;
+}
+
+function assertVerifiedStarterMutationTemplates(label, assets) {
+  const slab = getTemplate(assets, 'tpl-starter-scan-structure');
+  assert.strictEqual(slab.plan.steps.length, 1, `${label} slab template should have one step`);
+  assert.strictEqual(slab.plan.steps[0].action, 'CreateSlab');
+  assert.strictEqual(slab.plan.steps[0].commandJson.parameters.addOnCommandId.commandName, 'CreateSlab');
+  assert.strictEqual(slab.plan.steps[0].params.floorIndex, 0);
+  assert.strictEqual(slab.plan.steps[0].params.level, 0);
+  assert.strictEqual(slab.plan.steps[0].params.thickness, 0.3);
+  assert.strictEqual(slab.plan.steps[0].params.polygon.length, 4);
+
+  const cableCarrier = getTemplate(assets, 'tpl-starter-partition-walls');
+  assert.strictEqual(cableCarrier.plan.steps.length, 1, `${label} cable template should have one step`);
+  assert.strictEqual(cableCarrier.plan.steps[0].action, 'CreateCableCarrier');
+  assert.strictEqual(
+    cableCarrier.plan.steps[0].commandJson.parameters.addOnCommandId.commandName,
+    'CreateCableCarrier'
+  );
+  assert.strictEqual(cableCarrier.plan.steps[0].params.mepSystemIndex, 5);
+  assert.strictEqual(cableCarrier.plan.steps[0].params.width, 0.2);
+  assert.strictEqual(cableCarrier.plan.steps[0].params.height, 0.1);
+  assert.strictEqual(cableCarrier.plan.steps[0].params.waypoints.length, 5);
+}
+
 function main() {
   const chinese = readStarterAssets('zh-CN');
   const english = readStarterAssets('en-US');
@@ -70,6 +99,8 @@ function main() {
   assert.strictEqual(english.templates.length, chinese.templates.length);
   assert.strictEqual(english.commands.length, chinese.commands.length);
   assertNoCjk('English starter assets', english);
+  assertVerifiedStarterMutationTemplates('Chinese starter assets', chinese);
+  assertVerifiedStarterMutationTemplates('English starter assets', english);
 
   assert.match(
     userAssetsTest.getStarterAssetsFile('en-US'),
@@ -84,6 +115,7 @@ function main() {
   assert.strictEqual(localizedEnglish.templates.length, 5);
   assert.strictEqual(localizedEnglish.commands.length, 5);
   assertNoCjk('Localized starter assets', localizedEnglish);
+  assertVerifiedStarterMutationTemplates('Localized English starter assets', localizedEnglish);
 
   const englishPrompts = [
     'sample house',

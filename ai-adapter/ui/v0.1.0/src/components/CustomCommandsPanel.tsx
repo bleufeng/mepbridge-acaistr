@@ -281,7 +281,7 @@ export const CustomCommandsPanel: React.FC<CustomCommandsPanelProps> = ({
                       <option value="">{lang === "zh-CN" ? "-- 选择模板 --" : "-- Select template --"}</option>
                       {templates.map((tpl) => (
                         <option key={tpl.id} value={tpl.id}>
-                          {tpl.icon || "📋"} {tpl.name} ({tpl.riskLevel})
+                          {tpl.name} ({tpl.riskLevel})
                         </option>
                       ))}
                     </select>

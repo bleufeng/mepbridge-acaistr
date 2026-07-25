@@ -441,13 +441,16 @@ class AIAdapter {
     // 8. 复制构件（CopyElements）
     if (matches(['复制', '拷贝', 'copy', 'duplicate', 'clone'])) {
       const offset = extractDelta(text);
+      const targetStoryIndex = extractTargetStoryIndex(text);
+      const params = { offsetMm: offset, dryRun: true, confirmRequired: true };
+      if (targetStoryIndex !== null) params.targetStoryIndex = targetStoryIndex;
       return {
         steps: [{
           action: 'CopyElements',
           title: 'CopyElements',
           description: `复制选中构件 offset=${JSON.stringify(offset)}`,
           expected: '返回 createdGuids',
-          params: { offsetMm: offset, dryRun: true, confirmRequired: true }
+          params
         }],
         isMutation: true,
         warningText: '此操作会创建新构件，需用户确认',
@@ -661,6 +664,10 @@ class AIAdapter {
         const delta = extractDelta(text);
         const key = desc.paramExtractors.deltaMm ? 'deltaMm' : 'offsetMm';
         params[key] = delta;
+      }
+      if (desc.paramExtractors.targetStoryIndex) {
+        const targetStoryIndex = extractTargetStoryIndex(text);
+        if (targetStoryIndex !== null) params.targetStoryIndex = targetStoryIndex;
       }
       if (desc.paramExtractors.domain && desc.paramExtractors.domain.default) {
         params.domain = desc.paramExtractors.domain.default;
@@ -943,7 +950,6 @@ function extractWaypoints(text) {
 
 function extractDelta(text) {
   const delta = { x: 0, y: 0, z: 0 };
-  const lowerText = text.toLowerCase();
 
   // 匹配 "x=数字"、"x:数字"、"x  数字" 等
   const axisPatterns = [
@@ -956,22 +962,97 @@ function extractDelta(text) {
     if (m) delta[axis] = parseFloat(m[1]);
   });
 
-  // 方向语义：上/下/左/右/前/后
-  // 上/下 → z 轴；左/右 → x 轴；前/后 → y 轴
+  const numberPattern = '(-?\\d+(?:\\.\\d+)?)';
+  const directionalPatterns = [
+    { axis: 'x', sign: 1, words: '(?:(?:\\u5411|\\u5f80)?\\u53f3|right)' },
+    { axis: 'x', sign: -1, words: '(?:(?:\\u5411|\\u5f80)?\\u5de6|left)' },
+    { axis: 'y', sign: 1, words: '(?:(?:\\u5411|\\u5f80)?\\u524d|forward)' },
+    { axis: 'y', sign: -1, words: '(?:(?:\\u5411|\\u5f80)?\\u540e|backward)' },
+    { axis: 'z', sign: 1, words: '(?:\\u5411\\u4e0a|\\u4e0a\\u79fb|\\u62ac\\u9ad8|up)' },
+    { axis: 'z', sign: -1, words: '(?:\\u5411\\u4e0b|\\u4e0b\\u79fb|\\u964d\\u4f4e|down)' },
+  ];
+
+  // Prefer numbers adjacent to a direction so a story number is not reused as a move distance.
   if (!axisPatterns.some(({ regex }) => regex.test(text))) {
-    const numMatch = text.match(/(-?\d+(?:\.\d+)?)\s*(mm|毫米)?/i);
-    const num = numMatch ? parseFloat(numMatch[1]) : 0;
-    if (num !== 0) {
-      if (lowerText.includes('上') || lowerText.includes('up') || lowerText.includes('抬高')) delta.z = Math.abs(num);
-      else if (lowerText.includes('下') || lowerText.includes('down') || lowerText.includes('降低')) delta.z = -Math.abs(num);
-      else if (lowerText.includes('左') || lowerText.includes('left')) delta.x = -Math.abs(num);
-      else if (lowerText.includes('右') || lowerText.includes('right')) delta.x = Math.abs(num);
-      else if (lowerText.includes('前') || lowerText.includes('forward')) delta.y = Math.abs(num);
-      else if (lowerText.includes('后') || lowerText.includes('backward')) delta.y = -Math.abs(num);
+    for (const pattern of directionalPatterns) {
+      const afterDirection = new RegExp(`${pattern.words}\\s*(?:\\u79fb\\u52a8|by|to|=|:)?\\s*${numberPattern}\\s*(?:mm|\\u6beb\\u7c73)?`, 'i');
+      const beforeDirection = new RegExp(`${numberPattern}\\s*(?:mm|\\u6beb\\u7c73)?\\s*${pattern.words}`, 'i');
+      const match = text.match(afterDirection) || text.match(beforeDirection);
+      if (match) {
+        const rawValue = parseFloat(match[1]);
+        if (Number.isFinite(rawValue) && rawValue !== 0) {
+          delta[pattern.axis] = pattern.sign * Math.abs(rawValue);
+        }
+        break;
+      }
     }
   }
 
   return delta;
+}
+
+function extractTargetStoryIndex(text) {
+  const normalized = String(text || '').toLowerCase();
+
+  const words = {
+    basement: -1,
+    ground: 0,
+    first: 0,
+    second: 1,
+    third: 2,
+    fourth: 3,
+    fifth: 4,
+    sixth: 5,
+    seventh: 6,
+    eighth: 7,
+    ninth: 8,
+    tenth: 9,
+  };
+
+  const explicitIndex = normalized.match(/(?:target\s*)?(?:story|storey|floor|level)\s*index\s*(?:=|:|to)?\s*(-?\d+)/i)
+    || normalized.match(/targetStoryIndex\s*(?:=|:)\s*(-?\d+)/i)
+    || normalized.match(/\u697c\u5c42\u7d22\u5f15\s*(?:=|:|\u4e3a)?\s*(-?\d+)/);
+  if (explicitIndex) return Number(explicitIndex[1]);
+
+  const storyValue = '(basement|ground|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|b\\d+|\\d+)';
+  const contextual = normalized.match(new RegExp(`(?:story|storey|floor|level)\\s*(?:=|:|to|onto|on)?\\s*${storyValue}`, 'i'));
+  const ordinalBefore = normalized.match(new RegExp(`${storyValue}(?:st|nd|rd|th)?\\s*(?:story|storey|floor|level)`, 'i'));
+  const compact = normalized.match(/\b(b\d+|\d+f|f\d+)\b/i);
+  const chineseMatches = Array.from(normalized.matchAll(/(?:\u7b2c\s*)?(\d+|[\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341\u9996])\s*\u5c42/g));
+
+  let raw = null;
+  if (contextual) raw = contextual[1];
+  else if (ordinalBefore) raw = ordinalBefore[1];
+  else if (compact) raw = compact[1];
+  else if (chineseMatches.length > 0) raw = chineseMatches[chineseMatches.length - 1][1];
+  if (!raw) return null;
+
+  const chineseWords = {
+    '\u9996': 0,
+    '\u4e00': 0,
+    '\u4e8c': 1,
+    '\u4e09': 2,
+    '\u56db': 3,
+    '\u4e94': 4,
+    '\u516d': 5,
+    '\u4e03': 6,
+    '\u516b': 7,
+    '\u4e5d': 8,
+    '\u5341': 9,
+  };
+
+  if (Object.prototype.hasOwnProperty.call(words, raw)) return words[raw];
+  if (Object.prototype.hasOwnProperty.call(chineseWords, raw)) return chineseWords[raw];
+
+  const basementMatch = raw.match(/^b(\d+)$/i);
+  if (basementMatch) return -Number(basementMatch[1]);
+
+  const floorMatch = raw.match(/^(?:f)?(\d+)(?:f)?$/i);
+  if (!floorMatch) return null;
+
+  const oneBasedFloor = Number(floorMatch[1]);
+  if (!Number.isFinite(oneBasedFloor)) return null;
+  return Math.max(0, oneBasedFloor - 1);
 }
 
 function stripCommandNamespace(action) {

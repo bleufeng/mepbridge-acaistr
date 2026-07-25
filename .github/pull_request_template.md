@@ -29,6 +29,10 @@ Describe the user-visible Workbench or module change.
 
 ## Verification
 
+- [ ] `git diff --check` and `git diff --cached --check` passed.
+- [ ] Changed text files contain no trailing whitespace or extra EOF blank
+      lines.
+- [ ] `node tools\validate-public-repository.js` passed.
 - Module validator:
 - Module tests:
 - Server checks:

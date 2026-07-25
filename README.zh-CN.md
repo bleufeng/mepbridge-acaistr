@@ -1,8 +1,8 @@
 # MEPbridge ACAIstr (MACAI)
 
-> MEPbridge ACAIstr（MACAI）是一套以 OPENBIM 与 Archicad 工作流为核心的原生 Add-On 与本地 MCP / Workbench 协同系统。基础阶段致力于打通大语言模型与专业三维设计软件之间安全、可控的双向交互，为设计工作提供自然语言对话调用、结构化命令执行与自主循环（AI Loop）能力。系统提供 `CollabAI 智能` 和 `Manual 手动` 两种操作入口；无 LLM 时仍可使用手动命令、固定模板和已配置的自定义 NL 命令。
+> MEPbridge ACAIstr（MACAI）是以 Archicad 工作流为核心的原生 Add-On 与本地 MCP / Workbench 协同系统。基础阶段致力于打通大语言模型与建筑三维设计软件之间安全、可控的双向交互，为设计工作提供自然语言对话调用、结构化命令执行与自主循环（AI Loop）能力。系统提供 `CollabAI 智能` 和 `Manual 手动` 两种操作入口；无 LLM 时仍可使用手动命令、固定模板和已配置的自定义 NL 命令。
 >
-> 探索方向：依托 MCP 双向数据交互，逐步形成“任务规划 → 执行建模 → 读取模型反馈 → 修正迭代”的 AI Loop。当前初始版本重点是建立可靠的模型读写、风险确认与结果回读基础；图纸解析、合规校验和建筑设计全流程、全专业智能化属于后续持续扩展方向。
+> 探索方向：依托 MCP 双向数据交互，逐步形成“任务规划 → 执行建模 → 读取模型反馈 → 修正迭代”的 AI Loop。当前初始版本重点是建立可靠的模型读写、风险确认与结果回读基础；图纸解析、合规校验和建筑设计全流程、全专业智能化期望持续扩展方向。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Archicad](https://img.shields.io/badge/Archicad-28%20%7C%2029-blue.svg)]()
@@ -166,17 +166,17 @@ node server\tests\extension-manager.test.js
 
 ## 安全与免责声明
 
-写入、删除、批量操作和几何修改应在测试或已备份的 PLN 中执行。执行前检查目标 GUID、单位、楼层和确认提示。
+写入、删除、批量操作和几何修改应在测试或已备份的 PLN 中执行，执行前检查目标 GUID、单位、楼层和确认提示。
 
-用户应确保插件使用符合适用规定，并对模型文件、输入参数、备份和执行结果负责。安装或使用本软件即表示接受相关风险和免责声明。
+用户应确保插件使用符合适用规定，并对模型文件、输入参数、备份和执行本项目的所有结果自行负责。
 
-公开反馈中不得提交 API Key、未脱敏日志或项目敏感数据。
+安装或使用本项目即表示接受相关风险和免责声明。
 
 ## 许可
 
 项目使用 [MIT License](LICENSE)。Archicad 和 Graphisoft 商标归其权利人所有。参见 [NOTICE](NOTICE)、[SECURITY.md](.github/SECURITY.md) 和 [SUPPORT.md](.github/SUPPORT.md)。
 
-个人和商业用途可按 MIT License 条款使用、修改和分发，并保留版权及许可声明。
+可按 MIT License 条款使用、修改和分发，请保留原始版权及许可声明。
 
-**MEPbridge ACAIstr (MACAI)** — Made with AI by Zuxai Z.
-&copy; 2026 Zuxai Z. &middot; MIT License — 个人和商业用途均可免费使用。
+**MEPbridge ACAIstr (MACAI)**  — Made by Zuxai Z.(Zhong)
+&copy; 2026 Zuxai Z. &middot; MIT License

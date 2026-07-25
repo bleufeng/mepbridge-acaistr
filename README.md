@@ -1,8 +1,8 @@
 # MEPbridge ACAIstr (MACAI)
 
-> MEPbridge ACAIstr (MACAI) is a native Add-On and local MCP / Workbench collaboration system centered on openBIM and Archicad workflows. Its initial focus is safe, controlled two-way interaction between large language models and professional 3D design software, providing natural-language interaction, structured command execution, and autonomous AI Loop capabilities for design work. The system provides `CollabAI Smart` and `Manual` as its two operation entry points; manual commands, fixed templates, and configured custom NL commands remain available without an LLM.
+> MEPbridge ACAIstr (MACAI) is a native Add-On and local MCP / Workbench collaboration system centered on Archicad workflows. Its initial focus is safe, controlled two-way interaction between large language models and building 3D design software, providing natural-language interaction, structured command execution, and autonomous AI Loop capabilities for design work. The system provides `CollabAI Smart` and `Manual` as its two operation entry points; manual commands, fixed templates, and configured custom NL commands remain available without an LLM.
 >
-> The exploration path uses two-way MCP data exchange to progressively form an AI Loop of task planning, model execution, model-feedback readback, and corrective iteration. The initial version focuses on reliable model read/write access, risk confirmation, and result readback. Drawing interpretation, compliance checking, and multidisciplinary end-to-end design automation remain directions for continued development.
+> The exploration path uses two-way MCP data exchange to progressively form an AI Loop of task planning, model execution, model-feedback readback, and corrective iteration. The initial version focuses on reliable model read/write access, risk confirmation, and result readback. Drawing interpretation, compliance checking, and multidisciplinary end-to-end design automation are expected to continue expanding.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Archicad](https://img.shields.io/badge/Archicad-28%20%7C%2029-blue.svg)]()
@@ -168,17 +168,17 @@ See [MODULE_DEVELOPMENT.md](docs/contributors/MODULE_DEVELOPMENT.md) and [PUBLIC
 
 ## Safety and Disclaimer
 
-Use a test or backed-up PLN for write, delete, batch, and geometry-changing commands. Review target GUIDs, units, story context, and confirmation prompts before execution.
+Use a test or backed-up PLN for write, delete, batch, and geometry-changing commands, and review target GUIDs, units, story context, and confirmation prompts before execution.
 
-Users are responsible for ensuring that their use of the Add-On complies with applicable requirements and for their model files, input parameters, backups, and execution results. Installing or using this software constitutes acceptance of the associated risks and disclaimer.
+Users are responsible for ensuring that their use of the Add-On complies with applicable requirements and for their model files, input parameters, backups, and all results produced by this project.
 
-Do not submit API keys, unredacted logs, or project-sensitive data in public issues.
+Installing or using this project constitutes acceptance of the associated risks and disclaimer.
 
 ## License
 
 Licensed under the [MIT License](LICENSE). Archicad and Graphisoft are trademarks of their respective owners. See [NOTICE](NOTICE), [SECURITY.md](.github/SECURITY.md), and [SUPPORT.md](.github/SUPPORT.md).
 
-Personal and commercial use is permitted under the MIT License, including use, modification, and distribution, provided that the copyright and license notice are retained.
+Use, modification, and distribution are permitted under the MIT License, provided that the original copyright and license notice are retained.
 
-**MEPbridge ACAIstr (MACAI)** — Made with AI by Zuxai Z.
-&copy; 2026 Zuxai Z. &middot; MIT License — Free for personal and commercial use.
+**MEPbridge ACAIstr (MACAI)** — Made by Zuxai Z.(Zhong)
+&copy; 2026 Zuxai Z. &middot; MIT License

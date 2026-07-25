@@ -15,6 +15,17 @@ This file records public user-facing changes. Versions follow Semantic Versionin
 
 ### Changed
 
+- Public contribution and export rules now reject trailing whitespace and
+  extra EOF blank lines in changed text files. Version impact: `none`; existing
+  GitHub Release assets remain unchanged.
+- Replaced the starter "scan wall, column, and beam AABBs" template with the
+  verified story-0 sample slab task, and replaced the two sample partition-wall
+  task with the verified sample CableCarrier task. Version impact: `none`;
+  the existing GitHub Release assets remain unchanged until a versioned package
+  refresh is approved.
+- User-template task names are now rendered as plain text in template lists,
+  groups, selectors, management cards, and replay dialogs; inconsistent
+  per-template icons and hot markers are no longer displayed.
 - Every public repository update must add a concise entry under
   `[Unreleased]`.
 - Product version changes must increment Semantic Versioning and synchronize
@@ -23,6 +34,14 @@ This file records public user-facing changes. Versions follow Semantic Versionin
 - Package locale now controls the initial Workbench language, starter assets,
   and built-in regional knowledge base while preserving manual language
   switching.
+- Refreshed README wording (removed openBIM framing, tightened safety and
+  disclaimer wording, and updated the author signature) and replaced the
+  workflow diagram. Version impact: `none`; existing GitHub Release assets
+  remain unchanged.
+- Reset the starter sample slab and sample CableCarrier template coordinates
+  to the source element native positions (no X+20m offset), matching the
+  current AC28 story-0 read/recreate regression data. Version impact: `none`;
+  existing GitHub Release assets remain unchanged.
 
 ## [0.1.0] - 2026-07-20
 
