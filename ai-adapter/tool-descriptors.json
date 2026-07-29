@@ -1066,7 +1066,7 @@
       "title": "MEPBridge get grid elements",
       "description": "Enumerate all grid elements (axis/grid lines) in the Archicad project. Grid elements are Object variants identified by APIVarId_GridElement ('GREL'), not a separate ElemTypeID. Returns guid/type/floorIndex/variationId/layerName per element, with optional AABB. Read-only native query. Language-agnostic (no layer name dependency).",
       "domain": "Building",
-      "status": "code-complete-pending-compile",
+      "status": "runtime-schema-smoke",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "GetGridElements",
@@ -1401,7 +1401,7 @@
       "title": "MEPBridge delete elements (universal)",
       "description": "Delete any type of Archicad element by GUID (walls/columns/beams/slabs/roofs/doors/windows/MEP routes/etc). Universal deletion command - unlike DeleteMEPElements which only works for MEP routes. Added 2026-06-29 after AI auto-drawing floorplan found DeleteMEPElements cannot delete architectural walls. Irreversible high-risk mutation, requires confirmation.",
       "domain": "Building",
-      "status": "code-complete-pending-compile",
+      "status": "runtime-schema-smoke",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "DeleteElements",
@@ -1908,6 +1908,10 @@
         "floorIndex": {
           "type": "integer",
           "description": "Story index (0-based), defaults to current story"
+        },
+        "profileGuid": {
+          "type": "string",
+          "description": "Complex profile attribute GUID (from GetProfiles). When set, applies API_ProfileStructure + profileAttr, overriding rectangular thickness. Optional, backward compatible."
         }
       },
       "commandJson": {
@@ -1982,6 +1986,10 @@
         "rotationAngle": {
           "type": "number",
           "description": "Rotation angle in radians"
+        },
+        "profileGuid": {
+          "type": "string",
+          "description": "Complex profile attribute GUID (from GetProfiles). When set, applies API_ProfileStructure + profileAttr. Optional, backward compatible."
         }
       },
       "commandJson": {
@@ -2045,6 +2053,10 @@
         "end": {
           "type": "point2d",
           "description": "Beam end point {x,y} in meters"
+        },
+        "profileGuid": {
+          "type": "string",
+          "description": "Complex profile attribute GUID (from GetProfiles). When set, applies API_ProfileStructure + profileAttr. Optional, backward compatible."
         }
       },
       "commandJson": {
@@ -4148,7 +4160,7 @@
       "title": "MEPBridge get elements by type",
       "description": "Query all elements of a specific type from the Archicad model. Returns guid/type/floorIndex/layerIndex per element, with optional AABB. Supports Wall/Column/Beam/Slab/Roof/Door/Window/Object/Stair/MEPRoute. Native element discovery query. P4-2.",
       "domain": "Building",
-      "status": "code-complete-pending-compile",
+      "status": "runtime-schema-smoke",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "GetElementsByType",
@@ -4251,7 +4263,7 @@
       "title": "MEPBridge set selection (low-mutation, AI location assist)",
       "description": "Change the current Archicad selection to the specified element GUIDs. Supports replace/add/remove modes. Helps AI locate problem elements for user confirmation. Does not modify the model. P4-3.",
       "domain": "Building",
-      "status": "code-complete-pending-compile",
+      "status": "runtime-schema-smoke",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "SetSelectedElements",
@@ -4323,7 +4335,7 @@
       "title": "MEPBridge get element precise geometry (read)",
       "description": "Get precise geometry of a single element by GUID. Returns type-specific fields: Wall→start/end/thickness/height/length, Column→position/height, Beam→start/end/length, Slab→polygon/thickness/level, Roof→polygon/thickness/baseLevel, Door/Window→width/height/owner. P4-5.",
       "domain": "Building",
-      "status": "code-complete-pending-compile",
+      "status": "runtime-schema-smoke",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "GetElementGeometry",
@@ -4391,7 +4403,7 @@
       "title": "MEPBridge change door/window geometry (low-mutation)",
       "description": "Modify geometry of an existing door or window by GUID. Supports width/height/refPos/sillHeight(Window only)/libPartIndex. Fills the gap of ChangeElementGeometry which only supports Wall/Column/Beam. P4-7.",
       "domain": "Building",
-      "status": "code-complete-pending-compile",
+      "status": "runtime-schema-smoke",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "ChangeOpeningGeometry",
@@ -4479,7 +4491,7 @@
       "title": "MEPBridge change MEP route properties (medium-mutation)",
       "description": "Modify properties of an existing MEP route by GUID. Supports mepSystemIndex/mepSystemName. Uses RoutingElement::Modify API. Does not modify cross-section (diameter), waypoints, or offsetFromHomeStory — those require RoutingSegment/Node level APIs (future). P4-8.",
       "domain": "Building",
-      "status": "code-complete-pending-compile",
+      "status": "runtime-schema-smoke",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "ChangeMEPRouteProperties",
@@ -4752,6 +4764,421 @@
             "domain": "Ventilation",
             "dryRun": true,
             "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_favorites",
+      "title": "MEPBridge get favorites",
+      "description": "Enumerate project Favorites (收藏夹). Returns name/elementType/folder per favorite. Favorites are identified by unique name (the Archicad API does not expose a stable favorite GUID, so name is the identity). Optional elementType filter. Read-only. Stage-1 semantic enhancement.",
+      "domain": "Project",
+      "status": "runtime-schema-smoke",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetFavorites",
+      "riskLevel": "read",
+      "automationModes": ["manual-preview", "dry-run-only"],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": ["收藏夹", "收藏夹列表", "所有收藏夹", "查询收藏夹", "标准构件"],
+        "en": ["favorites", "favorite list", "all favorites", "get favorites"]
+      },
+      "paramExtractors": {
+        "elementType": {"type": "string", "description": "Filter by element type (Wall/Column/.../empty=all)"}
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "GetFavorites"},
+          "addOnCommandParameters": {}
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_profiles",
+      "title": "MEPBridge get profiles",
+      "description": "Enumerate Profile Manager (截面管理器) definitions. Complex profiles are attributes. Returns index/name/guid per profile. Read-only. Stage-1 semantic enhancement.",
+      "domain": "Project",
+      "status": "runtime-schema-smoke",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetProfiles",
+      "riskLevel": "read",
+      "automationModes": ["manual-preview", "dry-run-only"],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": ["截面", "截面列表", "复合截面", "查询截面", "截面管理器"],
+        "en": ["profiles", "profile list", "complex profile", "get profiles", "profile manager"]
+      },
+      "paramExtractors": {},
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "GetProfiles"},
+          "addOnCommandParameters": {}
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_view_map",
+      "title": "MEPBridge get view map",
+      "description": "Enumerate Navigator View Map (视图列表, read-only). Returns guid/name/viewName/itemType/databaseTypeID per view. Stage-1 semantic enhancement.",
+      "domain": "Project",
+      "status": "runtime-schema-smoke",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetViewMap",
+      "riskLevel": "read",
+      "automationModes": ["manual-preview", "dry-run-only"],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": ["视图", "视图列表", "视图映射", "所有视图", "查询视图"],
+        "en": ["views", "view map", "view list", "all views", "get views"]
+      },
+      "paramExtractors": {
+        "maxDepth": {"type": "integer", "description": "Max recursion depth (1-10, default 5)"}
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "GetViewMap"},
+          "addOnCommandParameters": {"maxDepth": 5}
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_section_markers",
+      "title": "MEPBridge get section/elevation markers",
+      "description": "Enumerate Section/Elevation/InteriorElevation marker elements. These are database elements with geometry. Returns guid/type/AABB per marker. Read-only. Stage-1 semantic enhancement.",
+      "domain": "Building",
+      "status": "runtime-schema-smoke",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetSectionMarkers",
+      "riskLevel": "read",
+      "automationModes": ["manual-preview", "dry-run-only"],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": ["剖面", "立面", "剖面标记", "立面标记", "所有剖面", "查询剖面"],
+        "en": ["sections", "elevations", "section markers", "elevation markers", "all sections"]
+      },
+      "paramExtractors": {
+        "elementType": {"type": "string", "description": "Filter: Section/Elevation/InteriorElevation/All (default All)"}
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "GetSectionMarkers"},
+          "addOnCommandParameters": {"elementType": "All", "includeGeometry": true}
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_classifications",
+      "title": "MEPBridge get classification systems",
+      "description": "Enumerate project classification systems (分类系统). Returns guid/name/description/source/version per system, optional rootItems. Read-only. Stage-1 semantic enhancement.",
+      "domain": "Project",
+      "status": "runtime-schema-smoke",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetClassifications",
+      "riskLevel": "read",
+      "automationModes": ["manual-preview", "dry-run-only"],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": ["分类", "分类系统", "所有分类", "查询分类", "BIM分类"],
+        "en": ["classifications", "classification systems", "all classifications", "get classifications"]
+      },
+      "paramExtractors": {
+        "includeRootItems": {"type": "boolean", "description": "Include root items per system (default false)"}
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "GetClassifications"},
+          "addOnCommandParameters": {"includeRootItems": false}
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_layers",
+      "title": "MEPBridge get layers",
+      "description": "Enumerate project layers (图层). Returns index/name/guid/conClassId per layer. Read-only. Stage-1 semantic enhancement.",
+      "domain": "Project",
+      "status": "runtime-schema-smoke",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetLayers",
+      "riskLevel": "read",
+      "automationModes": ["manual-preview", "dry-run-only"],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": ["图层", "图层列表", "所有图层", "查询图层", "隐藏图层"],
+        "en": ["layers", "layer list", "all layers", "get layers", "hidden layers"]
+      },
+      "paramExtractors": {},
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "GetLayers"},
+          "addOnCommandParameters": {}
+        }
+      }
+    },
+    {
+      "name": "mepbridge.find_elements_by_property",
+      "title": "MEPBridge find elements by property (universal)",
+      "description": "Find elements of ANY type by property value. Universal generalization of FindRoutesByProperty (MEP-only). Enumerate by elementType (Wall/Column/Beam/Slab/Roof/Door/Window/Object/Lamp/Mesh/Zone) and match by propertyGuid or groupName+propertyName + valueString. Read-only. Stage-2 semantic enhancement.",
+      "domain": "Building",
+      "status": "runtime-schema-smoke",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "FindElementsByProperty",
+      "riskLevel": "read",
+      "automationModes": ["manual-preview", "dry-run-only"],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": ["按属性查找", "查找构件", "按属性找墙", "未分类的墙", "找所有墙", "按属性筛选", "通用属性查找"],
+        "en": ["find elements", "find by property", "search elements", "filter by property", "unclassified walls", "find all walls"]
+      },
+      "paramExtractors": {
+        "elementType": {"type": "string", "description": "Element type (Wall/Column/Beam/Slab/Roof/Door/Window/Object/Lamp/Mesh/Zone) (required)"},
+        "groupName": {"type": "string", "description": "Property group name"},
+        "propertyName": {"type": "string", "description": "Property name"},
+        "valueString": {"type": "string", "description": "Property value to match (required)"},
+        "propertyGuid": {"type": "string", "description": "Property definition GUID (alternative to groupName+propertyName)"},
+        "filter": {"type": "string", "description": "All/UserDefined/BuiltIn (default All)"},
+        "includeProperty": {"type": "boolean", "description": "Include full property object in response (default true)"}
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "FindElementsByProperty"},
+          "addOnCommandParameters": {
+            "elementType": "Wall",
+            "groupName": "Classification",
+            "propertyName": "FireRating",
+            "valueString": "REI60",
+            "filter": "All",
+            "includeProperty": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.assign_classification",
+      "title": "MEPBridge assign classification to element",
+      "description": "Read an element's current classification by GUID, and optionally assign a classification item via the public ACAPI_Element_AddClassificationItem/RemoveClassificationItem API. Supports dryRun -> confirmRequired -> execute -> readback. When the element already has a different item in the same system, set replaceExisting=true (default) to replace it. Mutation: actual assignment requires confirmRequired=true. Stage-2 semantic enhancement.",
+      "domain": "Building",
+      "status": "runtime-schema-smoke",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "AssignClassification",
+      "riskLevel": "write",
+      "automationModes": ["manual-preview", "dry-run-only", "confirmed-run"],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "undoable",
+      "nlTriggers": {
+        "zh": ["构件分类", "查询分类", "元素分类", "读分类", "当前分类", "分配分类", "设置分类", "BIM分类"],
+        "en": ["element classification", "get classification", "read classification", "current classification", "assign classification", "set classification"]
+      },
+      "paramExtractors": {
+        "elementGuid": {"type": "string", "description": "Element GUID (required)"},
+        "systemGuid": {"type": "string", "description": "Optional system filter; when assigning must match assignItemGuid's system"},
+        "assignItemGuid": {"type": "string", "description": "Target classification item GUID (omit for read-only mode)"},
+        "replaceExisting": {"type": "boolean", "description": "Replace an existing item in the same system (default true)"},
+        "dryRun": {"type": "boolean", "description": "Preview without modifying (default true)"},
+        "confirmRequired": {"type": "boolean", "description": "Must be true when dryRun=false"}
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "AssignClassification"},
+          "addOnCommandParameters": {
+            "elementGuid": "AABBCC-DDDD-EEEE-FFFF-000000000001",
+            "dryRun": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_favorite",
+      "title": "MEPBridge get favorite detail",
+      "description": "Read a single Favorite by name. Returns name/elementType/folder plus profile/layer/classification/property/category counts. Favorites are identified by unique name (the Archicad API does not expose a stable favorite GUID, so name is the identity). Read-only. Stage-2 semantic enhancement.",
+      "domain": "Project",
+      "status": "runtime-schema-smoke",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetFavorite",
+      "riskLevel": "read",
+      "automationModes": ["manual-preview", "dry-run-only"],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": ["收藏夹详情", "查看收藏夹", "收藏夹信息", "读取收藏夹"],
+        "en": ["favorite detail", "get favorite", "read favorite", "favorite info"]
+      },
+      "paramExtractors": {
+        "favoriteName": {"type": "string", "description": "Favorite name (required, identity)"}
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "GetFavorite"},
+          "addOnCommandParameters": {"favoriteName": "Standard Wall 200"}
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_from_favorite",
+      "title": "MEPBridge create element from favorite",
+      "description": "Create a new Wall/Column/Beam element from a Favorite, overriding geometry (start/end or position) and optional floorIndex. Restores the favorite's classifications, categories and properties onto the new element, then readbacks the header. Mutation: actual creation requires confirmRequired=true. Stage-2 semantic enhancement.",
+      "domain": "Building",
+      "status": "runtime-schema-smoke",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateFromFavorite",
+      "riskLevel": "write",
+      "automationModes": ["manual-preview", "dry-run-only", "confirmed-run"],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "undoable",
+      "nlTriggers": {
+        "zh": ["从收藏夹创建", "用收藏夹建墙", "按收藏夹创建构件", "收藏夹生成"],
+        "en": ["create from favorite", "create wall from favorite", "instantiate favorite", "place favorite"]
+      },
+      "paramExtractors": {
+        "favoriteName": {"type": "string", "description": "Favorite name (required)"},
+        "start": {"type": "point2d", "description": "Start point {x,y} in meters (Wall/Beam)"},
+        "end": {"type": "point2d", "description": "End point {x,y} in meters (Wall/Beam)"},
+        "position": {"type": "point2d", "description": "Position {x,y} in meters (Column)"},
+        "floorIndex": {"type": "integer", "description": "Story index (optional)"},
+        "dryRun": {"type": "boolean", "description": "Preview without creating (default true)"},
+        "confirmRequired": {"type": "boolean", "description": "Must be true when dryRun=false"}
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "CreateFromFavorite"},
+          "addOnCommandParameters": {
+            "favoriteName": "Standard Wall 200",
+            "start": {"x": 0, "y": 0},
+            "end": {"x": 4, "y": 0},
+            "dryRun": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.apply_favorite",
+      "title": "MEPBridge apply favorite to element",
+      "description": "Apply a Favorite's settings (parameters, segments, classifications, categories, properties) to an existing Wall/Column/Beam element while preserving the target's GUID, type, floor and geometry. Readbacks the element to verify geometry was preserved. Mutation: actual change requires confirmRequired=true. Stage-2 semantic enhancement.",
+      "domain": "Building",
+      "status": "runtime-schema-smoke",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "ApplyFavorite",
+      "riskLevel": "write",
+      "automationModes": ["manual-preview", "dry-run-only", "confirmed-run"],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "undoable",
+      "nlTriggers": {
+        "zh": ["应用收藏夹", "套用收藏夹", "把收藏夹应用到", "用收藏夹更新构件"],
+        "en": ["apply favorite", "apply favorite to element", "match favorite settings"]
+      },
+      "paramExtractors": {
+        "elementGuid": {"type": "string", "description": "Target element GUID (required)"},
+        "favoriteName": {"type": "string", "description": "Favorite name (required, same type as target)"},
+        "dryRun": {"type": "boolean", "description": "Preview without changing (default true)"},
+        "confirmRequired": {"type": "boolean", "description": "Must be true when dryRun=false"}
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "ApplyFavorite"},
+          "addOnCommandParameters": {
+            "elementGuid": "AABBCC-DDDD-EEEE-FFFF-000000000001",
+            "favoriteName": "Standard Wall 200",
+            "dryRun": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.save_favorite",
+      "title": "MEPBridge save element as favorite",
+      "description": "Capture an existing element's settings (element, memo, classifications, user-defined properties, categories) and save them as a new Favorite under the given name (optional folder hierarchy). Mutation: actual write requires confirmRequired=true. Stage-2 semantic enhancement.",
+      "domain": "Project",
+      "status": "runtime-schema-smoke",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "SaveFavorite",
+      "riskLevel": "write",
+      "automationModes": ["manual-preview", "dry-run-only", "confirmed-run"],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "best-effort",
+      "nlTriggers": {
+        "zh": ["保存收藏夹", "存为收藏夹", "另存为收藏夹", "收藏当前构件"],
+        "en": ["save favorite", "save as favorite", "store favorite", "create favorite from element"]
+      },
+      "paramExtractors": {
+        "elementGuid": {"type": "string", "description": "Source element GUID (required)"},
+        "favoriteName": {"type": "string", "description": "New favorite name (required)"},
+        "folder": {"type": "array", "description": "Optional folder hierarchy (array of names)"},
+        "dryRun": {"type": "boolean", "description": "Preview without saving (default true)"},
+        "confirmRequired": {"type": "boolean", "description": "Must be true when dryRun=false"}
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "SaveFavorite"},
+          "addOnCommandParameters": {
+            "elementGuid": "AABBCC-DDDD-EEEE-FFFF-000000000001",
+            "favoriteName": "My Wall 240",
+            "dryRun": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.set_layer_batch",
+      "title": "MEPBridge set layer for multiple elements",
+      "description": "Move a batch of elements to a target layer (by layerGuid or layerName). Records each change's previous layer, applies the batch in one undoable command, then readbacks every changed element to verify its new layer. Mutation: actual change requires confirmRequired=true. Stage-2 semantic enhancement.",
+      "domain": "Modify",
+      "status": "runtime-schema-smoke",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "SetLayerBatch",
+      "riskLevel": "write",
+      "automationModes": ["manual-preview", "dry-run-only", "confirmed-run"],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "undoable",
+      "nlTriggers": {
+        "zh": ["批量改图层", "设置图层", "移动到图层", "改图层", "批量设置图层"],
+        "en": ["set layer batch", "change layer", "move to layer", "batch set layer", "assign layer"]
+      },
+      "paramExtractors": {
+        "elementGuids": {"type": "array", "description": "Element GUIDs to move (required, non-empty)"},
+        "layerGuid": {"type": "string", "description": "Target layer GUID (alternative to layerName)"},
+        "layerName": {"type": "string", "description": "Target layer name (alternative to layerGuid)"},
+        "dryRun": {"type": "boolean", "description": "Preview without changing (default true)"},
+        "confirmRequired": {"type": "boolean", "description": "Must be true when dryRun=false"}
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "SetLayerBatch"},
+          "addOnCommandParameters": {
+            "elementGuids": ["AABBCC-DDDD-EEEE-FFFF-000000000001"],
+            "layerName": "Structure",
+            "dryRun": true
           }
         }
       }

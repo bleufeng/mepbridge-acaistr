@@ -198,8 +198,8 @@ for (const filePath of files) {
 }
 
 const descriptorRegistry = parseJson(path.join(root, 'ai-adapter/tool-descriptors.json'));
-if (descriptorRegistry && (!Array.isArray(descriptorRegistry.descriptors) || descriptorRegistry.descriptors.length !== 59)) {
-  failures.push('Core descriptor count must be 59.');
+if (descriptorRegistry && (!Array.isArray(descriptorRegistry.descriptors) || descriptorRegistry.descriptors.length !== 72)) {
+  failures.push('Core descriptor count must be 72.');
 }
 
 const moduleRegistry = parseJson(path.join(root, 'modules/registry.json'));

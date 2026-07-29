@@ -1,8 +1,8 @@
-# MEPbridge ACAIstr v0.1.0 安装说明
+# MEPbridge ACAIstr v0.1.1 安装说明
 
 本说明适用于 Archicad 28 和 Archicad 29 的 Windows 发布包。
 
-中文优先界面请下载 `MEPbridge-ACAIstr-v0.1.0-win64-zh-CN.zip`，英文优先界面请下载 `MEPbridge-ACAIstr-v0.1.0-win64-en-US.zip`。首次安装不要使用独立 APX 更新文件，也不要使用 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`。
+中文优先界面请下载 `MEPbridge-ACAIstr-v0.1.1-win64-zh-CN.zip`，英文优先界面请下载 `MEPbridge-ACAIstr-v0.1.1-win64-en-US.zip`。首次安装不要使用独立 APX 更新文件，也不要使用 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`。
 
 ## 环境要求
 
@@ -24,8 +24,8 @@ Archicad-29\MEPBridge.apx
 
 只能安装与 Archicad 主版本一致的 APX。
 
-`MEPbridge-ACAIstr-v0.1.0-AC28-win64.apx` 和
-`MEPbridge-ACAIstr-v0.1.0-AC29-win64.apx` 只更新原生 Add-On，不包含
+`MEPbridge-ACAIstr-v0.1.1-AC28-win64.apx` 和
+`MEPbridge-ACAIstr-v0.1.1-AC29-win64.apx` 只更新原生 Add-On，不包含
 Server、UI、MCP Server、生产依赖和安装脚本，仅适用于已经完成完整安装的用户。
 
 ## 自动安装
@@ -118,12 +118,57 @@ node <发布包根目录>\tools\mepbridge-mcp-server.js
 
 默认卸载只移除 APX，保留用户数据。需要清除 Workbench 菜单配置时，可运行 PowerShell 脚本并增加 `-RemoveWorkbenchConfig`。
 
+## 版本更新
+
+已安装旧版本的用户，按以下方式更新到新版本：
+
+### 方式一：完整包更新（推荐）
+
+适用于 Server、UI、MCP Server 或依赖有改动的版本。
+
+1. 从 GitHub Releases 下载新版本的完整 ZIP（`win64-zh-CN.zip` 或 `win64-en-US.zip`）。
+2. 保存工作并关闭 Archicad。
+3. 将新 ZIP 解压到一个新目录（建议保留旧目录以便回滚）。
+4. 双击新目录中的 `Install-MEPBridge.cmd`。
+5. 按提示选择已安装的 Archicad。
+6. 重新启动 Archicad。
+
+安装程序会自动备份哈希不同的旧 APX，并替换为新版。用户数据（模板、自定义命令、知识库等）保存在 `%APPDATA%\MEPBridge`，不会被覆盖。
+
+### 方式二：仅 APX 更新
+
+适用于仅修复原生 Add-On、未改动 Server/UI/依赖的小版本更新。
+
+1. 从 GitHub Releases 下载独立的 `MEPbridge-ACAIstr-vX.Y.Z-AC28-win64.apx` 或 `MEPbridge-ACAIstr-vX.Y.Z-AC29-win64.apx`（与已安装的 Archicad 主版本一致）。
+2. 保存工作并关闭 Archicad。
+3. 将新 APX 复制到 `<Archicad 安装目录>\Add-Ons\MEPBridge\`，覆盖旧 `MEPBridge.apx`（建议先备份旧文件）。
+4. 重新启动 Archicad。
+
+> 注意：仅 APX 更新不包含 Server/UI/MCP Server 的改动。如新版本同时更新了 Workbench 组件，请使用方式一。
+
+### 更新后验证
+
+- Archicad 加载 Add-On 时没有错误。
+- MEPbridge ACAIstr 菜单显示三个独立菜单项。
+- Workbench 可打开 `http://127.0.0.1:19780/`。
+- `/health` 显示新版本号。
+- Ping 显示对应版本的注册命令数和 descriptor/MCP 工具数。
+
+### 回滚
+
+如新版本出现问题需要回滚：
+
+- **完整包更新**：用旧目录重新运行 `Install-MEPBridge.cmd`，或从备份目录恢复旧 APX。
+- **仅 APX 更新**：用之前备份的旧 `MEPBridge.apx` 覆盖新版。
+
+用户数据在新旧版本间通常兼容；如遇数据格式不兼容，`%APPDATA%\MEPBridge\backups\` 下有自动备份。
+
 ## 验证
 
 - Archicad 加载 Add-On 时没有错误。
 - MEPbridge ACAIstr 菜单显示三个独立菜单项。
 - Workbench 可以打开 `http://127.0.0.1:19780/`。
-- `/health` 显示版本 `0.1.0`。
-- Ping 显示 61 个注册命令和 59 个 descriptor/MCP 工具。
+- `/health` 显示版本 `0.1.1`。
+- Ping 显示 74 个注册命令和 72 个 descriptor/MCP 工具。
 
 执行写入、删除、批量或几何修改前，应使用测试或已备份的 PLN。

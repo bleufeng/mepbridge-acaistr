@@ -284,6 +284,138 @@ const BUILTIN_TEMPLATES = [
         { action: 'RotateSelectedElements', title: '旋转选中', params: { useCurrentSelection: true, center: params.center || { x: 0, y: 0 }, angle: params.angle || 1.5708 }, riskLevel: 'medium-mutation' }
       ]
     })
+  },
+  {
+    id: 'TPL-013',
+    name: '复制楼梯与平台楼板到2/3层',
+    category: 'building',
+    keywords: {
+      zh: ['复制楼梯', '多楼层楼梯', '2层楼梯', '3层楼梯', '复制首层楼梯', '楼梯复制到二层三层', '二层三层楼梯', '复制楼梯到2层3层'],
+      en: ['copy stair', 'multi-floor stair', 'stair on floor 2 and 3', 'replicate stair to floors', 'copy stair to upper floors']
+    },
+    description: '把首层双跑楼梯+平台楼板（TPL-003 参数）复制到楼层序号2和3（floorIndex=1,2，即第2、3层）。同图位置，相对楼层高度不变：平台 level=1.5m、下跑 baseLevel=0m、上跑 baseLevel=1.5m。共 6 步（每层 1 平台楼板 + 2 楼梯段）。targetFloors 可参数化。',
+    generate: (params = {}) => {
+      const offsetX = params.offsetX || 0;
+      const offsetY = params.offsetY || 0;
+      const stepNum = params.stepNum || 10;
+      const totalHeight = params.totalHeight || 1.5;
+      const flightWidth = params.flightWidth || 1.2;
+      const targetFloors = Array.isArray(params.targetFloors) && params.targetFloors.length > 0 ? params.targetFloors : [1, 2];
+
+      const translatePoint = (pt) => ({ x: pt.x + offsetX, y: pt.y + offsetY });
+      const landingPolygon = [
+        { x: -0.4, y: -5.62 },
+        { x: 1.1, y: -5.62 },
+        { x: 1.1, y: -2.87 },
+        { x: -0.4, y: -2.87 }
+      ].map(translatePoint);
+      const upperFlightWaypoints = [
+        { x: 1.093790198, y: -3.47 },
+        { x: 4.64, y: -3.47 }
+      ].map(translatePoint);
+      const lowerFlightWaypoints = [
+        { x: 4.566209814, y: -5.02 },
+        { x: 1.020000012, y: -5.02 }
+      ].map(translatePoint);
+
+      const steps = [];
+      for (const floorIndex of targetFloors) {
+        const floorLabel = `楼层${floorIndex + 1}`;
+        steps.push({
+          action: 'CreateSlab',
+          title: `${floorLabel} 楼梯平台楼板 level=1.5m 厚0.24m 范围1.5×2.75m`,
+          params: { polygon: landingPolygon, thickness: 0.24, level: 1.5, floorIndex, dryRun: true, confirmRequired: true },
+          riskLevel: 'create-element'
+        });
+        steps.push({
+          action: 'CreateStair',
+          title: `${floorLabel} 上跑楼梯段 10步高1.5m宽1.2m baseLevel=1.5m`,
+          params: { start: upperFlightWaypoints[0], end: upperFlightWaypoints[upperFlightWaypoints.length - 1], waypoints: upperFlightWaypoints, totalHeight, baseLevel: 1.5, stepNum, flightWidth, floorIndex, dryRun: true, confirmRequired: true },
+          riskLevel: 'create-element'
+        });
+        steps.push({
+          action: 'CreateStair',
+          title: `${floorLabel} 下跑楼梯段 10步高1.5m宽1.2m baseLevel=0m`,
+          params: { start: lowerFlightWaypoints[0], end: lowerFlightWaypoints[lowerFlightWaypoints.length - 1], waypoints: lowerFlightWaypoints, totalHeight, baseLevel: 0.0, stepNum, flightWidth, floorIndex, dryRun: true, confirmRequired: true },
+          riskLevel: 'create-element'
+        });
+      }
+
+      return {
+        userIntent: `复制首层楼梯与平台楼板到楼层序号2和3（floorIndex=${targetFloors.join(',')}），共 ${steps.length} 步`,
+        steps
+      };
+    }
+  },
+  {
+    id: 'TPL-014',
+    name: '在第2/3层创建外墙与楼板',
+    category: 'building',
+    keywords: {
+      zh: ['创建墙楼板到2层3层', '创建首层到2层3层', '创建墙和楼板', '创建首层墙', '创建外围墙到2层3层', '创建外墙到二层三层', '把首层创建到2层3层', '把首层创建到二层三层', '复制墙楼板', '复制首层到2层3层', '复制外围墙到2层3层'],
+      en: ['create shell on floors', 'create walls and slab on floors', 'create ground floor on upper floors', 'create shell to floor 2 and 3', 'replicate shell to floors', 'copy walls and slab to floors']
+    },
+    description: '在第 2 层与第 3 层各创建 4 面外墙 + 1 块楼板（共 10 步）。墙体参数来自首层实测几何（厚度 0.3m，高度 3m），楼板为 15.55x14.55m 矩形。每步自包含坐标，不依赖 GUID，跨项目可用。',
+    generate: (params = {}) => {
+      const targetFloors = Array.isArray(params.targetFloors) && params.targetFloors.length > 0 ? params.targetFloors : [1, 2];
+
+      // Measured ground-floor outer wall geometries (from GetElementGeometry)
+      const walls = [
+        { id: 'south', label: '南墙', start: { x: -5.99, y: -11.37 }, end: { x: 9.31, y: -11.37 } },
+        { id: 'north', label: '北墙', start: { x: -5.99, y: 2.93 }, end: { x: 9.31, y: 2.93 } },
+        { id: 'west', label: '西墙', start: { x: -5.99, y: -11.37 }, end: { x: -5.99, y: 2.93 } },
+        { id: 'east', label: '东墙', start: { x: 9.31, y: -11.37 }, end: { x: 9.31, y: 2.93 } }
+      ];
+      const wallThickness = 0.3;
+      const wallHeight = 3;
+      const slabPolygon = [
+        { x: -6.24, y: -11.37 },
+        { x: 9.31, y: -11.37 },
+        { x: 9.31, y: 3.18 },
+        { x: -6.24, y: 3.18 }
+      ];
+      const slabThickness = 0.3;
+      const slabLevel = 0;
+
+      const steps = [];
+      for (const floorIndex of targetFloors) {
+        const floorLabel = `第 ${floorIndex + 1} 层`;
+        for (const w of walls) {
+          steps.push({
+            action: 'CreateWall',
+            title: `${floorLabel} ${w.label} (${w.start.x},${w.start.y})→(${w.end.x},${w.end.y})`,
+            params: {
+              start: w.start,
+              end: w.end,
+              thickness: wallThickness,
+              height: wallHeight,
+              floorIndex,
+              dryRun: false,
+              confirmRequired: true
+            },
+            riskLevel: 'low-mutation'
+          });
+        }
+        steps.push({
+          action: 'CreateSlab',
+          title: `${floorLabel} 楼板 level=${slabLevel}m thickness=${slabThickness}m`,
+          params: {
+            polygon: slabPolygon,
+            thickness: slabThickness,
+            level: slabLevel,
+            floorIndex,
+            dryRun: false,
+            confirmRequired: true
+          },
+          riskLevel: 'low-mutation'
+        });
+      }
+
+      return {
+        userIntent: `在第 ${targetFloors.map(i => i + 1).join(' 和 ')} 层创建 4 外墙 + 1 楼板（floorIndex=${targetFloors.join(',')}），共 ${steps.length} 步`,
+        steps
+      };
+    }
   }
 ];
 
@@ -388,6 +520,36 @@ const ENGLISH_TEMPLATE_METADATA = {
     userIntent: 'Rotate selected elements',
     stepLabels: ['Rotate selected elements'],
   },
+  'TPL-013': {
+    name: 'Replicate stair and landing slab to floors 2 and 3',
+    description: 'Copies the two-flight stair and landing slab (TPL-003 parameters) to floor index 1 and 2 (the 2nd and 3rd stories). Same plan position; relative-to-story heights are preserved (landing level=1.5m, lower flight baseLevel=0m, upper flight baseLevel=1.5m).',
+    userIntent: 'Replicate the ground-floor stair and landing slab to floors 2 and 3',
+    stepLabels: [
+      'Floor 2 landing slab',
+      'Floor 2 upper stair flight',
+      'Floor 2 lower stair flight',
+      'Floor 3 landing slab',
+      'Floor 3 upper stair flight',
+      'Floor 3 lower stair flight',
+    ],
+  },
+  'TPL-014': {
+    name: 'Create outer walls and slab on floors 2 and 3',
+    description: 'Creates 4 outer walls + 1 slab on each of floors 2 and 3 (10 steps total). Wall parameters come from measured ground-floor geometry (thickness 0.3m, height 3m); slab is a 15.55x14.55m rectangle. Each step is self-contained with coordinates, no GUID dependency, works across projects.',
+    userIntent: 'Create outer walls and slab on floors 2 and 3',
+    stepLabels: [
+      'Floor 2 south wall',
+      'Floor 2 north wall',
+      'Floor 2 west wall',
+      'Floor 2 east wall',
+      'Floor 2 slab',
+      'Floor 3 south wall',
+      'Floor 3 north wall',
+      'Floor 3 west wall',
+      'Floor 3 east wall',
+      'Floor 3 slab',
+    ],
+  },
 };
 
 function formatNumber(value) {
@@ -426,6 +588,17 @@ function englishStepTitle(templateId, step, index, metadata) {
     return `${label}: ${formatPoint(step.params?.start)} -> ${formatPoint(step.params?.end)}; ` +
       `${step.params?.stepNum || 0} steps, height=${formatNumber(step.params?.totalHeight)}m, ` +
       `width=${formatNumber(step.params?.flightWidth)}m`;
+  }
+
+  if (templateId === 'TPL-014') {
+    if (step.action === 'CreateWall') {
+      return `${label}: ${formatPoint(step.params?.start)} -> ${formatPoint(step.params?.end)}, ` +
+        `thickness=${formatNumber(step.params?.thickness)}m, height=${formatNumber(step.params?.height)}m, floorIndex=${step.params?.floorIndex}`;
+    }
+    if (step.action === 'CreateSlab') {
+      return `${label}: level=${formatNumber(step.params?.level)}m, ` +
+        `thickness=${formatNumber(step.params?.thickness)}m, floorIndex=${step.params?.floorIndex}`;
+    }
   }
 
   return label;

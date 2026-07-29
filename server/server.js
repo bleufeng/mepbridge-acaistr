@@ -9,7 +9,7 @@ const { resolveReleaseLocale } = require('./services/release-locale');
 const app = express();
 const PORT = process.env.PORT || 19780;
 const HOST = process.env.HOST || '127.0.0.1';
-const APP_VERSION = '0.1.0';
+const APP_VERSION = '0.1.1';
 const JSON_LIMIT = process.env.MEPBRIDGE_JSON_LIMIT || '1mb';
 const BUILD_INFO = {
   version: APP_VERSION,

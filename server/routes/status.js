@@ -6,7 +6,7 @@ const path = require('path');
 
 // Archicad JSON API 端口范围
 const ARCHICAD_PORTS = Array.from({length: 21}, (_, i) => 19723 + i);
-const APP_VERSION = '0.1.0';
+const APP_VERSION = '0.1.1';
 const BUILD_INFO = {
   version: APP_VERSION,
   buildDate: process.env.MEPBRIDGE_BUILD_DATE || null,

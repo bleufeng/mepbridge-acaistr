@@ -4,9 +4,8 @@
 >
 > 探索方向：依托 MCP 双向数据交互，逐步形成“任务规划 → 执行建模 → 读取模型反馈 → 修正迭代”的 AI Loop。当前初始版本重点是建立可靠的模型读写、风险确认与结果回读基础；图纸解析、合规校验和建筑设计全流程、全专业智能化期望持续扩展方向。
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Archicad](https://img.shields.io/badge/Archicad-28%20%7C%2029-blue.svg)]()
-[![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)]()
+[![Version](https://img.shields.io/badge/version-0.1.1-orange.svg)]()
 [![OPENBIM](https://img.shields.io/badge/OPENBIM-Workflow-0F766E.svg)]()
 [![Archicad JSON API](https://img.shields.io/badge/ARCHICAD-JSON%20API-2563EB.svg)]()
 [![C++ Add-On](https://img.shields.io/badge/C%2B%2B-Add--On-00599C.svg)]()
@@ -22,30 +21,51 @@
   <img src=".github/assets/mepbridge-acaistr-workflow.png" alt="MEPbridge ACAIstr 功能流程：自然语言命令与可扩展用户模板、安全编排、Workbench 与 MCP Server、Archicad 执行和结果回读" width="100%">
 </p>
 
-自然语言任务和可扩展用户模板经过计划编排与风险控制，由本地 Workbench / MCP 层驱动 Archicad 执行，并将结构化结果回读形成操作闭环。
+自然语言任务和可扩展用户模板按计划编排与风险控制，设计指令与 AI 算法连通数据，由本地 Workbench / MCP 层驱动 Archicad 执行，并将结构化结果回读形成操作闭环。
 
 ## 发布范围
 
-- 版本：`v0.1.0`
-- 61 个注册 C++ 命令
-- 59 个 descriptor/MCP 工具
+- 版本：`v0.1.1`
+- 74 个注册 C++ 命令
+- 72 个 descriptor/MCP 工具
 - 两个仅直接调用的 C++ 命令：`SwitchStory`、`ChangeStairGeometry`
 - 支持 Archicad 28 和 Archicad 29 Windows 版本
 - Server 默认地址：`127.0.0.1:19780`
 - Archicad JSON API 本机检测范围：`127.0.0.1:19723-19743`
 
-公开更新记录：[CHANGELOG.md](CHANGELOG.md)。
+公开更新记录：[CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)。
 
 请从 GitHub Releases 按界面语言下载完整安装包：
 
-- `MEPbridge-ACAIstr-v0.1.0-win64-zh-CN.zip`：中文完整安装包。
-- `MEPbridge-ACAIstr-v0.1.0-win64-en-US.zip`：英文完整安装包。
+- `MEPbridge-ACAIstr-v0.1.1-win64-zh-CN.zip`：中文完整安装包。
+- `MEPbridge-ACAIstr-v0.1.1-win64-en-US.zip`：英文完整安装包。
 
 不要下载 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`，它们不是安装包，不包含完整 APX 和运行依赖。每个完整 ZIP 均包含 AC28/AC29 APX、Workbench Server、编译后的 UI、MCP Server、生产依赖、法律文件、发布清单和 SHA256 校验和。单独的 AC28/AC29 APX 仅供已安装完整运行环境的用户更新插件。
 
 公开仓库提供 C2 Workbench 开放协作能力，包括 React Workbench、Node.js Server、MCP Server、核心 descriptor、审核模块 SDK 与 schema、示例和公开文档。开发者可以新增审核模块、组合现有 Archicad 命令形成新工作流、扩展 UI 面板与 Server 服务、完善 MCP 集成，并贡献示例或文档。
 
-本仓库面向 Workbench 开发与功能扩展，不以独立构建 APX 为目标。最终用户应下载经过验收的发布 ZIP，不需要克隆源码。
+本仓库面向 Workbench 开发与功能扩展，不以独立构建 APX 为目标，最终用户应下载经过验收的发布 ZIP，不需要克隆源码。支持第三方 API 自定义接入，项目还未扩展深度能力，建议搭配支持 MCP 协议的主流 AI 大模型宿主平台使用。
+
+## 示例预览
+
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="50%" align="center">
+      <video src="https://github.com/user-attachments/assets/dd0671dd-3e2c-4b34-950c-6cafdf272182" controls muted width="480"></video>
+    </td>
+    <td width="50%" align="center">
+      <video src="https://github.com/user-attachments/assets/ab30744b-9342-4bf5-9e65-189c8fd8b5db" controls muted width="480"></video>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src=".github/assets/exmpl-01door.png" alt="门构件创建结果" width="480">
+    </td>
+    <td width="50%" align="center">
+      <img src=".github/assets/exmpl-02line.png" alt="线段绘制结果" width="480">
+    </td>
+  </tr>
+</table>
 
 ## 主要能力
 
@@ -174,9 +194,10 @@ node server\tests\extension-manager.test.js
 
 ## 许可
 
-项目使用 [MIT License](LICENSE)。Archicad 和 Graphisoft 商标归其权利人所有。参见 [NOTICE](NOTICE)、[SECURITY.md](.github/SECURITY.md) 和 [SUPPORT.md](.github/SUPPORT.md)。
+项目使用 [MIT License](LICENSE)，请参阅 [NOTICE](NOTICE)、[SECURITY.md](.github/SECURITY.md) 和 [SUPPORT.md](.github/SUPPORT.md)。本项目为第三方插件，与 Archicad 和 Graphisoft 无关。
 
 可按 MIT License 条款使用、修改和分发，请保留原始版权及许可声明。
 
 **MEPbridge ACAIstr (MACAI)**  — Made by Zuxai Z.(Zhong)
+
 &copy; 2026 Zuxai Z. &middot; MIT License

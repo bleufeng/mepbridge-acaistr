@@ -8,6 +8,7 @@ const {
 const { migrateLegacyFile } = require('./runtime-paths');
 const { decrypt: decryptLlmConfig } = require('./llm-config-crypto');
 const { normalizeUiLocale, isEnglishUiLocale } = require('./ui-locale');
+const semanticIndex = require('./semantic-index');
 
 const CONFIG_FILE = migrateLegacyFile('.llm-config.json');
 // D.5: 加载 tool-descriptors.json 作为命令注册中心
@@ -216,24 +217,37 @@ class AIAdapter {
   // BASE 模式不经此链路（UI 端直接调 /api/execute）
   async generatePlan(text, context = {}) {
     const hasLLM = !!this.llm;
+    const planContext = { ...context };
+
+    try {
+      planContext.semanticIndex = await semanticIndex.createContext(text, {
+        elementGuid: context.elementGuid || context.routeGuid
+      });
+    } catch (error) {
+      console.log('[AI Adapter] Semantic index unavailable:', error.message);
+      planContext.semanticIndex = {
+        unavailable: true,
+        error: error.message
+      };
+    }
 
     // V2 H3.3: 注入执行历史到 context（LLM 感知之前的操作）
-    if (hasLLM && this.executionHistory.length > 0 && !context.history) {
-      context.history = this.getHistorySummary();
+    if (hasLLM && this.executionHistory.length > 0 && !planContext.history) {
+      planContext.history = this.getHistorySummary();
     }
 
     if (hasLLM) {
       // ─── LLM 优先路径 ───
       // L1: LLM 语义理解（systemPrompt 已从 descriptors 自动生成）
       try {
-        const plan = await this.llm.generatePlan(text, context);
+        const plan = await this.llm.generatePlan(text, planContext);
         if (plan && plan.steps && plan.steps.length > 0) {
           // LLM 命中：低置信度时仍降级到本地匹配（避免幻觉）
           if (plan.confidence !== undefined && plan.confidence < 0.5) {
             console.log(`[AI Adapter] LLM low confidence (${plan.confidence}), falling back to descriptor matching`);
           } else {
             console.log('[AI Adapter] LLM generated plan successfully');
-            return this.enrichPlan(plan, text, context);
+            return this.enrichPlan(plan, text, planContext);
           }
         }
       } catch (error) {
@@ -244,18 +258,18 @@ class AIAdapter {
       const descriptorMatch = this.matchDescriptorByText(text);
       if (descriptorMatch) {
         console.log(`[AI Adapter] NL matched descriptor (after LLM): ${descriptorMatch.name}`);
-        const plan = this.buildPlanFromDescriptor(descriptorMatch, text, context.language);
-        return this.enrichPlan(plan, text, context);
+        const plan = this.buildPlanFromDescriptor(descriptorMatch, text, planContext.language);
+        return this.enrichPlan(plan, text, planContext);
       }
 
       // L3: fallback 硬编码
-      const fallbackPlan = this.fallbackGeneratePlan(text, context);
+      const fallbackPlan = this.fallbackGeneratePlan(text, planContext);
       if (fallbackPlan && !fallbackPlan.unsupported) {
-        return this.enrichPlan(fallbackPlan, text, context);
+        return this.enrichPlan(fallbackPlan, text, planContext);
       }
 
       // L4: 无法识别 → 友好回复
-      return this.buildUnrecognizedResponse(text, context.language);
+      return this.buildUnrecognizedResponse(text, planContext.language);
     }
 
     // ─── 无 LLM 路径（跳过 LLM 语义理解） ───
@@ -263,18 +277,18 @@ class AIAdapter {
     const descriptorMatch = this.matchDescriptorByText(text);
     if (descriptorMatch) {
       console.log(`[AI Adapter] NL matched descriptor (no-LLM mode): ${descriptorMatch.name}`);
-      const plan = this.buildPlanFromDescriptor(descriptorMatch, text, context.language);
-      return this.enrichPlan(plan, text, context);
+      const plan = this.buildPlanFromDescriptor(descriptorMatch, text, planContext.language);
+      return this.enrichPlan(plan, text, planContext);
     }
 
     // L2: fallback 硬编码
-    const fallbackPlan = this.fallbackGeneratePlan(text, context);
+    const fallbackPlan = this.fallbackGeneratePlan(text, planContext);
     if (fallbackPlan && !fallbackPlan.unsupported) {
-      return this.enrichPlan(fallbackPlan, text, context);
+      return this.enrichPlan(fallbackPlan, text, planContext);
     }
 
     // L3: 无法识别 → 友好回复
-    return this.buildUnrecognizedResponse(text, context.language);
+    return this.buildUnrecognizedResponse(text, planContext.language);
   }
 
   // D5: 无法识别意图时的友好回复（不执行任何命令）
@@ -754,7 +768,11 @@ class AIAdapter {
 
       const commandName = desc?.commandName || step.commandName || stripCommandNamespace(action).commandName || action || 'Ping';
       const commandNamespace = desc?.commandNamespace || step.commandNamespace || stripCommandNamespace(action).commandNamespace || 'MEPBridge';
-      const params = normalizeStepParams(commandName, step.params || {});
+      const params = normalizeStepParams(commandName, this.applySemanticParameters(
+        commandName,
+        step.params || {},
+        context.semanticIndex?.matches || {}
+      ));
       const commandJson = step.commandJson || this.buildCommandJson(commandName, commandNamespace, params, desc);
       const isMutation = desc && ['low-mutation', 'high-mutation', 'mutation', 'create-element', 'medium-mutation', 'batch-create'].includes(desc.riskLevel);
 
@@ -786,6 +804,57 @@ class AIAdapter {
         : null),
       userIntent: plan.userIntent || text
     };
+  }
+
+  applySemanticParameters(commandName, inputParams, matches = {}) {
+    const params = { ...inputParams };
+    const profile = matches.profiles;
+    const favorite = matches.favorites;
+    const layer = matches.layers;
+    const classification = matches.classifications;
+    const property = matches.propertyDefinitions;
+    const story = matches.stories;
+    const mepSystem = matches.mepSystems;
+
+    if (profile?.guid && ['CreateWall', 'CreateColumn', 'CreateBeam'].includes(commandName) && !params.profileGuid) {
+      params.profileGuid = profile.guid;
+    }
+
+    if (favorite?.name && ['GetFavorite', 'CreateFromFavorite', 'ApplyFavorite'].includes(commandName) && !params.favoriteName) {
+      params.favoriteName = favorite.name;
+    }
+
+    if (layer && commandName === 'SetLayerBatch' && !params.layerGuid && !params.layerName) {
+      if (layer.guid) params.layerGuid = layer.guid;
+      else if (layer.name) params.layerName = layer.name;
+    }
+
+    if (classification && commandName === 'AssignClassification') {
+      if (classification.systemGuid && !params.systemGuid) params.systemGuid = classification.systemGuid;
+      if (classification.kind === 'item' && classification.itemGuid && !params.assignItemGuid) {
+        params.assignItemGuid = classification.itemGuid;
+      }
+    }
+
+    if (property && ['FindElementsByProperty', 'GetElementProperties', 'SetElementProperty', 'SetElementProperties'].includes(commandName)) {
+      if (property.propertyGuid && !params.propertyGuid) params.propertyGuid = property.propertyGuid;
+      if (property.groupName && !params.groupName) params.groupName = property.groupName;
+      if (property.propertyName && !params.propertyName) params.propertyName = property.propertyName;
+    }
+
+    if (story && params.floorIndex === undefined && ['CreateWall', 'CreateColumn', 'CreateBeam', 'CreateSlab', 'FindElementsByProperty'].includes(commandName)) {
+      const floorIndex = story.index ?? story.floorIndex;
+      if (floorIndex !== undefined) params.floorIndex = floorIndex;
+    }
+
+    if (mepSystem && ['CreatePipe', 'CreateDuct', 'CreateCableCarrier', 'ChangeMEPRouteProperties'].includes(commandName)) {
+      if (mepSystem.index !== undefined && params.mepSystemIndex === undefined) {
+        params.mepSystemIndex = mepSystem.index;
+      }
+      if (mepSystem.name && !params.mepSystemName) params.mepSystemName = mepSystem.name;
+    }
+
+    return params;
   }
 
   findDescriptorByAction(action) {

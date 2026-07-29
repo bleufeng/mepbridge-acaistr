@@ -554,7 +554,7 @@ router.get('/export', (req, res) => {
     const bundle = {
       schemaVersion: 'user-asset-1',
       exportedAt: new Date().toISOString(),
-      appVersion: '0.1.0',
+      appVersion: '0.1.1',
       templates: assets.templates,
       commands: assets.commands
     };

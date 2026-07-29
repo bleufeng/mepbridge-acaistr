@@ -49,17 +49,17 @@ function isHostRunning(processText, matchers = []) {
   return matchers.some((matcher) => processText.includes(String(matcher).toLowerCase()));
 }
 
-function detectConfig(name, configPath, processText, processMatchers, marker = 'mepbridge') {
-  const exists = safeExists(configPath);
-  const configured = exists && fileContains(configPath, marker);
+function detectConfig(name, configPaths, processText, processMatchers, marker = 'mepbridge') {
+  const paths = Array.isArray(configPaths) ? configPaths : [configPaths];
+  const configuredPath = paths.find((p) => safeExists(p) && fileContains(p, marker));
   const running = isHostRunning(processText, processMatchers);
-  if (!configured || !running) return null;
+  if (!configuredPath || !running) return null;
   return {
     name,
     configured: true,
     running: true,
     connected: true,
-    path: configPath,
+    path: configuredPath,
     status: 'connected'
   };
 }
@@ -68,33 +68,61 @@ router.get('/status', (req, res) => {
   const home = os.homedir();
   const serverScript = path.join(ROOT, 'tools', 'mepbridge-mcp-server.js');
   const generatedCodexConfig = path.join(ROOT, 'dist', 'mcp-configs', 'codex-config.toml');
-  const codexUserConfig = path.join(home, '.codex', 'config.toml');
 
   const processText = getRunningProcessText();
   const candidates = [
     {
       name: 'CodeBuddy',
-      configPath: path.join(ROOT, '.codebuddy', '.mcp.json'),
+      configPaths: [
+        path.join(home, '.codebuddy', 'mcp.json'),
+        path.join(home, '.codebuddy', '.mcp.json'),
+        path.join(ROOT, '.codebuddy', '.mcp.json')
+      ],
       processMatchers: ['codebuddy']
     },
     {
+      name: 'WorkBuddy',
+      configPaths: [
+        path.join(home, '.workbuddy', 'mcp.json'),
+        path.join(home, '.workbuddy', '.mcp.json')
+      ],
+      processMatchers: ['workbuddy']
+    },
+    {
       name: 'Codex',
-      configPath: safeExists(codexUserConfig) ? codexUserConfig : generatedCodexConfig,
+      configPaths: [
+        path.join(home, '.codex', 'mcp.json'),
+        path.join(home, '.codex', 'config.toml'),
+        generatedCodexConfig
+      ],
       processMatchers: ['codex.exe', 'chatgpt.exe']
     },
     {
       name: 'Cursor',
-      configPath: path.join(ROOT, '.cursor', 'mcp.json'),
+      configPaths: [
+        path.join(home, '.cursor', 'mcp.json'),
+        path.join(ROOT, '.cursor', 'mcp.json')
+      ],
       processMatchers: ['cursor.exe', 'cursor']
     },
     {
+      name: 'Claude Code',
+      configPaths: [
+        path.join(home, '.claude.json')
+      ],
+      processMatchers: ['claude.exe'],
+      marker: 'mepbridge-mcp-server'
+    },
+    {
       name: 'Claude Desktop',
-      configPath: path.join(home, 'AppData', 'Roaming', 'Claude', 'claude_desktop_config.json'),
-      processMatchers: ['claude.exe', 'claude desktop', 'cowork-svc.exe']
+      configPaths: [
+        path.join(home, 'AppData', 'Roaming', 'Claude', 'claude_desktop_config.json')
+      ],
+      processMatchers: ['claude desktop']
     }
   ];
   const platforms = candidates
-    .map(({ name, configPath, processMatchers }) => detectConfig(name, configPath, processText, processMatchers))
+    .map(({ name, configPaths, processMatchers, marker }) => detectConfig(name, configPaths, processText, processMatchers, marker || 'mepbridge'))
     .filter(Boolean);
 
   const configuredCount = platforms.length;

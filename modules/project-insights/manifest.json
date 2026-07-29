@@ -2,7 +2,7 @@
   "$schema": "../schema/module-manifest.schema.json",
   "schemaVersion": "mepbridge-module-manifest-1",
   "id": "project-insights",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "apiVersion": "1",
   "displayName": {
     "zh-CN": "项目概览",
