@@ -4,7 +4,7 @@
 
 请下载中文 `win64-zh-CN.zip` 或英文 `win64-en-US.zip` 完整安装包。独立 APX 仅用于已有完整安装的更新，GitHub 自动生成的源码归档不是安装包。
 
-1. 解压完整的 v0.1.0 发布 ZIP。
+1. 解压完整的 v0.1.1 发布 ZIP。
 2. 关闭 Archicad，双击 `Install-MEPBridge.cmd`。
 3. 重新启动 Archicad。
 4. 点击“MEPbridge ACAIstr → 打开 MEPbridge ACAIstr”。
@@ -16,7 +16,7 @@
 1. 打开测试或已备份的 PLN。
 2. 确认 Workbench 显示 Archicad 和 MEPBridge 在线。
 3. 执行 Ping 或读取项目信息。
-4. 确认版本为 `0.1.0`，注册命令为 61 个，descriptor/MCP 工具为 59 个。
+4. 确认版本为 `0.1.1`，注册命令为 74 个，descriptor/MCP 工具为 72 个。
 
 ## 3. Manual 手动模式
 

@@ -237,7 +237,7 @@ class ExtensionManager {
     status.mepbridge = {
       available: true,
       status: 'online',
-      version: '0.1.0',
+      version: '0.1.1',
       features: [],
       lastCheck: Date.now(),
     };

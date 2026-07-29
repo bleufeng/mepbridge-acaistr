@@ -1,47 +1,68 @@
 # Changelog
 
-This file records public user-facing changes. Versions follow Semantic Versioning.
+Public user-facing changes. Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
 ### Added
 
-- Added a public `VERSION` source of truth and an automated version/update
-  record gate for every public pull request and `main` update.
-- Added a mandatory pull-request checklist for changelog, version impact,
-  bilingual documentation, and Release asset impact.
-- Added independent Chinese (`zh-CN`) and English (`en-US`) Windows v0.1.0
-  installation packages and standalone AC28/AC29 APX update assets.
+- None in this cycle.
 
 ### Changed
 
-- Public contribution and export rules now reject trailing whitespace and
-  extra EOF blank lines in changed text files. Version impact: `none`; existing
-  GitHub Release assets remain unchanged.
-- Replaced the starter "scan wall, column, and beam AABBs" template with the
-  verified story-0 sample slab task, and replaced the two sample partition-wall
-  task with the verified sample CableCarrier task. Version impact: `none`;
-  the existing GitHub Release assets remain unchanged until a versioned package
-  refresh is approved.
-- User-template task names are now rendered as plain text in template lists,
-  groups, selectors, management cards, and replay dialogs; inconsistent
-  per-template icons and hot markers are no longer displayed.
-- Every public repository update must add a concise entry under
-  `[Unreleased]`.
-- Product version changes must increment Semantic Versioning and synchronize
-  the changelog, English and Chinese public guides, and Server/UI package
-  metadata.
-- Package locale now controls the initial Workbench language, starter assets,
-  and built-in regional knowledge base while preserving manual language
-  switching.
-- Refreshed README wording (removed openBIM framing, tightened safety and
-  disclaimer wording, and updated the author signature) and replaced the
-  workflow diagram. Version impact: `none`; existing GitHub Release assets
-  remain unchanged.
-- Reset the starter sample slab and sample CableCarrier template coordinates
-  to the source element native positions (no X+20m offset), matching the
-  current AC28 story-0 read/recreate regression data. Version impact: `none`;
-  existing GitHub Release assets remain unchanged.
+- None in this cycle.
+
+### Fixed
+
+- None in this cycle.
+
+### Known Boundaries
+
+- None in this cycle.
+
+## [0.1.1] - 2026-07-28
+
+### Added
+
+- 13 new C++ commands: GetFavorites, GetFavorite, CreateFromFavorite, ApplyFavorite, SaveFavorite, GetProfiles, GetViewMap, GetSectionMarkers, GetClassifications, GetLayers, FindElementsByProperty, AssignClassification, SetLayerBatch.
+- CreateWall, CreateColumn, and CreateBeam now support an optional `profileGuid` parameter for cross-section profile selection.
+- Semantic-index main chain integrated into the Workbench Server for natural-language command matching.
+- Example preview section added to README with demonstration videos and result screenshots.
+- Chinese changelog (`CHANGELOG.zh-CN.md`) and bilingual version-update instructions in the installation guide.
+
+### Changed
+
+- C++ command count increased from 61 to 74; descriptor/MCP tool count increased from 59 to 72.
+- CopyElements empty-sourceGuids handling fixed across three layers: resolver now skips selection-set fallback when `dryRun=true` and `sourceGuids` is empty; C++ schema removed `minItems:1`; C++ `Execute()` returns a dry-run preview for empty GUIDs (APX rebuild required for the C++ portion).
+- Starter shell template converted from CopyElements (GUID-dependent) to CreateWall x8 + CreateSlab x2 (10 steps, self-contained coordinates, cross-project, no GUID dependency).
+- MCP status display now detects CodeBuddy, WorkBuddy, Codex, and Claude Code platforms via multiple config-path arrays; per-candidate custom markers supported.
+- Claude Code MCP plugin install path corrected to `~/.claude.json` top-level `mcpServers` (not `~/.claude/mcp.json`).
+- README wording refreshed (removed openBIM framing, tightened safety/disclaimer wording, updated author signature, added third-party disclaimer) and workflow diagram replaced with example preview.
+- Starter sample slab and CableCarrier template coordinates reset to source element native positions (no X+20m offset), matching current AC28 story-0 read/recreate regression data.
+- User-template task names render as plain text in lists, groups, selectors, management cards, and replay dialogs; per-template icons and hot markers removed.
+- Package locale controls the initial Workbench language, starter assets, and built-in regional knowledge base; manual language switching preserved.
+- Public `VERSION` source of truth and automated version gate for every public pull request and `main` update.
+- Mandatory pull-request checklist covering changelog, version impact, bilingual docs, and Release asset impact.
+- Each public repository update must add a concise `[Unreleased]` entry.
+- Product version changes must increment Semantic Versioning and sync the changelog, bilingual public guides, and Server/UI package metadata.
+
+### Fixed
+
+- CopyElements empty-sourceGuids three-layer interception: resolver no longer reads the Archicad selection set when `dryRun=true` and `sourceGuids` is empty; C++ schema `minItems:1` removed; C++ `Execute()` returns a successful dry-run preview for empty GUIDs.
+- MCP status display only showed CodeBuddy; WorkBuddy and Codex were open but not displayed. Fixed by adding WorkBuddy, supporting multiple config paths per platform, and removing false-positive matchers.
+- Command-count drift across source, descriptors, MCP, and documentation corrected.
+- Obsolete duplicate UI artifacts and source maps removed from the public release scope.
+- AC28/AC29 package paths corrected.
+- Conversation history and execution state preserved when switching to the conversation-only window.
+
+### Known Boundaries
+
+- `SwitchStory` and `ChangeStairGeometry` are registered C++ commands but not published as descriptor/MCP tools in v0.1.1.
+- `CopyElementsCommand.cpp` schema and `Execute()` changes require an APX rebuild for the dry-run placeholder to work cross-project; the Create-type template workaround is used in the meantime.
+- `GetViewMap` returns 0 views in the current test project (no View Map items in the project, not a bug).
+- `CreateColumn`/`CreateBeam` `profileGuid` is parsed but not applied (memo multi-segment structure; future enhancement).
+- The public source repository does not include the Graphisoft DevKit and does not promise a reproducible official APX build.
+- Users are responsible for project backups, input review, and compliance with applicable requirements.
 
 ## [0.1.0] - 2026-07-20
 
@@ -59,23 +80,20 @@ This file records public user-facing changes. Versions follow Semantic Versionin
 
 ### Changed
 
-- Public version identifiers are unified as `0.1.0`.
+- Public version identifiers unified as `0.1.0`.
 - AC28 and AC29 use independent resource files and menu registration.
 - Server defaults to `127.0.0.1`; network exposure requires an explicit `HOST` override.
-- Runtime user data is stored under `%APPDATA%\MEPBridge` by default.
-- MCP tool count is generated dynamically from descriptors.
-- Public repository layout now separates user documentation, package source files, and internal technical resources.
+- Runtime user data stored under `%APPDATA%\MEPBridge` by default.
+- MCP tool count generated dynamically from descriptors.
+- Public repository layout separates user documentation, package source files, and internal technical resources.
 
 ### Fixed
 
-- Corrected command-count drift across source, descriptors, MCP, and documentation.
-- Removed obsolete duplicate UI artifacts and source maps from the public release scope.
-- Corrected AC28/AC29 package paths.
-- Preserved conversation history and execution state when switching to the conversation-only window.
+- None in this cycle.
 
 ### Known Boundaries
 
-- `SwitchStory` and `ChangeStairGeometry` are registered C++ commands but are not published as descriptor/MCP tools in v0.1.0.
+- `SwitchStory` and `ChangeStairGeometry` are registered C++ commands but not published as descriptor/MCP tools in v0.1.0.
 - Some AC28/AC29 implementation details may continue to converge in later updates.
 - The public source repository does not include the Graphisoft DevKit and does not promise a reproducible official APX build.
 - Users are responsible for project backups, input review, and compliance with applicable requirements.

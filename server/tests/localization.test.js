@@ -84,7 +84,10 @@ function assertVerifiedStarterMutationTemplates(label, assets) {
     cableCarrier.plan.steps[0].commandJson.parameters.addOnCommandId.commandName,
     'CreateCableCarrier'
   );
-  assert.strictEqual(cableCarrier.plan.steps[0].params.mepSystemIndex, 5);
+  assert.strictEqual(cableCarrier.plan.steps[0].params.mepSystemIndex, undefined, `${label} cable template must not hardcode mepSystemIndex (attribute index is project/version-specific)`);
+  assert.strictEqual(cableCarrier.plan.steps[0].params.mepSystemName, undefined, `${label} cable template must not hardcode mepSystemName (system name is project/language-specific); command uses project default CableCarrier system`);
+  assert.strictEqual(cableCarrier.plan.steps[0].commandJson.parameters.addOnCommandParameters.mepSystemIndex, undefined, `${label} cable template commandJson must not hardcode mepSystemIndex`);
+  assert.strictEqual(cableCarrier.plan.steps[0].commandJson.parameters.addOnCommandParameters.mepSystemName, undefined, `${label} cable template commandJson must not hardcode mepSystemName`);
   assert.strictEqual(cableCarrier.plan.steps[0].params.width, 0.2);
   assert.strictEqual(cableCarrier.plan.steps[0].params.height, 0.1);
   assert.strictEqual(cableCarrier.plan.steps[0].params.waypoints.length, 5);
@@ -94,7 +97,7 @@ function main() {
   const chinese = readStarterAssets('zh-CN');
   const english = readStarterAssets('en-US');
 
-  assert.strictEqual(chinese.templates.length, 5);
+  assert.strictEqual(chinese.templates.length, 7);
   assert.strictEqual(chinese.commands.length, 5);
   assert.strictEqual(english.templates.length, chinese.templates.length);
   assert.strictEqual(english.commands.length, chinese.commands.length);
@@ -112,7 +115,7 @@ function main() {
   );
 
   const localizedEnglish = userAssetsTest.localizeStarterAssets(chinese, 'en-US');
-  assert.strictEqual(localizedEnglish.templates.length, 5);
+  assert.strictEqual(localizedEnglish.templates.length, 7);
   assert.strictEqual(localizedEnglish.commands.length, 5);
   assertNoCjk('Localized starter assets', localizedEnglish);
   assertVerifiedStarterMutationTemplates('Localized English starter assets', localizedEnglish);
@@ -130,6 +133,7 @@ function main() {
     'create beam',
     'move selected elements',
     'rotate selected elements',
+    'create shell on floors',
   ];
 
   for (const prompt of englishPrompts) {
@@ -140,7 +144,7 @@ function main() {
   }
 
   const englishList = taskTemplates.list('en-US');
-  assert.strictEqual(englishList.length, 12);
+  assert.strictEqual(englishList.length, 14);
   assertNoCjk('English task template catalog', englishList);
 
   const chinesePlan = taskTemplates.tryGenerate('创建楼板', { locale: 'zh-CN' });

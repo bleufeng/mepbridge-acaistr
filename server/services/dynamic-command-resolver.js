@@ -30,6 +30,18 @@ async function resolveDynamicCommandParameters(archicadCommand, endpoint) {
     };
   }
 
+  // dryRun=true with empty sourceGuids: skip selection fallback so the request
+  // reaches the C++ CopyElements dry-run branch for param preview. The C++ side
+  // returns NO_SOURCE_GUIDS in this case, which is the intended dry-run feedback
+  // (not a server-side 409 error that blocks the template step).
+  if (params.dryRun === true) {
+    return {
+      type: 'copy-elements-source-guids',
+      status: 'skipped',
+      reason: 'dryRun with empty sourceGuids; letting C++ dry-run branch handle preview'
+    };
+  }
+
   const selected = await fetchSelectedElements(endpoint);
   const allowedTypes = Array.isArray(params.allowedTypes) && params.allowedTypes.length > 0
     ? params.allowedTypes

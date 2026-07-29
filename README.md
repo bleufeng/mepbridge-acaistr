@@ -2,11 +2,10 @@
 
 > MEPbridge ACAIstr (MACAI) is a native Add-On and local MCP / Workbench collaboration system centered on Archicad workflows. Its initial focus is safe, controlled two-way interaction between large language models and building 3D design software, providing natural-language interaction, structured command execution, and autonomous AI Loop capabilities for design work. The system provides `CollabAI Smart` and `Manual` as its two operation entry points; manual commands, fixed templates, and configured custom NL commands remain available without an LLM.
 >
-> The exploration path uses two-way MCP data exchange to progressively form an AI Loop of task planning, model execution, model-feedback readback, and corrective iteration. The initial version focuses on reliable model read/write access, risk confirmation, and result readback. Drawing interpretation, compliance checking, and multidisciplinary end-to-end design automation are expected to continue expanding.
+> The exploration path uses two-way MCP data exchange to progressively form an AI Loop of task planning, model execution, model-feedback readback, and corrective iteration. Design instructions connect with AI algorithms through data, driving Archicad execution via the local Workbench / MCP layer and reading back structured results to close the loop. The initial version focuses on reliable model read/write access, risk confirmation, and result readback. Drawing interpretation, compliance checking, and multidisciplinary end-to-end design automation are expected to continue expanding.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Archicad](https://img.shields.io/badge/Archicad-28%20%7C%2029-blue.svg)]()
-[![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)]()
+[![Version](https://img.shields.io/badge/version-0.1.1-orange.svg)]()
 [![OPENBIM](https://img.shields.io/badge/OPENBIM-Workflow-0F766E.svg)]()
 [![Archicad JSON API](https://img.shields.io/badge/ARCHICAD-JSON%20API-2563EB.svg)]()
 [![C++ Add-On](https://img.shields.io/badge/C%2B%2B-Add--On-00599C.svg)]()
@@ -22,13 +21,34 @@
   <img src=".github/assets/mepbridge-acaistr-workflow.png" alt="MEPbridge ACAIstr workflow: natural-language commands and extensible user templates, safe orchestration, Workbench and MCP Server, Archicad execution, and result readback" width="100%">
 </p>
 
-Natural-language tasks and extensible user templates pass through planning and risk controls, the local Workbench / MCP layer, Archicad execution, and structured result readback.
+Natural-language tasks and extensible user templates pass through planning and risk controls, connecting design instructions with AI algorithms through data, driving Archicad execution via the local Workbench / MCP layer, and reading back structured results to form a closed loop.
+
+## Example Preview
+
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="50%" align="center">
+      <video src="https://github.com/user-attachments/assets/dd0671dd-3e2c-4b34-950c-6cafdf272182" controls muted width="480"></video>
+    </td>
+    <td width="50%" align="center">
+      <video src="https://github.com/user-attachments/assets/ab30744b-9342-4bf5-9e65-189c8fd8b5db" controls muted width="480"></video>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src=".github/assets/exmpl-01door.png" alt="Door element creation result" width="480">
+    </td>
+    <td width="50%" align="center">
+      <img src=".github/assets/exmpl-02line.png" alt="Line drawing result" width="480">
+    </td>
+  </tr>
+</table>
 
 ## Release Scope
 
-- Version: `v0.1.0`
-- 61 registered C++ commands
-- 59 descriptor/MCP tools
+- Version: `v0.1.1`
+- 74 registered C++ commands
+- 72 descriptor/MCP tools
 - Direct-only C++ commands: `SwitchStory` and `ChangeStairGeometry`
 - Archicad 28 and Archicad 29 Windows builds
 - Server default: `127.0.0.1:19780`
@@ -38,8 +58,8 @@ Public update history: [CHANGELOG.md](CHANGELOG.md).
 
 Download the full package for your language from GitHub Releases:
 
-- `MEPbridge-ACAIstr-v0.1.0-win64-en-US.zip`: English full package.
-- `MEPbridge-ACAIstr-v0.1.0-win64-zh-CN.zip`: Chinese full package.
+- `MEPbridge-ACAIstr-v0.1.1-win64-en-US.zip`: English full package.
+- `MEPbridge-ACAIstr-v0.1.1-win64-zh-CN.zip`: Chinese full package.
 
 Do not use GitHub's automatically generated `Source code.zip` or `Source code.tar.gz`; they are not installation packages and do not contain the complete APX and runtime dependencies. Each full ZIP contains both AC28 and AC29 APXs, the Workbench Server, compiled UI, MCP Server, production dependencies, legal files, manifest, and checksums. The standalone AC28/AC29 APX assets are update-only files for users who already have a complete package installed.
 
@@ -176,7 +196,7 @@ Installing or using this project constitutes acceptance of the associated risks 
 
 ## License
 
-Licensed under the [MIT License](LICENSE). Archicad and Graphisoft are trademarks of their respective owners. See [NOTICE](NOTICE), [SECURITY.md](.github/SECURITY.md), and [SUPPORT.md](.github/SUPPORT.md).
+Licensed under the [MIT License](LICENSE). See [NOTICE](NOTICE), [SECURITY.md](.github/SECURITY.md), and [SUPPORT.md](.github/SUPPORT.md). This project is a third-party Add-On and is not affiliated with Archicad or Graphisoft.
 
 Use, modification, and distribution are permitted under the MIT License, provided that the original copyright and license notice are retained.
 
