@@ -4,7 +4,7 @@
 
 Download the English `win64-en-US.zip` or Chinese `win64-zh-CN.zip` full package. APX-only assets are updates for existing installations; GitHub's generated source archives are not installation packages.
 
-1. Extract the complete v0.1.1 release ZIP.
+1. Extract the complete v0.1.2 release ZIP.
 2. Close Archicad and run `Install-MEPBridge.cmd`.
 3. Restart Archicad.
 4. Open **MEPbridge ACAIstr -> Open MEPbridge ACAIstr**.
@@ -16,7 +16,7 @@ See [INSTALL.md](INSTALL.md) for manual installation and MCP configuration.
 1. Open a test or backed-up PLN.
 2. Confirm that the Workbench shows Archicad and MEPBridge as online.
 3. Run Ping or read the current project information.
-4. Confirm version `0.1.1`, 74 registered C++ commands, and 72 descriptor/MCP tools.
+4. Confirm version `0.1.2`, 74 registered C++ commands, and 72 descriptor/MCP tools.
 
 ## 3. Manual Mode
 

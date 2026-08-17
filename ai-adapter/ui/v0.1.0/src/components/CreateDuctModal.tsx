@@ -32,7 +32,7 @@ export const CreateDuctModal: React.FC<CreateDuctModalProps> = ({
     end:   { x: 6, y: 0, z: 3.2 },
     widthMm: 300,
     heightMm: 200,
-    mepSystemName: 'SupplyAir'
+    mepSystemName: ''
   });
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,7 +59,9 @@ export const CreateDuctModal: React.FC<CreateDuctModalProps> = ({
                 width: params.widthMm / 1000,
                 height: params.heightMm / 1000,
                 crossSection: { shape: "Rectangular" },
-                mepSystemName: params.mepSystemName,
+                ...(params.mepSystemName.trim()
+                  ? { mepSystemName: params.mepSystemName.trim() }
+                  : {}),
                 dryRun: true,
                 confirmRequired: false
               }

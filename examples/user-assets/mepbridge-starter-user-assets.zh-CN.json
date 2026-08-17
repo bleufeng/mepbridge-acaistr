@@ -606,7 +606,7 @@
                     },
                     {
                         "item": "系统与截面",
-                        "expected": "mepSystemIndex=5，width=0.20m，height=0.10m",
+                        "expected": "使用项目默认桥架系统，width=0.20m，height=0.10m",
                         "actual": "待执行",
                         "status": "warning"
                     }

@@ -222,4 +222,4 @@ export const USER_ASSET_SCHEMA_VERSION = "user-asset-1";
 /**
  * 当前应用版本（从 package.json 读取，这里硬编码避免动态 require）
  */
-export const APP_VERSION = "0.1.0";
+export const APP_VERSION = __MEPBRIDGE_APP_VERSION__;

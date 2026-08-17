@@ -1,4 +1,11 @@
+// Must stay in sync with the C++ commands that read `dryRun` and enforce
+// `confirmRequired` (grep Sources for `parameters.Get ("dryRun"`). A command
+// missing here has both parameters stripped before the call, so the Add-On falls
+// back to its `dryRun = true` default and the write silently never happens.
+// tests/test-command-capabilities.js diffs this list against Sources/.
 const DRY_RUN_AND_CONFIRM_COMMANDS = new Set([
+  'ApplyFavorite',
+  'AssignClassification',
   'BatchCreateElements',
   'ChangeElementGeometry',
   'ChangeMEPRouteProperties',
@@ -9,6 +16,7 @@ const DRY_RUN_AND_CONFIRM_COMMANDS = new Set([
   'CreateColumn',
   'CreateDoor',
   'CreateFlexibleSegment',
+  'CreateFromFavorite',
   'CreateLamp',
   'CreateMesh',
   'CreateObject',
@@ -23,6 +31,8 @@ const DRY_RUN_AND_CONFIRM_COMMANDS = new Set([
   'MirrorSelectedElements',
   'MoveSelectedElements',
   'RotateSelectedElements',
+  'SaveFavorite',
+  'SetLayerBatch',
   'SetSelectedElements',
   'SetStories',
 ]);

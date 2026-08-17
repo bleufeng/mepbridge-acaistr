@@ -23,6 +23,7 @@ const {
   getCommandSafetyCapabilities,
   normalizeCommandSafetyParameters,
 } = require('../server/services/command-capabilities');
+const { APP_VERSION } = require('../server/services/app-version');
 
 // ── 配置 ──
 const SERVER_ENDPOINT = process.env.MEPBRIDGE_ENDPOINT || 'http://127.0.0.1:19780';
@@ -440,7 +441,7 @@ async function executeTool(toolName, args = {}) {
 const PROTOCOL_VERSION = '2024-11-05';
 const SERVER_INFO = {
   name: 'mepbridge-mcp-server',
-  version: '0.1.1',
+  version: APP_VERSION,
 };
 
 function handleRequest(req) {

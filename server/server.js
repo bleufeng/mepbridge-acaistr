@@ -5,11 +5,11 @@ const path = require('path');
 const fs = require('fs');
 const extensionManager = require('./services/extension-manager');
 const { resolveReleaseLocale } = require('./services/release-locale');
+const { APP_VERSION } = require('./services/app-version');
 
 const app = express();
 const PORT = process.env.PORT || 19780;
 const HOST = process.env.HOST || '127.0.0.1';
-const APP_VERSION = '0.1.1';
 const JSON_LIMIT = process.env.MEPBRIDGE_JSON_LIMIT || '1mb';
 const BUILD_INFO = {
   version: APP_VERSION,
@@ -75,6 +75,7 @@ const knowledgeBaseRouter = require('./routes/knowledge-base');     // H8: 知�
 const learningMemoryRouter = require('./routes/learning-memory');   // H9: 学习记忆
 const proactiveIntelRouter = require('./routes/proactive-intelligence'); // H10: 主动智能
 const mcpStatusRouter = require('./routes/mcp-status');             // MCP host integration status
+const gsmObjectsRouter = require('./routes/gsm-objects');           // Offline GSM catalog resolution
 
 // FO-2 (2026-06-26): 启动选择集事件监听服务（C++ SelectionChangeHandler → 文件信号 → SSE）
 const selectionEventService = require('./services/selection-events');
@@ -97,6 +98,7 @@ app.use('/api/knowledge-base', knowledgeBaseRouter); // H8: 知识库（建筑�
 app.use('/api/learning-memory', learningMemoryRouter); // H9: 学习记忆（纠正记录+模式学习）
 app.use('/api/proactive', proactiveIntelRouter);      // H10: 主动智能（缺口检测+建议+预判）
 app.use('/api/mcp', mcpStatusRouter);                 // MCP plugin host status
+app.use('/api/gsm-objects', gsmObjectsRouter);        // v0.1.3: offline catalog resolver, no live AC enumeration
 
 // 健康检查
 app.get('/health', (req, res) => {
@@ -124,6 +126,13 @@ app.get('/ui-config.json', (req, res) => {
     archicadHost,
     archicadPort: getArchicadPort()
   });
+});
+
+// 使用指南入口（菜单项 2 指向此路由）
+// 直接写死 /help.html 会让 en-US 发布包的用户看到中文页，因此这里按发布包 locale
+// 重定向到对应的静态页；locale 与 /ui-config.json 同源（RELEASE_MANIFEST.json）。
+app.get('/guide', (req, res) => {
+  res.redirect(RELEASE_LOCALE === 'en-US' ? '/help.en-US.html' : '/help.html');
 });
 
 // 静态文件服务（必须在 SPA fallback 之前）

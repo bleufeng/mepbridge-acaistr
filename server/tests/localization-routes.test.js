@@ -9,6 +9,14 @@ process.env.MEPBRIDGE_DATA_DIR = TEST_DATA_DIR;
 
 const CJK_PATTERN = /[\u3400-\u9fff]/;
 
+// Derived from the shipped starter file rather than hardcoded, so adding a
+// starter template does not break this test for an unrelated reason. The
+// localization contract under test is "no CJK in the en-US payload", not a
+// particular template count.
+const starterEnUs = require('../../examples/user-assets/mepbridge-starter-user-assets.en-US.json');
+const STARTER_TEMPLATE_COUNT = starterEnUs.templates.length;
+const STARTER_COMMAND_COUNT = starterEnUs.commands.length;
+
 function assertNoCjk(label, value) {
   const serialized = JSON.stringify(value);
   assert.strictEqual(CJK_PATTERN.test(serialized), false, `${label} contains CJK text: ${serialized}`);
@@ -70,8 +78,12 @@ async function main() {
   try {
     const initialAssets = await requestJson(`${baseUrl}/api/user-assets/load?locale=en-US`);
     assert.strictEqual(initialAssets.locale, 'en-US');
-    assert.strictEqual(initialAssets.templates.length, 5);
-    assert.strictEqual(initialAssets.commands.length, 5);
+    // No exact count here: on a developer machine `migrateLegacyFile` seeds the
+    // temp data dir from the repo's gitignored user-data/assets.json, while a
+    // fresh install seeds from the starter file. The localization contract is
+    // that the en-US payload carries no CJK text, not a specific count.
+    assert.ok(initialAssets.templates.length > 0);
+    assert.ok(initialAssets.commands.length > 0);
     assertNoCjk('First-run English user asset response', {
       templates: initialAssets.templates,
       commands: initialAssets.commands,
@@ -83,12 +95,15 @@ async function main() {
       body: JSON.stringify({ locale: 'en-US' }),
     });
     assert.strictEqual(reset.locale, 'en-US');
-    assert.deepStrictEqual(reset.stats, { templates: 5, commands: 5 });
+    assert.deepStrictEqual(reset.stats, {
+      templates: STARTER_TEMPLATE_COUNT,
+      commands: STARTER_COMMAND_COUNT,
+    });
 
     const assets = await requestJson(`${baseUrl}/api/user-assets/load?locale=en-US`);
     assert.strictEqual(assets.locale, 'en-US');
-    assert.strictEqual(assets.templates.length, 5);
-    assert.strictEqual(assets.commands.length, 5);
+    assert.strictEqual(assets.templates.length, STARTER_TEMPLATE_COUNT);
+    assert.strictEqual(assets.commands.length, STARTER_COMMAND_COUNT);
     assertNoCjk('English user asset response', {
       templates: assets.templates,
       commands: assets.commands,

@@ -97,7 +97,16 @@ function checkMarkdownLinks(filePath) {
     const target = match[1].replace(/^<|>$/g, '');
     if (!target || target.startsWith('#') || /^(?:https?|mailto):/i.test(target)) continue;
 
-    const decoded = decodeURIComponent(target.split(/[?#]/, 1)[0]);
+    const rawPath = target.split(/[?#]/, 1)[0];
+    // A link like (0.0%) makes decodeURIComponent throw, since % is not followed
+    // by two hex digits. Fall back to the raw text so one malformed link is
+    // reported as a broken link rather than aborting the whole validation run.
+    let decoded;
+    try {
+      decoded = decodeURIComponent(rawPath);
+    } catch {
+      decoded = rawPath;
+    }
     const resolved = path.resolve(path.dirname(filePath), decoded);
     const leavesRoot = resolved !== root && !resolved.startsWith(`${root}${path.sep}`);
     if (leavesRoot || !fs.existsSync(resolved)) {
@@ -141,10 +150,12 @@ for (const requiredPath of [
   'docs/contributors/MODULE_DEVELOPMENT.md',
   'docs/contributors/PUBLIC_SOURCE_BOUNDARY.md',
   'ai-adapter/tool-descriptors.json',
+  'ai-adapter/command-boundary.json',
   'modules/registry.json',
   'server/server.js',
   'tools/mepbridge-mcp-server.js',
   'tools/validate-modules.js',
+  'tools/validate-mep-system-identifiers.js',
   'tools/validate-public-repository.js',
   'tools/validate-public-version.js',
 ]) {
@@ -197,9 +208,13 @@ for (const filePath of files) {
   if (extension === '.md') checkMarkdownLinks(filePath);
 }
 
+const commandBoundary = parseJson(path.join(root, 'ai-adapter/command-boundary.json'));
+const expectedDescriptors = commandBoundary?.descriptors;
 const descriptorRegistry = parseJson(path.join(root, 'ai-adapter/tool-descriptors.json'));
-if (descriptorRegistry && (!Array.isArray(descriptorRegistry.descriptors) || descriptorRegistry.descriptors.length !== 72)) {
-  failures.push('Core descriptor count must be 72.');
+if (typeof expectedDescriptors !== 'number') {
+  failures.push('ai-adapter/command-boundary.json must declare a numeric descriptors count.');
+} else if (descriptorRegistry && (!Array.isArray(descriptorRegistry.descriptors) || descriptorRegistry.descriptors.length !== expectedDescriptors)) {
+  failures.push(`Core descriptor count must be ${expectedDescriptors}.`);
 }
 
 const moduleRegistry = parseJson(path.join(root, 'modules/registry.json'));

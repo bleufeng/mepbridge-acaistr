@@ -11,6 +11,7 @@ const {
   migrateLegacyFile,
   projectPath
 } = require('../services/runtime-paths');
+const { APP_VERSION } = require('../services/app-version');
 const { normalizeUiLocale } = require('../services/ui-locale');
 
 // 用户数据统一存放到 user-data/ 目录（便于用户查找、备份、迁移）
@@ -554,7 +555,7 @@ router.get('/export', (req, res) => {
     const bundle = {
       schemaVersion: 'user-asset-1',
       exportedAt: new Date().toISOString(),
-      appVersion: '0.1.1',
+      appVersion: APP_VERSION,
       templates: assets.templates,
       commands: assets.commands
     };
