@@ -6547,7 +6547,9 @@ export default function App() {
                         diameterMm: params.diameterMm,
                         crossSection: { shape: params.crossSectionShape }
                       },
-                      mepSystemName: params.mepSystemName,
+                      ...(params.mepSystemName.trim()
+                        ? { mepSystemName: params.mepSystemName.trim() }
+                        : {}),
                       dryRun: false,
                       confirmRequired: true
                     }
@@ -6629,7 +6631,9 @@ export default function App() {
                       width: params.widthMm / 1000,
                       height: params.heightMm / 1000,
                       crossSection: { shape: "Rectangular" },
-                      mepSystemName: params.mepSystemName,
+                      ...(params.mepSystemName.trim()
+                        ? { mepSystemName: params.mepSystemName.trim() }
+                        : {}),
                       dryRun: false,
                       confirmRequired: true
                     }
@@ -6668,7 +6672,9 @@ export default function App() {
                       width: params.widthMm / 1000,
                       height: params.heightMm / 1000,
                       crossSection: { shape: "Rectangular" },
-                      mepSystemName: params.mepSystemName,
+                      ...(params.mepSystemName.trim()
+                        ? { mepSystemName: params.mepSystemName.trim() }
+                        : {}),
                       dryRun: false,
                       confirmRequired: true
                     }

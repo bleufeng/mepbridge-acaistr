@@ -1,13 +1,20 @@
 {
   "name": "mepbridge-acaistr-server",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MEPBridge ACAIstr Backend Server",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
     "validate:modules": "node ../tools/validate-modules.js",
+    "validate:mep-systems": "node ../tools/validate-mep-system-identifiers.js",
+    "validate:version": "node ../tools/validate-public-version.js --base HEAD",
+    "check:release": "node ../tools/release-go-no-go.js --root ..",
+    "check:release:evidence": "node ../tools/release-go-no-go.js --root .. --out ../outputs/release-evidence.json",
     "test:modules": "node ../modules/project-insights/tests/module.test.js && node tests/extension-manager.test.js",
+    "test:capabilities": "node ../tests/test-command-capabilities.js",
+    "test:runtime": "node ../tests/Test-AC29RuntimeRegression.js",
+    "test:release-gate": "node ../tests/test-public-version.js && node ../tests/test-release-go-no-go.js",
     "test:localization": "node tests/release-locale.test.js && node tests/localization.test.js && node tests/localization-routes.test.js"
   },
   "dependencies": {

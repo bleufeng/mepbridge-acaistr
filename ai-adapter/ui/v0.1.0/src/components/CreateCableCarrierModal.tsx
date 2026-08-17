@@ -32,7 +32,7 @@ export const CreateCableCarrierModal: React.FC<CreateCableCarrierModalProps> = (
     end:   { x: 8, y: 0, z: 2.8 },
     widthMm: 150,
     heightMm: 80,
-    mepSystemName: 'PowerTrunk'
+    mepSystemName: ''
   });
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,7 +59,9 @@ export const CreateCableCarrierModal: React.FC<CreateCableCarrierModalProps> = (
                 width: params.widthMm / 1000,
                 height: params.heightMm / 1000,
                 crossSection: { shape: "Rectangular" },
-                mepSystemName: params.mepSystemName,
+                ...(params.mepSystemName.trim()
+                  ? { mepSystemName: params.mepSystemName.trim() }
+                  : {}),
                 dryRun: true,
                 confirmRequired: false
               }

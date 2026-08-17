@@ -1,0 +1,13 @@
+{
+  "addOnName": "MEPBridge",
+  "description": "MEPbridge ACAIstr — AC + AI-Stream for Archicad",
+  "defaultLanguage": "INT",
+  "languages": [
+    "INT"
+  ],
+  "version": "0.1.2",
+  "copyright": {
+    "name": "Zuxai Z.",
+    "year": "%Y"
+  }
+}

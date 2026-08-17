@@ -465,8 +465,7 @@ ${mutationCmds.join('\n')}
           {"x": 5.05, "y": 3.05, "z": 0.8},
           {"x": 6.75, "y": 3.05, "z": 0.8}
         ],
-        "diameterMm": 20,
-        "mepSystemName": "给水"
+        "diameterMm": 20
       }
     },
     {
@@ -479,8 +478,7 @@ ${mutationCmds.join('\n')}
           {"x": 5.1, "y": 5.3, "z": 0.3},
           {"x": 6.7, "y": 5.3, "z": 0.3}
         ],
-        "diameterMm": 100,
-        "mepSystemName": "排水"
+        "diameterMm": 100
       }
     },
     {
@@ -494,8 +492,7 @@ ${mutationCmds.join('\n')}
           {"x": 5.9, "y": 5.4, "z": 2.3}
         ],
         "width": 0.15,
-        "height": 0.15,
-        "mepSystemName": "排风"
+        "height": 0.15
       }
     },
     {
@@ -509,8 +506,7 @@ ${mutationCmds.join('\n')}
           {"x": 5.05, "y": 5.4, "z": 2.4}
         ],
         "width": 0.02,
-        "height": 0.02,
-        "mepSystemName": "电气"
+        "height": 0.02
       }
     }
   ],
@@ -603,7 +599,8 @@ ${selectionSection}
   参数: {
     waypoints: [{x, y, z}, {x, y, z}],  // Archicad 模型坐标，单位米；至少 2 个点
     diameterMm: 100,     // 直径（毫米，可选）
-    mepSystemName: "给水" // 系统名称（可选）
+    // mepSystemName 可选。系统名称跨项目/语言/AC 版本不稳定，不要凭空编造；
+    // 只在用户明确指名时传入，省略则由 Add-On 用域默认系统。
   }
   返回: {guid: "新创建元素的GUID"}
 

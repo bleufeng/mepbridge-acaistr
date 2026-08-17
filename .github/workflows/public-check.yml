@@ -46,6 +46,12 @@ jobs:
           node server/tests/extension-manager.test.js
           node server/tests/mcp-status.test.js
 
+      - name: Verify no hardcoded MEP system identifiers
+        run: node tools/validate-mep-system-identifiers.js
+
+      - name: Verify command safety capability whitelist
+        run: node tests/test-command-capabilities.js
+
       - name: Verify English and Chinese UI localization
         run: npm run test:localization --prefix server
 
@@ -53,7 +59,15 @@ jobs:
         run: find server modules tools -name "*.js" -print0 | xargs -0 -n1 node --check
 
       - name: Verify core descriptor boundary
-        run: node -e "const d=require('./ai-adapter/tool-descriptors.json'); if(d.descriptors.length!==59) throw new Error('Expected 59 core descriptors');"
+        run: |
+          node -e "
+          const b = require('./ai-adapter/command-boundary.json');
+          const d = require('./ai-adapter/tool-descriptors.json');
+          if (d.descriptors.length !== b.descriptors) {
+            throw new Error('Expected ' + b.descriptors + ' core descriptors, found ' + d.descriptors.length);
+          }
+          console.log('descriptor boundary ok: ' + d.descriptors.length);
+          "
 
       - name: Lint and build UI
         run: |

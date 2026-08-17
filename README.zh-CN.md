@@ -5,7 +5,7 @@
 > 探索方向：依托 MCP 双向数据交互，逐步形成“任务规划 → 执行建模 → 读取模型反馈 → 修正迭代”的 AI Loop。当前初始版本重点是建立可靠的模型读写、风险确认与结果回读基础；图纸解析、合规校验和建筑设计全流程、全专业智能化期望持续扩展方向。
 
 [![Archicad](https://img.shields.io/badge/Archicad-28%20%7C%2029-blue.svg)]()
-[![Version](https://img.shields.io/badge/version-0.1.1-orange.svg)]()
+[![Version](https://img.shields.io/badge/version-0.1.2-orange.svg)]()
 [![OPENBIM](https://img.shields.io/badge/OPENBIM-Workflow-0F766E.svg)]()
 [![Archicad JSON API](https://img.shields.io/badge/ARCHICAD-JSON%20API-2563EB.svg)]()
 [![C++ Add-On](https://img.shields.io/badge/C%2B%2B-Add--On-00599C.svg)]()
@@ -25,7 +25,7 @@
 
 ## 发布范围
 
-- 版本：`v0.1.1`
+- 版本：`v0.1.2`
 - 74 个注册 C++ 命令
 - 72 个 descriptor/MCP 工具
 - 两个仅直接调用的 C++ 命令：`SwitchStory`、`ChangeStairGeometry`
@@ -37,8 +37,8 @@
 
 请从 GitHub Releases 按界面语言下载完整安装包：
 
-- `MEPbridge-ACAIstr-v0.1.1-win64-zh-CN.zip`：中文完整安装包。
-- `MEPbridge-ACAIstr-v0.1.1-win64-en-US.zip`：英文完整安装包。
+- `MEPbridge-ACAIstr-v0.1.2-win64-zh-CN.zip`：中文完整安装包。
+- `MEPbridge-ACAIstr-v0.1.2-win64-en-US.zip`：英文完整安装包。
 
 不要下载 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`，它们不是安装包，不包含完整 APX 和运行依赖。每个完整 ZIP 均包含 AC28/AC29 APX、Workbench Server、编译后的 UI、MCP Server、生产依赖、法律文件、发布清单和 SHA256 校验和。单独的 AC28/AC29 APX 仅供已安装完整运行环境的用户更新插件。
 

@@ -4,21 +4,30 @@
 
 ## [未发布]
 
-### 新增
+- v0.1.2 的变更已于 2026-08-17 正式发布，完整内容记录在下方 `## [0.1.2]` 段落。
 
-- 本周期无。
-
-### 变更
-
-- 本周期无。
+## [0.1.2] - 2026-08-17
 
 ### 修复
 
-- 本周期无。
+- 安装程序现在会在所有本地固定磁盘上查找 Archicad，不再只查 `C:` 和 `D:`，并额外搜索 `ProgramFiles(x86)` 与 `ProgramW6432` 目录。
+- 若机器上已有 MEPBridge Add-On 目录，安装程序会复用原位置，重复安装不再在不同 Add-On 目录下留下两份副本。
+- 安装程序会检测 Node.js，缺失时给出警告。Add-On 本身仍会正常安装、Archicad 命令仍可使用；仅 Workbench Server、UI 和 MCP Server 需要 Node.js 18 或更高版本。
+- `Install-MEPBridge.cmd` 不再隐藏交互式的 Archicad 目录询问，Archicad 装在非默认位置的用户可以正常回答该提问。
+- ApplyFavorite、AssignClassification、CreateFromFavorite、SaveFavorite、SetLayerBatch 的 `dryRun` 与 `confirmRequired` 参数在到达 Add-On 之前被剥除，导致 Add-On 退回预演模式：写入实际未发生却仍报成功。现已修正，五个命令均正常传递这两个参数。
+- GetViewMap 此前恒返回空列表，原因是它枚举的是发布集而非直接请求各个导航器视图图。现改为按 map id 读取公共视图图与我的视图图，并把打不开的视图图记入 `skippedMaps`，使「确实没有视图」与「查询失败」可以区分。
+- CreateWall 现在会把用户传入的 `thickness` 与 `height` 写入元素，不再静默丢弃。此前 `ACAPI_Element_GetDefaults` 后未置位元素 mask，Archicad 沿用墙工具默认厚度（0.3 m）与高度（3.0 m），忽略请求值。命令现切换为 `API_BasicStructure` 使 `thickness` 字段生效，并对修改的几何字段置位 mask。
+- ChangeElementGeometry、ChangeStairGeometry、ChangeOpeningGeometry 此前向 `ACAPI_Element_Change` 传入空元素 mask，Archicad 将其视为「不改动任何字段」，导致 Wall/Column/Beam/Stair/Door/Window 的几何修改被静默忽略。现改为仅对调用方明确请求的字段精确置位，不再使用 `SETFULL`；修改墙厚时还会把复合/截面墙切换为 `API_BasicStructure`，并同步写回当前建材，使标量厚度真正生效。
+- ApplyFavorite 与 CreateFromFavorite 的 dry-run 响应现新增显式 `applied: false` 字段及 `note` 提示，说明需 `confirmRequired=true` 才会真正应用。此前 dry-run 仅返回 `mode: "dry-run"`，无布尔标志，调用方可能误判为已成功写入。
 
-### 已知边界
+### 变更
 
-- 本周期无。
+- 安装指南补充 Node.js 前置要求、自定义安装路径，以及完整的手动安装分步说明，涵盖管理员权限、如何定位 Archicad 目录、如何区分 Archicad 28 与 29、旧版本处理和安装结果验证。
+- 注册命令数与 descriptor 数改由单一的 `ai-adapter/command-boundary.json` 提供，发布门禁、公开仓校验、CI 与打包脚本统一读取该文件，不再各自保存一份副本。
+- 命令示例不再包含硬编码的 MEP 系统名称或属性索引。这些标识跨项目、跨语言、跨 Archicad 版本并不稳定，省略后由 Add-On 使用域默认系统；并新增静态检查防止回归。
+- Archicad 实机回归改为校验返回内容而非仅校验字段存在，并新增收藏夹、批量图层、分类三类写入命令的端到端覆盖，每项测完都还原自身改动。
+- 内部命令指南补齐全部 74 个已注册命令。此前只有 52 个，收藏夹、截面、视图列表、分类、图层命令与项目/楼层查询均缺失。该文档的命令计数改为以 `ai-adapter/command-boundary.json` 为准。
+- 公开仓校验器遇到含孤立百分号的 Markdown 链接时不再中断整轮校验，而是将该链接报为失效链接。
 
 ## [0.1.1] - 2026-07-28
 

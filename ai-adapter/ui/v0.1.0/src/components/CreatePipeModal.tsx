@@ -31,7 +31,7 @@ export const CreatePipeModal: React.FC<CreatePipeModalProps> = ({
     start: { x: 0, y: 0, z: 3 },
     end:   { x: 5, y: 0, z: 3 },
     diameterMm: 22,
-    mepSystemName: 'DomesticHotWater',
+    mepSystemName: '',
     crossSectionShape: 'Circular'
   });
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -60,7 +60,9 @@ export const CreatePipeModal: React.FC<CreatePipeModalProps> = ({
                   diameterMm: params.diameterMm,
                   crossSection: { shape: params.crossSectionShape }
                 },
-                mepSystemName: params.mepSystemName,
+                ...(params.mepSystemName.trim()
+                  ? { mepSystemName: params.mepSystemName.trim() }
+                  : {}),
                 dryRun: true,
                 confirmRequired: false
               }

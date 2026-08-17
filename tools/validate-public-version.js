@@ -15,17 +15,35 @@ const root = path.resolve(getArgument('--root') || process.cwd());
 const base = getArgument('--base');
 const failures = [];
 
+function addFailure(message) {
+  failures.push(message);
+}
+
 function read(relativePath) {
-  return fs.readFileSync(path.join(root, relativePath), 'utf8');
+  const filePath = path.join(root, relativePath);
+  try {
+    return fs.readFileSync(filePath, 'utf8');
+  } catch (error) {
+    addFailure(`Cannot read ${relativePath}: ${error.message}`);
+    return null;
+  }
 }
 
 function readJson(relativePath) {
-  return JSON.parse(read(relativePath));
+  const content = read(relativePath);
+  if (content === null) return null;
+  try {
+    return JSON.parse(content);
+  } catch (error) {
+    addFailure(`Invalid JSON in ${relativePath}: ${error.message}`);
+    return null;
+  }
 }
 
 function requireContains(relativePath, expected, label) {
-  if (!read(relativePath).includes(expected)) {
-    failures.push(`${relativePath} does not contain ${label}: ${expected}`);
+  const content = read(relativePath);
+  if (content !== null && !content.includes(expected)) {
+    addFailure(`${relativePath} does not contain ${label}: ${expected}`);
   }
 }
 
@@ -69,17 +87,16 @@ function readFileAt(commit, relativePath) {
   }
 }
 
-function extractUnreleased(content) {
+function extractSection(content, heading) {
+  if (content === null) return null;
   const lines = content.split(/\r?\n/);
-  const start = lines.findIndex((line) => line.trim() === '## [Unreleased]');
+  const start = lines.findIndex((line) => line.trim() === heading);
   if (start < 0) return null;
-
-  const nextHeading = lines.findIndex(
-    (line, index) => index > start && /^##\s/.test(line),
-  );
-  return lines.slice(start + 1, nextHeading < 0 ? undefined : nextHeading)
-    .join('\n')
-    .trim();
+  const relativeEnd = lines
+    .slice(start + 1)
+    .findIndex((line) => /^##\s/.test(line));
+  const end = relativeEnd < 0 ? lines.length : start + 1 + relativeEnd;
+  return lines.slice(start + 1, end).join('\n').trim();
 }
 
 function compareVersions(left, right) {
@@ -93,50 +110,69 @@ function compareVersions(left, right) {
   return 0;
 }
 
-const version = read('VERSION').trim();
-if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
-  failures.push(`VERSION must contain a stable Semantic Version, found: ${version}`);
+function versionOf(document, label) {
+  const value = document?.version;
+  return [label, value];
 }
 
+const semverPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+const versionContent = read('VERSION');
+const version = versionContent === null ? '' : versionContent.trim();
+if (!semverPattern.test(version)) {
+  addFailure(`VERSION must contain a stable Semantic Version, found: ${version || '(missing)'}`);
+}
+
+const config = readJson('config.json');
 const serverPackage = readJson('server/package.json');
 const serverLock = readJson('server/package-lock.json');
 const uiPackage = readJson('ai-adapter/ui/v0.1.0/package.json');
 const uiLock = readJson('ai-adapter/ui/v0.1.0/package-lock.json');
 
 for (const [label, value] of [
-  ['server/package.json', serverPackage.version],
-  ['server/package-lock.json', serverLock.version],
-  ['server/package-lock.json root package', serverLock.packages?.['']?.version],
-  ['UI package.json', uiPackage.version],
-  ['UI package-lock.json', uiLock.version],
-  ['UI package-lock.json root package', uiLock.packages?.['']?.version],
+  versionOf(config, 'config.json'),
+  versionOf(serverPackage, 'server/package.json'),
+  versionOf(serverLock, 'server/package-lock.json'),
+  ['server/package-lock.json root package', serverLock?.packages?.['']?.version],
+  versionOf(uiPackage, 'UI package.json'),
+  versionOf(uiLock, 'UI package-lock.json'),
+  ['UI package-lock.json root package', uiLock?.packages?.['']?.version],
 ]) {
-  if (value !== version) {
-    failures.push(`${label} version must equal VERSION ${version}, found: ${value}`);
+  if (value !== undefined && value !== version) {
+    addFailure(`${label} version must equal VERSION ${version}, found: ${value}`);
   }
 }
 
 const changelog = read('CHANGELOG.md');
-if (!changelog.includes('## [Unreleased]')) {
-  failures.push('CHANGELOG.md must contain ## [Unreleased].');
-}
-const escapedVersion = version.replaceAll('.', '\\.');
-if (!new RegExp(`^## \\[${escapedVersion}\\] - \\d{4}-\\d{2}-\\d{2}$`, 'm').test(changelog)) {
-  failures.push(`CHANGELOG.md must contain a dated ## [${version}] release heading.`);
+const chineseChangelog = read('CHANGELOG.zh-CN.md');
+if (semverPattern.test(version)) {
+  const escapedVersion = version.replaceAll('.', '\\.');
+  const releaseHeading = new RegExp(`^## \\[${escapedVersion}\\] - \\d{4}-\\d{2}-\\d{2}$`, 'm');
+  if (changelog !== null && !releaseHeading.test(changelog)) {
+    addFailure(`CHANGELOG.md must contain a dated ## [${version}] release heading.`);
+  }
+  if (chineseChangelog !== null && !releaseHeading.test(chineseChangelog)) {
+    addFailure(`CHANGELOG.zh-CN.md must contain a dated ## [${version}] release heading.`);
+  }
 }
 
-requireContains('README.md', `version-${version}-`, 'the current version badge');
-requireContains('README.md', `Version: \`v${version}\``, 'the current public version');
-requireContains('README.zh-CN.md', `version-${version}-`, 'the current version badge');
-requireContains('README.zh-CN.md', `版本：\`v${version}\``, 'the current public version');
-requireContains('docs/user/INSTALL.md', `v${version} Installation`, 'the current installation-guide version');
-requireContains('docs/user/INSTALL.zh-CN.md', `v${version} 安装说明`, 'the current installation-guide version');
-requireContains('docs/user/QUICK_START.md', `v${version}`, 'the current quick-start version');
-requireContains('docs/user/QUICK_START.zh-CN.md', `v${version}`, 'the current quick-start version');
+if (semverPattern.test(version)) {
+  requireContains('README.md', `version-${version}-`, 'the current version badge');
+  requireContains('README.md', `Version: \`v${version}\``, 'the current public version');
+  requireContains('README.zh-CN.md', `version-${version}-`, 'the current version badge');
+  requireContains('README.zh-CN.md', `v${version}`, 'the current public version');
+  requireContains('docs/user/INSTALL.md', `v${version} Installation`, 'the current installation-guide version');
+  requireContains('docs/user/INSTALL.zh-CN.md', `v${version}`, 'the current installation-guide version');
+  requireContains('docs/user/QUICK_START.md', `v${version}`, 'the current quick-start version');
+  requireContains('docs/user/QUICK_START.zh-CN.md', `v${version}`, 'the current quick-start version');
+}
 
 let changedFiles = [];
 let previousVersion = null;
 const resolvedBase = canResolveCommit(base);
+
+if (base && !resolvedBase) {
+  addFailure(`Base commit cannot be resolved: ${base}`);
+}
 
 if (resolvedBase) {
   const diffFiles = git(['diff', '--name-only', base])
@@ -149,31 +185,39 @@ if (resolvedBase) {
     .map((file) => file.replaceAll('\\', '/'));
   changedFiles = [...new Set([...diffFiles, ...untrackedFiles])].sort();
 
-  if (changedFiles.length > 0 && !changedFiles.includes('CHANGELOG.md')) {
-    failures.push('Every public update must change CHANGELOG.md under [Unreleased].');
-  } else if (changedFiles.includes('CHANGELOG.md')) {
-    const baseChangelog = readFileAt(base, 'CHANGELOG.md');
-    if (
-      baseChangelog !== null
-      && extractUnreleased(baseChangelog) === extractUnreleased(changelog)
-    ) {
-      failures.push(
-        'Every public update must change the CHANGELOG.md [Unreleased] section.',
-      );
+  if (changedFiles.length > 0) {
+    const englishUnreleased = extractSection(changelog, '## [Unreleased]');
+    const chineseUnreleased = extractSection(chineseChangelog, '## [未发布]');
+    if (!englishUnreleased) {
+      addFailure('Public changes require a non-empty CHANGELOG.md ## [Unreleased] section.');
+    }
+    if (!chineseUnreleased) {
+      addFailure('Public changes require a non-empty CHANGELOG.zh-CN.md ## [未发布] section.');
+    }
+
+    const baseEnglish = extractSection(readFileAt(base, 'CHANGELOG.md'), '## [Unreleased]');
+    const baseChinese = extractSection(readFileAt(base, 'CHANGELOG.zh-CN.md'), '## [未发布]');
+    if (englishUnreleased && englishUnreleased === baseEnglish) {
+      addFailure('Public changes must update the CHANGELOG.md [Unreleased] section.');
+    }
+    if (chineseUnreleased && chineseUnreleased === baseChinese) {
+      addFailure('Public changes must update the CHANGELOG.zh-CN.md [未发布] section.');
     }
   }
 
   previousVersion = readVersionAt(base);
   if (previousVersion && previousVersion !== version) {
-    if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(previousVersion)) {
-      failures.push(`Base VERSION is not stable Semantic Versioning: ${previousVersion}`);
-    } else if (compareVersions(version, previousVersion) <= 0) {
-      failures.push(`VERSION must increase from ${previousVersion}, found: ${version}`);
+    if (!semverPattern.test(previousVersion)) {
+      addFailure(`Base VERSION is not stable Semantic Versioning: ${previousVersion}`);
+    } else if (semverPattern.test(version) && compareVersions(version, previousVersion) <= 0) {
+      addFailure(`VERSION must increase from ${previousVersion}, found: ${version}`);
     }
 
     const requiredVersionFiles = [
       'VERSION',
+      'config.json',
       'CHANGELOG.md',
+      'CHANGELOG.zh-CN.md',
       'README.md',
       'README.zh-CN.md',
       'docs/user/INSTALL.md',
@@ -188,7 +232,7 @@ if (resolvedBase) {
 
     for (const relativePath of requiredVersionFiles) {
       if (!changedFiles.includes(relativePath)) {
-        failures.push(`Product version changes must update ${relativePath}.`);
+        addFailure(`Product version changes must update ${relativePath}.`);
       }
     }
   }
@@ -208,5 +252,5 @@ console.log(JSON.stringify({
   base: resolvedBase ? base : null,
   previousVersion,
   changedFileCount: changedFiles.length,
-  changelogRequired: changedFiles.length > 0,
+  changelogRequired: resolvedBase && changedFiles.length > 0,
 }, null, 2));

@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const archicadClient = require('./archicad-client');
+const { APP_VERSION } = require('./app-version');
 const {
   readJsonFile,
   resolveInside,
@@ -237,7 +238,7 @@ class ExtensionManager {
     status.mepbridge = {
       available: true,
       status: 'online',
-      version: '0.1.1',
+      version: APP_VERSION,
       features: [],
       lastCheck: Date.now(),
     };

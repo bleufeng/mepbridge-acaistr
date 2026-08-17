@@ -131,6 +131,13 @@ const INDEX_BUILDERS = {
     })));
   },
 
+  gsmObjects: async () => ({
+    success: true,
+    skipped: true,
+    reason: 'no real GSM enumeration command is currently available',
+    data: []
+  }),
+
   propertyDefinitions: async (options) => {
     const elementGuid = String(options?.elementGuid || '').trim();
     if (!elementGuid) {
@@ -309,7 +316,9 @@ function itemSearchValues(item) {
 
 function searchInSection(sectionName, keyword, index = activeIndex) {
   if (!index || !keyword) return [];
-  const items = index.sections?.[sectionName]?.items;
+  const section = index.sections?.[sectionName];
+  if (section?.state !== 'ready') return [];
+  const items = section.items;
   if (!Array.isArray(items)) return [];
   const normalizedKeyword = String(keyword).trim().toLowerCase();
   if (!normalizedKeyword) return [];
@@ -318,7 +327,9 @@ function searchInSection(sectionName, keyword, index = activeIndex) {
 
 function resolveByName(sectionName, name, index = activeIndex) {
   if (!index || !name) return null;
-  const items = index.sections?.[sectionName]?.items;
+  const section = index.sections?.[sectionName];
+  if (section?.state !== 'ready') return null;
+  const items = section.items;
   if (!Array.isArray(items)) return null;
   const normalizedName = String(name).trim().toLowerCase();
   return items.find((item) => itemSearchValues(item).some((value) => value === normalizedName)) || null;

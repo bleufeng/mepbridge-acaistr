@@ -3,10 +3,10 @@ const router = express.Router();
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const { APP_VERSION } = require('../services/app-version');
 
 // Archicad JSON API 端口范围
 const ARCHICAD_PORTS = Array.from({length: 21}, (_, i) => 19723 + i);
-const APP_VERSION = '0.1.1';
 const BUILD_INFO = {
   version: APP_VERSION,
   buildDate: process.env.MEPBRIDGE_BUILD_DATE || null,

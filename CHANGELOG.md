@@ -4,21 +4,30 @@ Public user-facing changes. Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
-### Added
+- The v0.1.2 changes released on 2026-08-17 are recorded in the `## [0.1.2]` section below.
 
-- None in this cycle.
-
-### Changed
-
-- None in this cycle.
+## [0.1.2] - 2026-08-17
 
 ### Fixed
 
-- None in this cycle.
+- The installer now locates Archicad on any fixed drive instead of only `C:` and `D:`, and also searches the `ProgramFiles(x86)` and `ProgramW6432` roots.
+- The installer reuses an existing MEPBridge Add-On folder when one is already present, so a repeat install no longer leaves two copies under different Add-On directories.
+- The installer detects Node.js and warns when it is missing. The Add-On itself still installs and Archicad commands still work; only the Workbench Server, UI, and MCP Server require Node.js 18 or later.
+- `Install-MEPBridge.cmd` no longer hides the interactive Archicad-folder prompt, so users whose Archicad is installed outside the default location can still answer it.
+- ApplyFavorite, AssignClassification, CreateFromFavorite, SaveFavorite, and SetLayerBatch had their `dryRun` and `confirmRequired` parameters stripped before reaching the Add-On, so the Add-On fell back to a dry run and the write silently never happened while still reporting success. All five now pass both parameters through.
+- GetViewMap always returned an empty list because it enumerated Publisher Sets instead of requesting each Navigator view map directly. It now reads the Public and My view maps by map id, and reports any map it could not open under `skippedMaps` so an empty result can be told apart from a failed query.
+- CreateWall now writes the user-supplied `thickness` and `height` to the element instead of silently dropping them. The element mask was not set after `ACAPI_Element_GetDefaults`, so Archicad reused the wall-tool default thickness (0.3 m) and height (3.0 m) and ignored the request. The command now sets `API_BasicStructure` so the `thickness` field is honoured, and sets the mask for the geometry fields it changes.
+- ChangeElementGeometry, ChangeStairGeometry, and ChangeOpeningGeometry passed a null element mask to `ACAPI_Element_Change`, which Archicad treats as "change nothing", so Wall/Column/Beam/Stair/Door/Window geometry edits were silently ignored. They now mask only the fields explicitly requested instead of using `SETFULL`; wall thickness edits also switch composite/profile walls to `API_BasicStructure` and write back the current building material so the scalar thickness takes effect.
+- ApplyFavorite and CreateFromFavorite dry-run responses now include an explicit `applied: false` field and a `note` explaining that `confirmRequired=true` is required to actually apply. Previously a dry run reported `mode: "dry-run"` but gave no boolean flag, so callers could mistake it for a successful write.
 
-### Known Boundaries
+### Changed
 
-- None in this cycle.
+- Installation guides document the Node.js prerequisite, custom install paths, and a full step-by-step manual installation procedure covering administrator rights, locating the Archicad folder, choosing between Archicad 28 and 29, handling a previous build, and verifying the result.
+- The registered command and descriptor counts now come from a single `ai-adapter/command-boundary.json` file that the release gate, the public repository validator, CI, and the packaging scripts all read, instead of each carrying its own copy.
+- Command examples no longer contain hardcoded MEP system names or attribute indexes. Those identifiers are not stable across projects, locales, or Archicad versions, so omitting them lets the Add-On use the domain default. A static check keeps them out.
+- The Archicad runtime regression now checks returned content rather than only that response fields exist, and covers the favourite, layer-batch and classification write commands end to end, each restoring what it changed.
+- The internal command guide lists all 74 registered commands. It had 52, so the favourites, profile, view-map, classification and layer commands were absent along with the project and story queries. Command counts there now defer to `ai-adapter/command-boundary.json`.
+- The public repository validator no longer aborts on a Markdown link containing a stray percent sign; such a link is reported as broken instead.
 
 ## [0.1.1] - 2026-07-28
 

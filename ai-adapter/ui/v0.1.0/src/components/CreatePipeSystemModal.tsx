@@ -39,7 +39,7 @@ export const CreatePipeSystemModal: React.FC<CreatePipeSystemModalProps> = ({
     ],
     branches: [],
     diameterMm: 22,
-    mepSystemName: 'DomesticHotWater'
+    mepSystemName: ''
   });
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
