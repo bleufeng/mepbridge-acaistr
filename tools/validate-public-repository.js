@@ -18,6 +18,9 @@ const blockedTopLevel = new Set([
   'outputs',
   'user-data',
 ]);
+const allowedFilesUnderBlockedTopLevel = new Set([
+  'tests/test-command-capabilities.js',
+]);
 const blockedExtensions = new Set([
   '.apx',
   '.pln',
@@ -158,6 +161,7 @@ for (const requiredPath of [
   'tools/validate-mep-system-identifiers.js',
   'tools/validate-public-repository.js',
   'tools/validate-public-version.js',
+  'tests/test-command-capabilities.js',
 ]) {
   requireFile(requiredPath);
 }
@@ -177,7 +181,7 @@ const files = walk(root);
 for (const filePath of files) {
   const relativePath = relative(filePath);
   const firstSegment = relativePath.split('/', 1)[0];
-  if (blockedTopLevel.has(firstSegment)) {
+  if (blockedTopLevel.has(firstSegment) && !allowedFilesUnderBlockedTopLevel.has(relativePath)) {
     failures.push(`Blocked top-level path is present: ${relativePath}`);
   }
   if (blockedExtensions.has(path.extname(filePath).toLowerCase())) {

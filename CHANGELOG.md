@@ -4,7 +4,9 @@ Public user-facing changes. Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
-- The v0.1.2 changes released on 2026-08-17 are recorded in the `## [0.1.2]` section below.
+### Fixed
+
+- Public CI now exports and permits only `tests/test-command-capabilities.js` from the otherwise private top-level `tests/` directory, keeping the command-safety check runnable without widening the public source boundary.
 
 ## [0.1.2] - 2026-08-17
 
