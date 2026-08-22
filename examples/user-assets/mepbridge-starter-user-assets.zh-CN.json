@@ -1696,6 +1696,787 @@
             "usageCount": 0,
             "version": "1.0",
             "notes": "创建型模板：在第 2/3 层用 CreateWall ×4 + CreateSlab ×1 各创建外围护结构。参数来自首层实测几何（GetElementGeometry 读取），每步自包含坐标不依赖 GUID，跨项目可用。与 tpl-starter-room-walls（4 CreateWall）和 tpl-starter-scan-structure（CreateSlab）设计一致。原\"复制\"模板因 CopyElements 空 sourceGuids 三层拦截（resolver/schema minItems/C++ NO_SOURCE_GUIDS）改为创建型。"
+        },
+        {
+          "id": "tpl-starter-create-elevated-mesh",
+          "name": "创建带高程网面地形",
+          "category": "Building",
+          "icon": "MESH",
+          "description": "预览创建带逐顶点高程的 Archicad Mesh；源码与离线契约已完成，待 AC28/AC29 APX 重编及实机验证。",
+          "plan": {
+            "title": "创建带高程网面地形",
+            "warning": "预览模式，不写入模型。实际创建须在 APX 重编并完成实机验证后，将 dryRun 改为 false 且 confirmRequired=true。",
+            "isMutation": true,
+            "mepCode": "CreateMesh",
+            "steps": [
+              {
+                "id": "step-preview",
+                "title": "预览带高程网面地形",
+                "action": "CreateMesh",
+                "description": "使用闭合二维边界和与 points 等长的 heights 创建网面预览。",
+                "expectedResult": "返回 Mesh 预览及高程范围。",
+                "params": {
+                  "polygon": {
+                    "points": [
+                      {
+                        "x": 0,
+                        "y": 0
+                      },
+                      {
+                        "x": 10,
+                        "y": 0
+                      },
+                      {
+                        "x": 10,
+                        "y": 8
+                      },
+                      {
+                        "x": 0,
+                        "y": 8
+                      }
+                    ],
+                    "heights": [
+                      0,
+                      1.2,
+                      0.8,
+                      0
+                    ]
+                  },
+                  "level": 0,
+                  "floorIndex": 0,
+                  "dryRun": true,
+                  "confirmRequired": false
+                },
+                "commandJson": {
+                  "command": "API.ExecuteAddOnCommand",
+                  "parameters": {
+                    "addOnCommandId": {
+                      "commandNamespace": "MEPBridge",
+                      "commandName": "CreateMesh"
+                    },
+                    "addOnCommandParameters": {
+                      "polygon": {
+                        "points": [
+                          {
+                            "x": 0,
+                            "y": 0
+                          },
+                          {
+                            "x": 10,
+                            "y": 0
+                          },
+                          {
+                            "x": 10,
+                            "y": 8
+                          },
+                          {
+                            "x": 0,
+                            "y": 8
+                          }
+                        ],
+                        "heights": [
+                          0,
+                          1.2,
+                          0.8,
+                          0
+                        ]
+                      },
+                      "level": 0,
+                      "floorIndex": 0,
+                      "dryRun": true,
+                      "confirmRequired": false
+                    }
+                  }
+                },
+                "commandNamespace": "MEPBridge",
+                "commandName": "CreateMesh",
+                "descriptorName": "mepbridge.create_mesh",
+                "riskLevel": "create-element",
+                "status": "pending"
+              }
+            ],
+            "parameters": [
+              {
+                "item": "执行模式",
+                "expected": "dryRun=true 且 confirmRequired=false",
+                "actual": "预览",
+                "status": "ok"
+              }
+            ]
+          },
+          "riskLevel": "create-element",
+          "createdAt": "2026-08-19T00:00:00.000+08:00",
+          "updatedAt": "2026-08-19T00:00:00.000+08:00",
+          "tags": [
+            "starter",
+            "example",
+            "preview-first",
+            "v0.1.2"
+          ],
+          "usageCount": 0,
+          "version": "1.0",
+          "notes": "preview-first; 待 AC28/AC29 APX 重编及 runtime readback。"
+        },
+        {
+          "id": "tpl-starter-create-extruded-morph",
+          "name": "创建挤出变形体",
+          "category": "Building",
+          "icon": "MORPH",
+          "description": "预览将二维多边形垂直挤出为 Solid Morph；源码与离线契约已完成，待 AC28/AC29 APX 重编及实机验证。",
+          "plan": {
+            "title": "创建挤出变形体",
+            "warning": "预览模式，不写入模型。实际创建须在 APX 重编并完成实机验证后，将 dryRun 改为 false 且 confirmRequired=true。",
+            "isMutation": true,
+            "mepCode": "CreateMorph",
+            "steps": [
+              {
+                "id": "step-preview",
+                "title": "预览挤出变形体",
+                "action": "CreateMorph",
+                "description": "使用简单闭合二维多边形和正向挤出高度创建 Morph 预览。",
+                "expectedResult": "返回 Morph 预览及顶点/面计数。",
+                "params": {
+                  "polygon": [
+                    {
+                      "x": 0,
+                      "y": 0
+                    },
+                    {
+                      "x": 4,
+                      "y": 0
+                    },
+                    {
+                      "x": 4,
+                      "y": 3
+                    },
+                    {
+                      "x": 0,
+                      "y": 3
+                    }
+                  ],
+                  "baseLevel": 0,
+                  "extrudeHeight": 2.5,
+                  "floorIndex": 0,
+                  "dryRun": true,
+                  "confirmRequired": false
+                },
+                "commandJson": {
+                  "command": "API.ExecuteAddOnCommand",
+                  "parameters": {
+                    "addOnCommandId": {
+                      "commandNamespace": "MEPBridge",
+                      "commandName": "CreateMorph"
+                    },
+                    "addOnCommandParameters": {
+                      "polygon": [
+                        {
+                          "x": 0,
+                          "y": 0
+                        },
+                        {
+                          "x": 4,
+                          "y": 0
+                        },
+                        {
+                          "x": 4,
+                          "y": 3
+                        },
+                        {
+                          "x": 0,
+                          "y": 3
+                        }
+                      ],
+                      "baseLevel": 0,
+                      "extrudeHeight": 2.5,
+                      "floorIndex": 0,
+                      "dryRun": true,
+                      "confirmRequired": false
+                    }
+                  }
+                },
+                "commandNamespace": "MEPBridge",
+                "commandName": "CreateMorph",
+                "descriptorName": "mepbridge.create_morph",
+                "riskLevel": "create-element",
+                "status": "pending"
+              }
+            ],
+            "parameters": [
+              {
+                "item": "执行模式",
+                "expected": "dryRun=true 且 confirmRequired=false",
+                "actual": "预览",
+                "status": "ok"
+              }
+            ]
+          },
+          "riskLevel": "create-element",
+          "createdAt": "2026-08-19T00:00:00.000+08:00",
+          "updatedAt": "2026-08-19T00:00:00.000+08:00",
+          "tags": [
+            "starter",
+            "example",
+            "preview-first",
+            "v0.1.2"
+          ],
+          "usageCount": 0,
+          "version": "1.0",
+          "notes": "preview-first; 待 AC28/AC29 APX 重编及 runtime readback。"
+        },
+        {
+            "id": "tpl-starter-create-wall-from-favorite",
+            "name": "按收藏夹预览创建墙体",
+            "category": "MEPBridge-创建",
+            "icon": "WALL",
+            "description": "读取并核对墙体收藏夹，然后以 dryRun 预览按收藏夹创建墙体；不预置收藏夹名称或 GUID。",
+            "plan": {
+                "title": "按收藏夹预览创建墙体",
+                "warning": "预览优先。必须选择当前项目中 elementType=Wall 的唯一收藏夹；缺失或多候选时不得执行创建步骤。",
+                "isMutation": true,
+                "mepCode": "GetFavorite + CreateFromFavorite",
+                "steps": [
+                    {
+                        "id": "step-read-wall-favorite",
+                        "title": "读取并核对墙体收藏夹",
+                        "action": "GetFavorite",
+                        "description": "按用户选择或语义索引解析的名称读取收藏夹。",
+                        "expectedResult": "返回唯一且 elementType=Wall 的收藏夹。",
+                        "params": {},
+                        "commandJson": {
+                            "command": "API.ExecuteAddOnCommand",
+                            "parameters": {
+                                "addOnCommandId": {
+                                    "commandNamespace": "MEPBridge",
+                                    "commandName": "GetFavorite"
+                                },
+                                "addOnCommandParameters": {}
+                            }
+                        },
+                        "commandNamespace": "MEPBridge",
+                        "commandName": "GetFavorite",
+                        "descriptorName": "mepbridge.get_favorite",
+                        "riskLevel": "read",
+                        "status": "pending",
+                        "expectedElementType": "Wall",
+                        "requiredInputs": [
+                            "favoriteName"
+                        ]
+                    },
+                    {
+                        "id": "step-preview-wall-from-favorite",
+                        "title": "预览按收藏夹创建墙体",
+                        "action": "CreateFromFavorite",
+                        "description": "使用已核对的墙体收藏夹和示例轴线生成 dry-run 预览。",
+                        "expectedResult": "返回创建预览，不写入模型。",
+                        "params": {
+                            "start": {
+                                "x": 0,
+                                "y": 0
+                            },
+                            "end": {
+                                "x": 6,
+                                "y": 0
+                            },
+                            "floorIndex": 0,
+                            "dryRun": true,
+                            "confirmRequired": false
+                        },
+                        "commandJson": {
+                            "command": "API.ExecuteAddOnCommand",
+                            "parameters": {
+                                "addOnCommandId": {
+                                    "commandNamespace": "MEPBridge",
+                                    "commandName": "CreateFromFavorite"
+                                },
+                                "addOnCommandParameters": {
+                                    "start": {
+                                        "x": 0,
+                                        "y": 0
+                                    },
+                                    "end": {
+                                        "x": 6,
+                                        "y": 0
+                                    },
+                                    "floorIndex": 0,
+                                    "dryRun": true,
+                                    "confirmRequired": false
+                                }
+                            }
+                        },
+                        "commandNamespace": "MEPBridge",
+                        "commandName": "CreateFromFavorite",
+                        "descriptorName": "mepbridge.create_from_favorite",
+                        "riskLevel": "write",
+                        "status": "pending",
+                        "expectedElementType": "Wall",
+                        "requiredInputs": [
+                            "favoriteName"
+                        ]
+                    }
+                ],
+                "parameters": [
+                    {
+                        "item": "收藏夹",
+                        "expected": "当前项目中的唯一 Wall 收藏夹名称",
+                        "actual": "待选择",
+                        "status": "warning"
+                    },
+                    {
+                        "item": "执行模式",
+                        "expected": "dryRun=true, confirmRequired=false",
+                        "actual": "预览",
+                        "status": "ok"
+                    }
+                ]
+            },
+            "riskLevel": "write",
+            "createdAt": "2026-08-19T00:00:00.000+08:00",
+            "updatedAt": "2026-08-19T00:00:00.000+08:00",
+            "tags": [
+                "starter",
+                "example",
+                "preview-first",
+                "v0.1.3-planning",
+                "zh-CN"
+            ],
+            "usageCount": 0,
+            "version": "1.0",
+            "notes": "preview-first；执行前必须解析当前项目中的必填标识；不硬编码 GUID 或属性 index。"
+        },
+        {
+            "id": "tpl-starter-create-structural-member-from-profile",
+            "name": "按截面预览创建梁柱",
+            "category": "MEPBridge-创建",
+            "icon": "BEAM",
+            "description": "读取截面管理器，并使用当前项目唯一解析的 profileGuid 预览创建梁和柱；不硬编码截面 GUID 或 index。",
+            "plan": {
+                "title": "按截面预览创建梁柱",
+                "warning": "预览优先。必须先从当前项目 GetProfiles 结果中选择唯一截面；缺失或多候选时不得执行创建步骤。",
+                "isMutation": true,
+                "mepCode": "GetProfiles + CreateBeam + CreateColumn",
+                "steps": [
+                    {
+                        "id": "step-read-profiles",
+                        "title": "读取可用复合截面",
+                        "action": "GetProfiles",
+                        "description": "读取当前项目截面管理器定义。",
+                        "expectedResult": "返回截面 name/guid 候选。",
+                        "params": {},
+                        "commandJson": {
+                            "command": "API.ExecuteAddOnCommand",
+                            "parameters": {
+                                "addOnCommandId": {
+                                    "commandNamespace": "MEPBridge",
+                                    "commandName": "GetProfiles"
+                                },
+                                "addOnCommandParameters": {}
+                            }
+                        },
+                        "commandNamespace": "MEPBridge",
+                        "commandName": "GetProfiles",
+                        "descriptorName": "mepbridge.get_profiles",
+                        "riskLevel": "read",
+                        "status": "pending"
+                    },
+                    {
+                        "id": "step-preview-profile-beam",
+                        "title": "预览按截面创建梁",
+                        "action": "CreateBeam",
+                        "description": "使用所选 profileGuid 预览梁。",
+                        "expectedResult": "返回梁创建预览，不写入模型。",
+                        "params": {
+                            "start": {
+                                "x": 0,
+                                "y": 0
+                            },
+                            "end": {
+                                "x": 6,
+                                "y": 0
+                            },
+                            "dryRun": true,
+                            "confirmRequired": false
+                        },
+                        "commandJson": {
+                            "command": "API.ExecuteAddOnCommand",
+                            "parameters": {
+                                "addOnCommandId": {
+                                    "commandNamespace": "MEPBridge",
+                                    "commandName": "CreateBeam"
+                                },
+                                "addOnCommandParameters": {
+                                    "start": {
+                                        "x": 0,
+                                        "y": 0
+                                    },
+                                    "end": {
+                                        "x": 6,
+                                        "y": 0
+                                    },
+                                    "dryRun": true,
+                                    "confirmRequired": false
+                                }
+                            }
+                        },
+                        "commandNamespace": "MEPBridge",
+                        "commandName": "CreateBeam",
+                        "descriptorName": "mepbridge.create_beam",
+                        "riskLevel": "create-element",
+                        "status": "pending",
+                        "requiredInputs": [
+                            "profileGuid"
+                        ]
+                    },
+                    {
+                        "id": "step-preview-profile-column",
+                        "title": "预览按截面创建柱",
+                        "action": "CreateColumn",
+                        "description": "使用所选 profileGuid 预览柱。",
+                        "expectedResult": "返回柱创建预览，不写入模型。",
+                        "params": {
+                            "position": {
+                                "x": 0,
+                                "y": 3
+                            },
+                            "height": 3,
+                            "floorIndex": 0,
+                            "dryRun": true,
+                            "confirmRequired": false
+                        },
+                        "commandJson": {
+                            "command": "API.ExecuteAddOnCommand",
+                            "parameters": {
+                                "addOnCommandId": {
+                                    "commandNamespace": "MEPBridge",
+                                    "commandName": "CreateColumn"
+                                },
+                                "addOnCommandParameters": {
+                                    "position": {
+                                        "x": 0,
+                                        "y": 3
+                                    },
+                                    "height": 3,
+                                    "floorIndex": 0,
+                                    "dryRun": true,
+                                    "confirmRequired": false
+                                }
+                            }
+                        },
+                        "commandNamespace": "MEPBridge",
+                        "commandName": "CreateColumn",
+                        "descriptorName": "mepbridge.create_column",
+                        "riskLevel": "create-element",
+                        "status": "pending",
+                        "requiredInputs": [
+                            "profileGuid"
+                        ]
+                    }
+                ],
+                "parameters": [
+                    {
+                        "item": "截面",
+                        "expected": "当前项目唯一解析的 profileGuid",
+                        "actual": "待选择",
+                        "status": "warning"
+                    },
+                    {
+                        "item": "执行模式",
+                        "expected": "dryRun=true, confirmRequired=false",
+                        "actual": "预览",
+                        "status": "ok"
+                    }
+                ]
+            },
+            "riskLevel": "write",
+            "createdAt": "2026-08-19T00:00:00.000+08:00",
+            "updatedAt": "2026-08-19T00:00:00.000+08:00",
+            "tags": [
+                "starter",
+                "example",
+                "preview-first",
+                "v0.1.3-planning",
+                "zh-CN"
+            ],
+            "usageCount": 0,
+            "version": "1.0",
+            "notes": "preview-first；执行前必须解析当前项目中的必填标识；不硬编码 GUID 或属性 index。"
+        },
+        {
+            "id": "tpl-starter-batch-set-layer",
+            "name": "批量预览设置图层",
+            "category": "MEPBridge-修改",
+            "icon": "LAYER",
+            "description": "读取当前选择集和项目图层，再预览把多个元素设置到目标图层；不硬编码元素 GUID、图层 GUID 或 index。",
+            "plan": {
+                "title": "批量预览设置图层",
+                "warning": "预览优先。必须选择当前项目元素并唯一解析目标 layerGuid 或 layerName，缺少输入时不得执行修改步骤。",
+                "isMutation": true,
+                "mepCode": "GetSelectedElements + GetLayers + SetLayerBatch",
+                "steps": [
+                    {
+                        "id": "step-read-layer-selection",
+                        "title": "读取待修改的当前选择集",
+                        "action": "GetSelectedElements",
+                        "description": "读取当前可编辑选择集。",
+                        "expectedResult": "返回待修改元素 GUID。",
+                        "params": {
+                            "onlyEditable": true,
+                            "includeAabb": false,
+                            "includeMepInfo": false
+                        },
+                        "commandJson": {
+                            "command": "API.ExecuteAddOnCommand",
+                            "parameters": {
+                                "addOnCommandId": {
+                                    "commandNamespace": "MEPBridge",
+                                    "commandName": "GetSelectedElements"
+                                },
+                                "addOnCommandParameters": {
+                                    "onlyEditable": true,
+                                    "includeAabb": false,
+                                    "includeMepInfo": false
+                                }
+                            }
+                        },
+                        "commandNamespace": "MEPBridge",
+                        "commandName": "GetSelectedElements",
+                        "descriptorName": "mepbridge.get_selected_element_details",
+                        "riskLevel": "read",
+                        "status": "pending"
+                    },
+                    {
+                        "id": "step-read-layers",
+                        "title": "读取项目图层",
+                        "action": "GetLayers",
+                        "description": "读取当前项目图层 name/guid。",
+                        "expectedResult": "返回目标图层候选。",
+                        "params": {},
+                        "commandJson": {
+                            "command": "API.ExecuteAddOnCommand",
+                            "parameters": {
+                                "addOnCommandId": {
+                                    "commandNamespace": "MEPBridge",
+                                    "commandName": "GetLayers"
+                                },
+                                "addOnCommandParameters": {}
+                            }
+                        },
+                        "commandNamespace": "MEPBridge",
+                        "commandName": "GetLayers",
+                        "descriptorName": "mepbridge.get_layers",
+                        "riskLevel": "read",
+                        "status": "pending"
+                    },
+                    {
+                        "id": "step-preview-layer-batch",
+                        "title": "预览批量设置图层",
+                        "action": "SetLayerBatch",
+                        "description": "使用选择集元素和唯一目标图层执行 dry-run。",
+                        "expectedResult": "返回逐元素变更预览，不写入模型。",
+                        "params": {
+                            "elementGuids": [],
+                            "dryRun": true,
+                            "confirmRequired": false
+                        },
+                        "commandJson": {
+                            "command": "API.ExecuteAddOnCommand",
+                            "parameters": {
+                                "addOnCommandId": {
+                                    "commandNamespace": "MEPBridge",
+                                    "commandName": "SetLayerBatch"
+                                },
+                                "addOnCommandParameters": {
+                                    "elementGuids": [],
+                                    "dryRun": true,
+                                    "confirmRequired": false
+                                }
+                            }
+                        },
+                        "commandNamespace": "MEPBridge",
+                        "commandName": "SetLayerBatch",
+                        "descriptorName": "mepbridge.set_layer_batch",
+                        "riskLevel": "write",
+                        "status": "pending",
+                        "requiredInputs": [
+                            "elementGuids",
+                            "layerGuid|layerName"
+                        ]
+                    }
+                ],
+                "parameters": [
+                    {
+                        "item": "元素",
+                        "expected": "当前选择集的非空 elementGuids",
+                        "actual": "待读取",
+                        "status": "warning"
+                    },
+                    {
+                        "item": "目标图层",
+                        "expected": "唯一 layerGuid 或 layerName；不得使用 index",
+                        "actual": "待选择",
+                        "status": "warning"
+                    },
+                    {
+                        "item": "执行模式",
+                        "expected": "dryRun=true, confirmRequired=false",
+                        "actual": "预览",
+                        "status": "ok"
+                    }
+                ]
+            },
+            "riskLevel": "write",
+            "createdAt": "2026-08-19T00:00:00.000+08:00",
+            "updatedAt": "2026-08-19T00:00:00.000+08:00",
+            "tags": [
+                "starter",
+                "example",
+                "preview-first",
+                "v0.1.3-planning",
+                "zh-CN"
+            ],
+            "usageCount": 0,
+            "version": "1.0",
+            "notes": "preview-first；执行前必须解析当前项目中的必填标识；不硬编码 GUID 或属性 index。"
+        },
+        {
+            "id": "tpl-starter-assign-classification",
+            "name": "预览指派分类",
+            "category": "MEPBridge-修改",
+            "icon": "CLASSIFICATION",
+            "description": "读取当前选择集和分类系统/条目，再预览给元素指派分类；不硬编码元素、系统、条目 GUID 或 index。",
+            "plan": {
+                "title": "预览指派分类",
+                "warning": "预览优先。必须选择当前项目元素并唯一解析分类条目；缺失或多候选时不得执行指派步骤。",
+                "isMutation": true,
+                "mepCode": "GetSelectedElements + GetClassifications + AssignClassification",
+                "steps": [
+                    {
+                        "id": "step-read-classification-selection",
+                        "title": "读取待分类的当前选择集",
+                        "action": "GetSelectedElements",
+                        "description": "读取当前可编辑选择集。",
+                        "expectedResult": "返回待分类元素 GUID。",
+                        "params": {
+                            "onlyEditable": true,
+                            "includeAabb": false,
+                            "includeMepInfo": false
+                        },
+                        "commandJson": {
+                            "command": "API.ExecuteAddOnCommand",
+                            "parameters": {
+                                "addOnCommandId": {
+                                    "commandNamespace": "MEPBridge",
+                                    "commandName": "GetSelectedElements"
+                                },
+                                "addOnCommandParameters": {
+                                    "onlyEditable": true,
+                                    "includeAabb": false,
+                                    "includeMepInfo": false
+                                }
+                            }
+                        },
+                        "commandNamespace": "MEPBridge",
+                        "commandName": "GetSelectedElements",
+                        "descriptorName": "mepbridge.get_selected_element_details",
+                        "riskLevel": "read",
+                        "status": "pending"
+                    },
+                    {
+                        "id": "step-read-classifications",
+                        "title": "读取分类系统与根条目",
+                        "action": "GetClassifications",
+                        "description": "读取当前项目分类系统和条目候选。",
+                        "expectedResult": "返回 systemGuid/itemGuid 候选。",
+                        "params": {
+                            "includeRootItems": true
+                        },
+                        "commandJson": {
+                            "command": "API.ExecuteAddOnCommand",
+                            "parameters": {
+                                "addOnCommandId": {
+                                    "commandNamespace": "MEPBridge",
+                                    "commandName": "GetClassifications"
+                                },
+                                "addOnCommandParameters": {
+                                    "includeRootItems": true
+                                }
+                            }
+                        },
+                        "commandNamespace": "MEPBridge",
+                        "commandName": "GetClassifications",
+                        "descriptorName": "mepbridge.get_classifications",
+                        "riskLevel": "read",
+                        "status": "pending"
+                    },
+                    {
+                        "id": "step-preview-classification",
+                        "title": "预览指派分类",
+                        "action": "AssignClassification",
+                        "description": "使用当前项目元素和唯一分类条目执行 dry-run。",
+                        "expectedResult": "返回分类变更预览，不写入模型。",
+                        "params": {
+                            "replaceExisting": true,
+                            "dryRun": true,
+                            "confirmRequired": false
+                        },
+                        "commandJson": {
+                            "command": "API.ExecuteAddOnCommand",
+                            "parameters": {
+                                "addOnCommandId": {
+                                    "commandNamespace": "MEPBridge",
+                                    "commandName": "AssignClassification"
+                                },
+                                "addOnCommandParameters": {
+                                    "replaceExisting": true,
+                                    "dryRun": true,
+                                    "confirmRequired": false
+                                }
+                            }
+                        },
+                        "commandNamespace": "MEPBridge",
+                        "commandName": "AssignClassification",
+                        "descriptorName": "mepbridge.assign_classification",
+                        "riskLevel": "write",
+                        "status": "pending",
+                        "requiredInputs": [
+                            "elementGuid",
+                            "assignItemGuid"
+                        ]
+                    }
+                ],
+                "parameters": [
+                    {
+                        "item": "元素",
+                        "expected": "当前选择集中的 elementGuid",
+                        "actual": "待读取",
+                        "status": "warning"
+                    },
+                    {
+                        "item": "分类",
+                        "expected": "唯一 systemGuid/assignItemGuid；不得使用 index",
+                        "actual": "待选择",
+                        "status": "warning"
+                    },
+                    {
+                        "item": "执行模式",
+                        "expected": "dryRun=true, confirmRequired=false",
+                        "actual": "预览",
+                        "status": "ok"
+                    }
+                ]
+            },
+            "riskLevel": "write",
+            "createdAt": "2026-08-19T00:00:00.000+08:00",
+            "updatedAt": "2026-08-19T00:00:00.000+08:00",
+            "tags": [
+                "starter",
+                "example",
+                "preview-first",
+                "v0.1.3-planning",
+                "zh-CN"
+            ],
+            "usageCount": 0,
+            "version": "1.0",
+            "notes": "preview-first；执行前必须解析当前项目中的必填标识；不硬编码 GUID 或属性 index。"
         }
     ],
     "commands": [

@@ -1702,6 +1702,787 @@
       "usageCount": 0,
       "version": "1.0",
       "notes": "Creation-based template: build the outer shell on floors 2/3 using CreateWall x4 + CreateSlab x1 per floor. Parameters come from measured ground-floor geometry (GetElementGeometry); each step is self-contained with coordinates, no GUID dependency, works across projects. Consistent with tpl-starter-room-walls (4 CreateWall) and tpl-starter-scan-structure (CreateSlab). Replaced the previous \"copy\" template because CopyElements with empty sourceGuids is blocked at three layers (resolver / schema minItems / C++ NO_SOURCE_GUIDS)."
+    },
+    {
+      "id": "tpl-starter-create-elevated-mesh",
+      "name": "Create elevated terrain mesh",
+      "category": "Building",
+      "icon": "MESH",
+      "description": "Preview an Archicad Mesh with per-vertex elevations; source and offline contract are complete, pending AC28/AC29 APX rebuild and runtime verification.",
+      "plan": {
+        "title": "Create elevated terrain mesh",
+        "warning": "Preview only; no model write. After the APX rebuild and runtime verification, a confirmed run may set dryRun=false and confirmRequired=true.",
+        "isMutation": true,
+        "mepCode": "CreateMesh",
+        "steps": [
+          {
+            "id": "step-preview",
+            "title": "Preview elevated terrain mesh",
+            "action": "CreateMesh",
+            "description": "Use a closed 2D boundary and a heights array matching points length.",
+            "expectedResult": "Return a Mesh preview and elevation range.",
+            "params": {
+              "polygon": {
+                "points": [
+                  {
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "x": 10,
+                    "y": 0
+                  },
+                  {
+                    "x": 10,
+                    "y": 8
+                  },
+                  {
+                    "x": 0,
+                    "y": 8
+                  }
+                ],
+                "heights": [
+                  0,
+                  1.2,
+                  0.8,
+                  0
+                ]
+              },
+              "level": 0,
+              "floorIndex": 0,
+              "dryRun": true,
+              "confirmRequired": false
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateMesh"
+                },
+                "addOnCommandParameters": {
+                  "polygon": {
+                    "points": [
+                      {
+                        "x": 0,
+                        "y": 0
+                      },
+                      {
+                        "x": 10,
+                        "y": 0
+                      },
+                      {
+                        "x": 10,
+                        "y": 8
+                      },
+                      {
+                        "x": 0,
+                        "y": 8
+                      }
+                    ],
+                    "heights": [
+                      0,
+                      1.2,
+                      0.8,
+                      0
+                    ]
+                  },
+                  "level": 0,
+                  "floorIndex": 0,
+                  "dryRun": true,
+                  "confirmRequired": false
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateMesh",
+            "descriptorName": "mepbridge.create_mesh",
+            "riskLevel": "create-element",
+            "status": "pending"
+          }
+        ],
+        "parameters": [
+          {
+            "item": "执行模式",
+            "expected": "dryRun=true 且 confirmRequired=false",
+            "actual": "预览",
+            "status": "ok"
+          }
+        ]
+      },
+      "riskLevel": "create-element",
+      "createdAt": "2026-08-19T00:00:00.000+08:00",
+      "updatedAt": "2026-08-19T00:00:00.000+08:00",
+      "tags": [
+        "starter",
+        "example",
+        "preview-first",
+        "v0.1.2"
+      ],
+      "usageCount": 0,
+      "version": "1.0",
+      "notes": "preview-first; pending AC28/AC29 APX rebuild and runtime readback."
+    },
+    {
+      "id": "tpl-starter-create-extruded-morph",
+      "name": "Create extruded Morph",
+      "category": "Building",
+      "icon": "MORPH",
+      "description": "Preview a simple solid Morph made by vertically extruding a 2D polygon; source and offline contract are complete, pending AC28/AC29 APX rebuild and runtime verification.",
+      "plan": {
+        "title": "Create extruded Morph",
+        "warning": "Preview only; no model write. After the APX rebuild and runtime verification, a confirmed run may set dryRun=false and confirmRequired=true.",
+        "isMutation": true,
+        "mepCode": "CreateMorph",
+        "steps": [
+          {
+            "id": "step-preview",
+            "title": "Preview extruded Morph",
+            "action": "CreateMorph",
+            "description": "Use a simple closed 2D polygon and a positive extrusion height.",
+            "expectedResult": "Return a Morph preview with vertex and face counts.",
+            "params": {
+              "polygon": [
+                {
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "x": 4,
+                  "y": 0
+                },
+                {
+                  "x": 4,
+                  "y": 3
+                },
+                {
+                  "x": 0,
+                  "y": 3
+                }
+              ],
+              "baseLevel": 0,
+              "extrudeHeight": 2.5,
+              "floorIndex": 0,
+              "dryRun": true,
+              "confirmRequired": false
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateMorph"
+                },
+                "addOnCommandParameters": {
+                  "polygon": [
+                    {
+                      "x": 0,
+                      "y": 0
+                    },
+                    {
+                      "x": 4,
+                      "y": 0
+                    },
+                    {
+                      "x": 4,
+                      "y": 3
+                    },
+                    {
+                      "x": 0,
+                      "y": 3
+                    }
+                  ],
+                  "baseLevel": 0,
+                  "extrudeHeight": 2.5,
+                  "floorIndex": 0,
+                  "dryRun": true,
+                  "confirmRequired": false
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateMorph",
+            "descriptorName": "mepbridge.create_morph",
+            "riskLevel": "create-element",
+            "status": "pending"
+          }
+        ],
+        "parameters": [
+          {
+            "item": "执行模式",
+            "expected": "dryRun=true 且 confirmRequired=false",
+            "actual": "预览",
+            "status": "ok"
+          }
+        ]
+      },
+      "riskLevel": "create-element",
+      "createdAt": "2026-08-19T00:00:00.000+08:00",
+      "updatedAt": "2026-08-19T00:00:00.000+08:00",
+      "tags": [
+        "starter",
+        "example",
+        "preview-first",
+        "v0.1.2"
+      ],
+      "usageCount": 0,
+      "version": "1.0",
+      "notes": "preview-first; pending AC28/AC29 APX rebuild and runtime readback."
+    },
+    {
+      "id": "tpl-starter-create-wall-from-favorite",
+      "name": "Preview a wall from a Favorite",
+      "category": "MEPBridge-Create",
+      "icon": "WALL",
+      "description": "Read and verify a Wall Favorite, then preview wall creation without a hard-coded Favorite name or GUID.",
+      "plan": {
+        "title": "Preview a wall from a Favorite",
+        "warning": "Preview-first. Select one current-project Favorite with elementType=Wall; do not run the create step when it is missing or ambiguous.",
+        "isMutation": true,
+        "mepCode": "GetFavorite + CreateFromFavorite",
+        "steps": [
+          {
+            "id": "step-read-wall-favorite",
+            "title": "Read and verify the Wall Favorite",
+            "action": "GetFavorite",
+            "description": "Read the Favorite resolved from user input or the semantic index.",
+            "expectedResult": "Return one Favorite with elementType=Wall.",
+            "params": {},
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "GetFavorite"
+                },
+                "addOnCommandParameters": {}
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetFavorite",
+            "descriptorName": "mepbridge.get_favorite",
+            "riskLevel": "read",
+            "status": "pending",
+            "expectedElementType": "Wall",
+            "requiredInputs": [
+              "favoriteName"
+            ]
+          },
+          {
+            "id": "step-preview-wall-from-favorite",
+            "title": "Preview wall creation from the Favorite",
+            "action": "CreateFromFavorite",
+            "description": "Use the verified Favorite and sample baseline in a dry-run.",
+            "expectedResult": "Return a creation preview without writing the model.",
+            "params": {
+              "start": {
+                "x": 0,
+                "y": 0
+              },
+              "end": {
+                "x": 6,
+                "y": 0
+              },
+              "floorIndex": 0,
+              "dryRun": true,
+              "confirmRequired": false
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateFromFavorite"
+                },
+                "addOnCommandParameters": {
+                  "start": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "end": {
+                    "x": 6,
+                    "y": 0
+                  },
+                  "floorIndex": 0,
+                  "dryRun": true,
+                  "confirmRequired": false
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateFromFavorite",
+            "descriptorName": "mepbridge.create_from_favorite",
+            "riskLevel": "write",
+            "status": "pending",
+            "expectedElementType": "Wall",
+            "requiredInputs": [
+              "favoriteName"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "item": "Favorite",
+            "expected": "One current-project Wall Favorite name",
+            "actual": "Selection required",
+            "status": "warning"
+          },
+          {
+            "item": "Execution mode",
+            "expected": "dryRun=true, confirmRequired=false",
+            "actual": "Preview",
+            "status": "ok"
+          }
+        ]
+      },
+      "riskLevel": "write",
+      "createdAt": "2026-08-19T00:00:00.000+08:00",
+      "updatedAt": "2026-08-19T00:00:00.000+08:00",
+      "tags": [
+        "starter",
+        "example",
+        "preview-first",
+        "v0.1.3-planning",
+        "en-US"
+      ],
+      "usageCount": 0,
+      "version": "1.0",
+      "notes": "Preview-first. Resolve required current-project identities before execution; no GUID or attribute index is hard-coded."
+    },
+    {
+      "id": "tpl-starter-create-structural-member-from-profile",
+      "name": "Preview profile-based beam and column",
+      "category": "MEPBridge-Create",
+      "icon": "BEAM",
+      "description": "Read Profile Manager definitions and use one current-project profileGuid to preview a beam and column without hard-coded GUIDs or indexes.",
+      "plan": {
+        "title": "Preview profile-based beam and column",
+        "warning": "Preview-first. Select one profile from the current GetProfiles result; do not run create steps when it is missing or ambiguous.",
+        "isMutation": true,
+        "mepCode": "GetProfiles + CreateBeam + CreateColumn",
+        "steps": [
+          {
+            "id": "step-read-profiles",
+            "title": "Read available complex profiles",
+            "action": "GetProfiles",
+            "description": "Read current-project Profile Manager definitions.",
+            "expectedResult": "Return profile name/guid candidates.",
+            "params": {},
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "GetProfiles"
+                },
+                "addOnCommandParameters": {}
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetProfiles",
+            "descriptorName": "mepbridge.get_profiles",
+            "riskLevel": "read",
+            "status": "pending"
+          },
+          {
+            "id": "step-preview-profile-beam",
+            "title": "Preview a profile-based beam",
+            "action": "CreateBeam",
+            "description": "Use the selected profileGuid in a dry-run.",
+            "expectedResult": "Return a beam preview without writing the model.",
+            "params": {
+              "start": {
+                "x": 0,
+                "y": 0
+              },
+              "end": {
+                "x": 6,
+                "y": 0
+              },
+              "dryRun": true,
+              "confirmRequired": false
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateBeam"
+                },
+                "addOnCommandParameters": {
+                  "start": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "end": {
+                    "x": 6,
+                    "y": 0
+                  },
+                  "dryRun": true,
+                  "confirmRequired": false
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateBeam",
+            "descriptorName": "mepbridge.create_beam",
+            "riskLevel": "create-element",
+            "status": "pending",
+            "requiredInputs": [
+              "profileGuid"
+            ]
+          },
+          {
+            "id": "step-preview-profile-column",
+            "title": "Preview a profile-based column",
+            "action": "CreateColumn",
+            "description": "Use the selected profileGuid in a dry-run.",
+            "expectedResult": "Return a column preview without writing the model.",
+            "params": {
+              "position": {
+                "x": 0,
+                "y": 3
+              },
+              "height": 3,
+              "floorIndex": 0,
+              "dryRun": true,
+              "confirmRequired": false
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateColumn"
+                },
+                "addOnCommandParameters": {
+                  "position": {
+                    "x": 0,
+                    "y": 3
+                  },
+                  "height": 3,
+                  "floorIndex": 0,
+                  "dryRun": true,
+                  "confirmRequired": false
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateColumn",
+            "descriptorName": "mepbridge.create_column",
+            "riskLevel": "create-element",
+            "status": "pending",
+            "requiredInputs": [
+              "profileGuid"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "item": "Profile",
+            "expected": "One current-project profileGuid",
+            "actual": "Selection required",
+            "status": "warning"
+          },
+          {
+            "item": "Execution mode",
+            "expected": "dryRun=true, confirmRequired=false",
+            "actual": "Preview",
+            "status": "ok"
+          }
+        ]
+      },
+      "riskLevel": "write",
+      "createdAt": "2026-08-19T00:00:00.000+08:00",
+      "updatedAt": "2026-08-19T00:00:00.000+08:00",
+      "tags": [
+        "starter",
+        "example",
+        "preview-first",
+        "v0.1.3-planning",
+        "en-US"
+      ],
+      "usageCount": 0,
+      "version": "1.0",
+      "notes": "Preview-first. Resolve required current-project identities before execution; no GUID or attribute index is hard-coded."
+    },
+    {
+      "id": "tpl-starter-batch-set-layer",
+      "name": "Preview batch layer assignment",
+      "category": "MEPBridge-Modify",
+      "icon": "LAYER",
+      "description": "Read the current selection and project layers, then preview assigning one layer to multiple elements without hard-coded GUIDs or indexes.",
+      "plan": {
+        "title": "Preview batch layer assignment",
+        "warning": "Preview-first. Use current-project elements and resolve one layerGuid or layerName; do not run the write step while required inputs are missing.",
+        "isMutation": true,
+        "mepCode": "GetSelectedElements + GetLayers + SetLayerBatch",
+        "steps": [
+          {
+            "id": "step-read-layer-selection",
+            "title": "Read the editable selection",
+            "action": "GetSelectedElements",
+            "description": "Read the current editable selection.",
+            "expectedResult": "Return element GUIDs to modify.",
+            "params": {
+              "onlyEditable": true,
+              "includeAabb": false,
+              "includeMepInfo": false
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "GetSelectedElements"
+                },
+                "addOnCommandParameters": {
+                  "onlyEditable": true,
+                  "includeAabb": false,
+                  "includeMepInfo": false
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetSelectedElements",
+            "descriptorName": "mepbridge.get_selected_element_details",
+            "riskLevel": "read",
+            "status": "pending"
+          },
+          {
+            "id": "step-read-layers",
+            "title": "Read project layers",
+            "action": "GetLayers",
+            "description": "Read current-project layer names and GUIDs.",
+            "expectedResult": "Return target layer candidates.",
+            "params": {},
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "GetLayers"
+                },
+                "addOnCommandParameters": {}
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetLayers",
+            "descriptorName": "mepbridge.get_layers",
+            "riskLevel": "read",
+            "status": "pending"
+          },
+          {
+            "id": "step-preview-layer-batch",
+            "title": "Preview the batch layer assignment",
+            "action": "SetLayerBatch",
+            "description": "Use selected elements and one resolved layer in a dry-run.",
+            "expectedResult": "Return per-element changes without writing the model.",
+            "params": {
+              "elementGuids": [],
+              "dryRun": true,
+              "confirmRequired": false
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "SetLayerBatch"
+                },
+                "addOnCommandParameters": {
+                  "elementGuids": [],
+                  "dryRun": true,
+                  "confirmRequired": false
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "SetLayerBatch",
+            "descriptorName": "mepbridge.set_layer_batch",
+            "riskLevel": "write",
+            "status": "pending",
+            "requiredInputs": [
+              "elementGuids",
+              "layerGuid|layerName"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "item": "Elements",
+            "expected": "A non-empty current-selection elementGuids array",
+            "actual": "Read required",
+            "status": "warning"
+          },
+          {
+            "item": "Target layer",
+            "expected": "One layerGuid or layerName; never an index",
+            "actual": "Selection required",
+            "status": "warning"
+          },
+          {
+            "item": "Execution mode",
+            "expected": "dryRun=true, confirmRequired=false",
+            "actual": "Preview",
+            "status": "ok"
+          }
+        ]
+      },
+      "riskLevel": "write",
+      "createdAt": "2026-08-19T00:00:00.000+08:00",
+      "updatedAt": "2026-08-19T00:00:00.000+08:00",
+      "tags": [
+        "starter",
+        "example",
+        "preview-first",
+        "v0.1.3-planning",
+        "en-US"
+      ],
+      "usageCount": 0,
+      "version": "1.0",
+      "notes": "Preview-first. Resolve required current-project identities before execution; no GUID or attribute index is hard-coded."
+    },
+    {
+      "id": "tpl-starter-assign-classification",
+      "name": "Preview classification assignment",
+      "category": "MEPBridge-Modify",
+      "icon": "CLASSIFICATION",
+      "description": "Read the current selection and classifications, then preview assigning an item without hard-coded element, system, item GUIDs, or indexes.",
+      "plan": {
+        "title": "Preview classification assignment",
+        "warning": "Preview-first. Use a current-project element and resolve one classification item; do not run the write step when selection is missing or ambiguous.",
+        "isMutation": true,
+        "mepCode": "GetSelectedElements + GetClassifications + AssignClassification",
+        "steps": [
+          {
+            "id": "step-read-classification-selection",
+            "title": "Read the editable selection",
+            "action": "GetSelectedElements",
+            "description": "Read the current editable selection.",
+            "expectedResult": "Return the element GUID to classify.",
+            "params": {
+              "onlyEditable": true,
+              "includeAabb": false,
+              "includeMepInfo": false
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "GetSelectedElements"
+                },
+                "addOnCommandParameters": {
+                  "onlyEditable": true,
+                  "includeAabb": false,
+                  "includeMepInfo": false
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetSelectedElements",
+            "descriptorName": "mepbridge.get_selected_element_details",
+            "riskLevel": "read",
+            "status": "pending"
+          },
+          {
+            "id": "step-read-classifications",
+            "title": "Read classification systems and root items",
+            "action": "GetClassifications",
+            "description": "Read current-project classification candidates.",
+            "expectedResult": "Return systemGuid/itemGuid candidates.",
+            "params": {
+              "includeRootItems": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "GetClassifications"
+                },
+                "addOnCommandParameters": {
+                  "includeRootItems": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetClassifications",
+            "descriptorName": "mepbridge.get_classifications",
+            "riskLevel": "read",
+            "status": "pending"
+          },
+          {
+            "id": "step-preview-classification",
+            "title": "Preview classification assignment",
+            "action": "AssignClassification",
+            "description": "Use one current-project element and item in a dry-run.",
+            "expectedResult": "Return a classification preview without writing the model.",
+            "params": {
+              "replaceExisting": true,
+              "dryRun": true,
+              "confirmRequired": false
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "AssignClassification"
+                },
+                "addOnCommandParameters": {
+                  "replaceExisting": true,
+                  "dryRun": true,
+                  "confirmRequired": false
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "AssignClassification",
+            "descriptorName": "mepbridge.assign_classification",
+            "riskLevel": "write",
+            "status": "pending",
+            "requiredInputs": [
+              "elementGuid",
+              "assignItemGuid"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "item": "Element",
+            "expected": "One elementGuid from the current selection",
+            "actual": "Read required",
+            "status": "warning"
+          },
+          {
+            "item": "Classification",
+            "expected": "One systemGuid/assignItemGuid pair; never an index",
+            "actual": "Selection required",
+            "status": "warning"
+          },
+          {
+            "item": "Execution mode",
+            "expected": "dryRun=true, confirmRequired=false",
+            "actual": "Preview",
+            "status": "ok"
+          }
+        ]
+      },
+      "riskLevel": "write",
+      "createdAt": "2026-08-19T00:00:00.000+08:00",
+      "updatedAt": "2026-08-19T00:00:00.000+08:00",
+      "tags": [
+        "starter",
+        "example",
+        "preview-first",
+        "v0.1.3-planning",
+        "en-US"
+      ],
+      "usageCount": 0,
+      "version": "1.0",
+      "notes": "Preview-first. Resolve required current-project identities before execution; no GUID or attribute index is hard-coded."
     }
   ],
   "commands": [

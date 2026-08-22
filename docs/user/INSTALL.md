@@ -1,8 +1,8 @@
-# MEPbridge ACAIstr v0.1.2 Installation
+# MEPbridge ACAIstr v0.1.3 Installation
 
 This guide applies to the Windows release packages for Archicad 28 and Archicad 29.
 
-Download `MEPbridge-ACAIstr-v0.1.2-win64-en-US.zip` for an English-first installation or `MEPbridge-ACAIstr-v0.1.2-win64-zh-CN.zip` for a Chinese-first installation. Do not use an APX-only update or GitHub's automatically generated `Source code.zip` / `Source code.tar.gz` for first-time installation.
+Download `MEPbridge-ACAIstr-v0.1.3-win64-en-US.zip` for an English-first installation or `MEPbridge-ACAIstr-v0.1.3-win64-zh-CN.zip` for a Chinese-first installation. Do not use an APX-only update or GitHub's automatically generated `Source code.zip` / `Source code.tar.gz` for first-time installation.
 
 ## Requirements
 
@@ -36,10 +36,52 @@ Archicad-29\MEPBridge.apx
 
 Use only the APX matching the installed Archicad major version.
 
-The standalone `MEPbridge-ACAIstr-v0.1.2-AC28-win64.apx` and
-`MEPbridge-ACAIstr-v0.1.2-AC29-win64.apx` assets update only the native Add-On.
+The standalone `MEPbridge-ACAIstr-v0.1.3-AC28-win64.apx` and
+`MEPbridge-ACAIstr-v0.1.3-AC29-win64.apx` assets update only the native Add-On.
 They do not include the Server, UI, MCP Server, production dependencies, or
 installer and are intended only for an existing complete installation.
+
+## Choosing Between an APX-Only Update and a Full Package Update
+
+Each release states its upgrade type in the release notes. Read that first; the
+rules below explain what the two types mean and why the distinction matters.
+
+**APX-only update** — replace `MEPBridge.apx` and restart Archicad. Nothing else
+changes. Eligible only when the release changes the native Add-On alone: no new
+command, no change to the registered command count or the descriptor/MCP tool
+count, and no change to the Server, MCP Server, UI, task templates or installer.
+
+**Full package update** — reinstall from the complete ZIP. Required when the
+release touches anything outside the Add-On, including the Server or MCP Server,
+the descriptor/MCP tool registry, the UI, task templates, starter assets, or the
+installer. It is also required whenever the registered command count or the
+descriptor count changes, because both numbers are compiled into the APX and
+reported by Ping; updating only one side leaves Ping disagreeing with the files
+actually installed.
+
+Two rules apply to both types:
+
+- Never mix an APX from one release with a package from another. The Add-On and
+  the Server agree on a single command boundary per release; crossing releases is
+  unsupported even when the files load without an error.
+- Never use an APX-only asset for a first-time installation. It contains no
+  Server, no dependencies and no installer.
+
+### Performing an APX-Only Update
+
+1. Save your work and exit Archicad completely. A running Archicad locks the APX
+   file and the copy silently fails or has no effect.
+2. Back up the existing `MEPBridge.apx` in the Add-On folder.
+3. Copy the standalone APX matching your Archicad major version over it, keeping
+   the file name `MEPBridge.apx`.
+4. Confirm the folder contains exactly one active `.apx` file.
+5. Start Archicad and run Ping. The reported version must equal the new release
+   version, and the command and descriptor counts must match the release notes.
+   If the version still shows the old value, Archicad loaded a cached copy or the
+   file was locked during the copy — repeat from step 1.
+
+**v0.1.3 requires a full package update.** It changes the Server, the MCP Server
+and the descriptor registry in addition to the Add-On.
 
 ## Automatic Installation
 
@@ -277,7 +319,7 @@ User data is generally compatible across versions; if a data format incompatibil
 - Archicad loads the Add-On without an error.
 - The MEPbridge ACAIstr menu shows three independent menu items.
 - The Workbench opens at `http://127.0.0.1:19780/`.
-- `/health` reports version `0.1.2`.
-- Ping reports 74 registered commands and 72 descriptor/MCP tools.
+- `/health` reports version `0.1.3`.
+- For the released v0.1.3 package, Ping reports 76 registered C++ commands and 74 descriptor/MCP tools.
 
 Use a test or backed-up PLN before running write, delete, batch, or geometry-changing commands.

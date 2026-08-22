@@ -1,8 +1,8 @@
-# MEPbridge ACAIstr v0.1.2 安装说明
+# MEPbridge ACAIstr v0.1.3 安装说明
 
 本说明适用于 Archicad 28 和 Archicad 29 的 Windows 发布包。
 
-中文优先界面请下载 `MEPbridge-ACAIstr-v0.1.2-win64-zh-CN.zip`，英文优先界面请下载 `MEPbridge-ACAIstr-v0.1.2-win64-en-US.zip`。首次安装不要使用独立 APX 更新文件，也不要使用 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`。
+中文优先界面请下载 `MEPbridge-ACAIstr-v0.1.3-win64-zh-CN.zip`，英文优先界面请下载 `MEPbridge-ACAIstr-v0.1.3-win64-en-US.zip`。首次安装不要使用独立 APX 更新文件，也不要使用 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`。
 
 ## 环境要求
 
@@ -36,9 +36,32 @@ Archicad-29\MEPBridge.apx
 
 只能安装与 Archicad 主版本一致的 APX。
 
-`MEPbridge-ACAIstr-v0.1.2-AC28-win64.apx` 和
-`MEPbridge-ACAIstr-v0.1.2-AC29-win64.apx` 只更新原生 Add-On，不包含
+`MEPbridge-ACAIstr-v0.1.3-AC28-win64.apx` 和
+`MEPbridge-ACAIstr-v0.1.3-AC29-win64.apx` 只更新原生 Add-On，不包含
 Server、UI、MCP Server、生产依赖和安装脚本，仅适用于已经完成完整安装的用户。
+
+## 如何判断该只换 APX 还是重装完整包
+
+每个版本都会在发布说明里标注升级类型，请先看那里。下面解释这两种类型的含义，以及为什么必须区分。
+
+**只换 APX** —— 替换 `MEPBridge.apx` 后重启 Archicad，其余文件不动。仅当该版本的改动**完全局限在原生 Add-On 内**时适用：没有新增命令、注册命令数与 descriptor/MCP 工具数都没变，且未改动 Server、MCP Server、UI、任务模板和安装脚本。
+
+**重装完整包** —— 用完整 ZIP 重新安装。当版本改动涉及 Add-On 之外的任何部分时都必须如此，包括 Server 或 MCP Server、descriptor/MCP 工具注册表、UI、任务模板、starter 资产、安装脚本。**注册命令数或 descriptor 数发生变化时也必须重装完整包** —— 这两个数字都被编译进 APX 并由 Ping 回显，只更新一侧会导致 Ping 报的数字与实际安装的文件不一致。
+
+两种类型都适用的两条规则：
+
+- **不要把某个版本的 APX 与另一个版本的安装包混用。** Add-On 与 Server 在每个版本内共享同一套命令边界，跨版本混用不受支持 —— 即使文件能正常加载也一样。
+- **首次安装绝不能只用 APX 文件。** 它不含 Server、依赖和安装脚本。
+
+### 只换 APX 的操作步骤
+
+1. 保存工作并**完全退出 Archicad**。Archicad 运行时会锁定 APX 文件，复制会失败或不生效。
+2. 备份 Add-On 目录中现有的 `MEPBridge.apx`。
+3. 把与你的 Archicad 主版本对应的独立 APX 覆盖过去，文件名保持 `MEPBridge.apx`。
+4. 确认该目录内只有一个有效的 `.apx` 文件。
+5. 启动 Archicad 并执行 Ping：回报的版本必须等于新版本号，命令数与 descriptor 数必须与发布说明一致。若版本仍显示旧值，说明 Archicad 加载了旧副本或复制时文件被锁定 —— 从第 1 步重做。
+
+**v0.1.3 必须重装完整包。** 它除 Add-On 之外还改动了 Server、MCP Server 和 descriptor 注册表。
 
 ## 自动安装
 
@@ -276,7 +299,7 @@ node <发布包根目录>\tools\mepbridge-mcp-server.js
 - Archicad 加载 Add-On 时没有错误。
 - MEPbridge ACAIstr 菜单显示三个独立菜单项。
 - Workbench 可以打开 `http://127.0.0.1:19780/`。
-- `/health` 显示版本 `0.1.2`。
-- Ping 显示 74 个注册命令和 72 个 descriptor/MCP 工具。
+- `/health` 显示版本 `0.1.3`。
+- 对已发布的 v0.1.3 安装包，Ping 显示 76 个注册 C++ 命令和 74 个 descriptor/MCP 工具。
 
 执行写入、删除、批量或几何修改前，应使用测试或已备份的 PLN。

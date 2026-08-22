@@ -148,6 +148,28 @@ function extractorSpecToJsonSchema(key, spec = {}, defaultValue) {
     case 'guid':
     case 'string':
       return { type: 'string', description };
+    case 'object-reference':
+      return {
+        type: 'object',
+        description,
+        properties: {
+          source: {
+            type: 'string',
+            enum: ['favorite', 'projectLibrary'],
+            description: 'Object source: project Favorite or current project library',
+          },
+          guid: {
+            type: 'string',
+            description: 'Optional stable library-part GUID',
+          },
+          name: {
+            type: 'string',
+            description: 'Optional exact Favorite or library-part name',
+          },
+        },
+        required: ['source'],
+        additionalProperties: false,
+      };
     case 'point2d':
       return pointSchema(2, description, 'coordinate in meters');
     case 'point3d':
@@ -165,10 +187,17 @@ function extractorSpecToJsonSchema(key, spec = {}, defaultValue) {
         description
       );
       if (defaultValue && !Array.isArray(defaultValue) && Array.isArray(defaultValue.points)) {
+        const properties = { points: pointsSchema };
+        if (Array.isArray(defaultValue.heights)) {
+          properties.heights = arraySchema(
+            { type: 'number', description: 'Vertex height relative to the element base level' },
+            'Optional per-vertex heights; length must equal points.length'
+          );
+        }
         return {
           type: 'object',
           description,
-          properties: { points: pointsSchema },
+          properties,
           required: ['points'],
           additionalProperties: false,
         };
@@ -438,6 +467,92 @@ async function executeTool(toolName, args = {}) {
 }
 
 // ── MCP 协议处理 ──
+// ── 向本地 server 上报 MCP 客户端身份（供 /api/mcp/status 显示真实连接）──
+//
+// MCP 走 stdio，由宿主 app spawn 本进程，所以 server 无法靠端口观察到谁连上来了。
+// 唯一权威的身份来源是 initialize 握手里协议自带的 clientInfo。这里主动上报 +
+// 心跳保活；所有失败都必须静默吞掉，绝不能影响 MCP 协议本身。
+let _mcpSessionId = null;
+let _heartbeatTimer = null;
+
+function postRegistry(pathname, body, method = 'POST') {
+  return new Promise((resolve) => {
+    const payload = body == null ? null : JSON.stringify(body);
+    const req = http.request(
+      {
+        hostname: SERVER_URL.hostname,
+        port: SERVER_URL.port,
+        path: pathname,
+        method,
+        headers: payload
+          ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+          : {},
+        timeout: 3000,
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          if (res.statusCode < 200 || res.statusCode >= 300) return resolve(null);
+          try { resolve(JSON.parse(data)); } catch { resolve(null); }
+        });
+      }
+    );
+    // 上报是尽力而为：server 未启动、超时、报错都不影响 MCP 工作
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+function stopHeartbeat() {
+  if (_heartbeatTimer) {
+    clearInterval(_heartbeatTimer);
+    _heartbeatTimer = null;
+  }
+}
+
+function startHeartbeat(intervalMs) {
+  stopHeartbeat();
+  _heartbeatTimer = setInterval(() => {
+    if (!_mcpSessionId) return;
+    postRegistry(`/api/mcp/clients/${encodeURIComponent(_mcpSessionId)}/heartbeat`, {}).then((result) => {
+      // server 重启后 sessionId 会失效，此时重新注册而不是一直心跳到不存在的会话
+      if (result === null) {
+        _mcpSessionId = null;
+        stopHeartbeat();
+      }
+    });
+  }, intervalMs);
+  // 不能让心跳定时器把进程吊住，否则宿主关闭后本进程不退出
+  if (typeof _heartbeatTimer.unref === 'function') _heartbeatTimer.unref();
+}
+
+function registerClient(clientInfo, protocolVersion) {
+  const name = clientInfo && clientInfo.name;
+  if (!name) return;  // 无法自报身份的客户端不登记，避免污染权威列表
+
+  postRegistry('/api/mcp/clients', {
+    name,
+    version: clientInfo.version,
+    protocolVersion,
+    pid: process.pid,
+  }).then((result) => {
+    if (!result || !result.sessionId) return;
+    _mcpSessionId = result.sessionId;
+    startHeartbeat(result.heartbeatIntervalMs || 30000);
+  });
+}
+
+function unregisterClient() {
+  stopHeartbeat();
+  if (!_mcpSessionId) return;
+  const sessionId = _mcpSessionId;
+  _mcpSessionId = null;
+  postRegistry(`/api/mcp/clients/${encodeURIComponent(sessionId)}`, null, 'DELETE');
+}
+
 const PROTOCOL_VERSION = '2024-11-05';
 const SERVER_INFO = {
   name: 'mepbridge-mcp-server',
@@ -450,6 +565,8 @@ function handleRequest(req) {
   try {
     switch (method) {
       case 'initialize':
+        // clientInfo 是宿主自报的权威身份，与进程名无关
+        registerClient(params && params.clientInfo, params && params.protocolVersion);
         return {
           jsonrpc: '2.0',
           id,
@@ -545,17 +662,21 @@ function startStdioServer() {
 
   rl.on('close', () => {
     process.stderr.write('[MCP] stdin closed, shutting down\n');
-    process.exit(0);
+    unregisterClient();
+    // 留一点时间让注销请求发出；即使失败也会由 server 端 TTL 兜底
+    setTimeout(() => process.exit(0), 150);
   });
 
   process.on('SIGTERM', () => {
     process.stderr.write('[MCP] SIGTERM received\n');
-    process.exit(0);
+    unregisterClient();
+    setTimeout(() => process.exit(0), 150);
   });
 
   process.on('SIGINT', () => {
     process.stderr.write('[MCP] SIGINT received\n');
-    process.exit(0);
+    unregisterClient();
+    setTimeout(() => process.exit(0), 150);
   });
 }
 

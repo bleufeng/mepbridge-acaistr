@@ -310,7 +310,7 @@
     <section class="section">
       <h2><span class="index">4</span>Features and Command Boundary</h2>
       <ol class="guide-list">
-        <li>v0.1.2 registers 74 C++ commands, 72 of which have public descriptors. The Server and MCP Server generate their exposed operations dynamically from those descriptors.</li>
+        <li>The released v0.1.2 APX registers 74 C++ commands with 72 descriptors. As of August 19, 2026, the post-release source workspace contains 75 C++ registrations and 73 descriptors (including CreateMorph), pending AC28/AC29 APX rebuild and runtime verification.</li>
         <li><code>SwitchStory</code> and <code>ChangeStairGeometry</code> are primarily direct Add-On calls and are not published as full descriptor/MCP tools.</li>
       </ol>
       <div class="table-wrap">
@@ -332,7 +332,7 @@
       <h2><span class="index">5</span>MCP and API Integration</h2>
       <h3>MCP clients</h3>
       <ol class="guide-list">
-        <li>The MCP Server dynamically generates 72 tools from <code>ai-adapter\tool-descriptors.json</code>.</li>
+        <li>The MCP Server dynamically generates 73 tools from the current source; CreateMorph remains a pending contract until the APX rebuild from <code>ai-adapter\tool-descriptors.json</code>.</li>
         <li>Start the Workbench Server before using MCP.</li>
       </ol>
       <div class="code-block">{

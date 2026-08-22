@@ -5,7 +5,7 @@
 > The exploration path uses two-way MCP data exchange to progressively form an AI Loop of task planning, model execution, model-feedback readback, and corrective iteration. Design instructions connect with AI algorithms through data, driving Archicad execution via the local Workbench / MCP layer and reading back structured results to close the loop. The initial version focuses on reliable model read/write access, risk confirmation, and result readback. Drawing interpretation, compliance checking, and multidisciplinary end-to-end design automation are expected to continue expanding.
 
 [![Archicad](https://img.shields.io/badge/Archicad-28%20%7C%2029-blue.svg)]()
-[![Version](https://img.shields.io/badge/version-0.1.2-orange.svg)]()
+[![Version](https://img.shields.io/badge/version-0.1.3-orange.svg)]()
 [![OPENBIM](https://img.shields.io/badge/OPENBIM-Workflow-0F766E.svg)]()
 [![Archicad JSON API](https://img.shields.io/badge/ARCHICAD-JSON%20API-2563EB.svg)]()
 [![C++ Add-On](https://img.shields.io/badge/C%2B%2B-Add--On-00599C.svg)]()
@@ -46,7 +46,7 @@ Natural-language tasks and extensible user templates pass through planning and r
 
 ## Release Scope
 
-- Version: `v0.1.2`
+- Version: `v0.1.3`
 - 74 registered C++ commands
 - 72 descriptor/MCP tools
 - Direct-only C++ commands: `SwitchStory` and `ChangeStairGeometry`
@@ -58,8 +58,8 @@ Public update history: [CHANGELOG.md](CHANGELOG.md).
 
 Download the full package for your language from GitHub Releases:
 
-- `MEPbridge-ACAIstr-v0.1.2-win64-en-US.zip`: English full package.
-- `MEPbridge-ACAIstr-v0.1.2-win64-zh-CN.zip`: Chinese full package.
+- `MEPbridge-ACAIstr-v0.1.3-win64-en-US.zip`: English full package.
+- `MEPbridge-ACAIstr-v0.1.3-win64-zh-CN.zip`: Chinese full package.
 
 Do not use GitHub's automatically generated `Source code.zip` or `Source code.tar.gz`; they are not installation packages and do not contain the complete APX and runtime dependencies. Each full ZIP contains both AC28 and AC29 APXs, the Workbench Server, compiled UI, MCP Server, production dependencies, legal files, manifest, and checksums. The standalone AC28/AC29 APX assets are update-only files for users who already have a complete package installed.
 

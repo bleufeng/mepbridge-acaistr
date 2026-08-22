@@ -19,6 +19,7 @@ const DRY_RUN_AND_CONFIRM_COMMANDS = new Set([
   'CreateFromFavorite',
   'CreateLamp',
   'CreateMesh',
+  'CreateMorph',
   'CreateObject',
   'CreateRoof',
   'CreateSlab',

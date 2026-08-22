@@ -321,7 +321,7 @@
     <section class="section">
       <h2><span class="index">4</span>功能与命令边界</h2>
       <ol class="guide-list">
-        <li>v0.1.2 共注册 74 个 C++ 命令，其中 72 个具有公开 descriptor；Server 和 MCP Server 按 descriptor 动态工作。</li>
+        <li>已发布的 v0.1.2 APX 注册 74 个 C++ 命令并配套 72 个 descriptor。2026-08-19 的发布后源码工作区已推进到 75 个 C++ 注册与 73 个 descriptor（含 CreateMorph），但仍待 AC28/AC29 APX 重编及实机验证。</li>
         <li><code>SwitchStory</code> 与 <code>ChangeStairGeometry</code> 主要用于直接 Add-On 调用，不作为完整 descriptor/MCP 工具发布。</li>
       </ol>
       <div class="table-wrap">
@@ -345,7 +345,7 @@
       <h2><span class="index">5</span>MCP 与 API 接入</h2>
       <h3>MCP 客户端</h3>
       <ol class="guide-list">
-        <li>MCP Server 从 <code>ai-adapter\tool-descriptors.json</code> 动态生成 72 个工具。</li>
+        <li>MCP Server 从 <code>ai-adapter\tool-descriptors.json</code> 从当前源码动态生成 73 个工具；其中 CreateMorph 在 APX 重编前仅为待验证契约。</li>
         <li>使用 MCP 前，先启动 Workbench Server。</li>
       </ol>
       <div class="code-block">{
