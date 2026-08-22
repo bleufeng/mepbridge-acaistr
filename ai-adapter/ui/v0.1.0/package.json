@@ -25,7 +25,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
-    "autoprefixer": "^10.4.21",
+    "autoprefixer": "^10.5.4",
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
