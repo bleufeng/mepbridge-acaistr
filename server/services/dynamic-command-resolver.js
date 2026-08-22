@@ -1,6 +1,9 @@
 const axios = require('axios');
 
-const DEFAULT_COPY_ALLOWED_TYPES = ['MEPRoute', 'Wall', 'Column', 'Beam', 'Slab', 'Roof'];
+// 必须与 Sources/CopyElementsCommand.cpp 的 SupportedTypes[] 保持一致：
+// 这是第一道闸，不通过则请求根本到不了 Add-On。
+// tests/test-polygon-contour-contract.js 会 diff 两边。
+const DEFAULT_COPY_ALLOWED_TYPES = ['MEPRoute', 'Wall', 'Column', 'Beam', 'Slab', 'Roof', 'Mesh', 'Morph'];
 
 class DynamicResolutionError extends Error {
   constructor(code, message, statusCode = 400, detail = {}) {

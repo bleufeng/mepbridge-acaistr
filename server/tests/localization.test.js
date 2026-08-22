@@ -97,7 +97,7 @@ function main() {
   const chinese = readStarterAssets('zh-CN');
   const english = readStarterAssets('en-US');
 
-  assert.strictEqual(chinese.templates.length, 7);
+  assert.strictEqual(chinese.templates.length, 13);
   assert.strictEqual(chinese.commands.length, 5);
   assert.strictEqual(english.templates.length, chinese.templates.length);
   assert.strictEqual(english.commands.length, chinese.commands.length);
@@ -115,7 +115,7 @@ function main() {
   );
 
   const localizedEnglish = userAssetsTest.localizeStarterAssets(chinese, 'en-US');
-  assert.strictEqual(localizedEnglish.templates.length, 7);
+  assert.strictEqual(localizedEnglish.templates.length, 13);
   assert.strictEqual(localizedEnglish.commands.length, 5);
   assertNoCjk('Localized starter assets', localizedEnglish);
   assertVerifiedStarterMutationTemplates('Localized English starter assets', localizedEnglish);
@@ -144,7 +144,7 @@ function main() {
   }
 
   const englishList = taskTemplates.list('en-US');
-  assert.strictEqual(englishList.length, 14);
+  assert.strictEqual(englishList.length, 20);
   assertNoCjk('English task template catalog', englishList);
 
   const chinesePlan = taskTemplates.tryGenerate('创建楼板', { locale: 'zh-CN' });

@@ -8,7 +8,7 @@ review, and test the C2 Workbench layer:
 - React Workbench source
 - Node.js Server source
 - MCP Server
-- 72 core tool descriptors
+- 73 core tool descriptors (including the source-level `CreateMorph` contract pending native APX rebuild and runtime verification)
 - reviewed module registry, schema, modules, and module tests
 - the narrowly scoped public command-safety regression test at `tests/test-command-capabilities.js`
 - public examples and user documentation

@@ -4,9 +4,13 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const { APP_VERSION } = require('../services/app-version');
+const {
+  DEFAULT_PORTS: ARCHICAD_PORTS,
+  discoverInstances,
+  pickPrimaryPort,
+  describeAllInstances,
+} = require('../services/archicad-instances');
 
-// Archicad JSON API 端口范围
-const ARCHICAD_PORTS = Array.from({length: 21}, (_, i) => 19723 + i);
 const BUILD_INFO = {
   version: APP_VERSION,
   buildDate: process.env.MEPBRIDGE_BUILD_DATE || null,
@@ -97,24 +101,19 @@ router.get('/', async (req, res) => {
 });
 
 // 检查 Archicad JSON API
+//
+// 改为并行发现全部实例（原实现命中首个端口即 return，只能看到一个实例）。
+// global.archicadPort 沿用已知存活端口，双实例下不会跳变到另一个工程；
+// global.archicadInstances 供 /instances 与后续跨文件功能使用。
 async function checkArchicad() {
-  for (const port of ARCHICAD_PORTS) {
-    try {
-      const response = await axios.post(
-        `http://127.0.0.1:${port}`,
-        { command: 'API.GetProductInfo' },
-        { timeout: 1000 }
-      );
+  const instances = await discoverInstances({ post: axios.post });
+  global.archicadInstances = instances;
 
-      if (response.data && (response.data.version || response.data.result?.version)) {
-        global.archicadPort = port;
-        return true;
-      }
-    } catch (err) {
-      // 继续尝试下一个端口
-    }
-  }
-  return false;
+  const primary = pickPrimaryPort(instances, global.archicadPort);
+  if (primary == null) return false;
+
+  global.archicadPort = primary;
+  return true;
 }
 
 // 检查 MEPBridge Add-On
@@ -143,4 +142,36 @@ async function checkMEPBridge() {
   }
 }
 
+// 列出全部在线 Archicad 实例及各自打开的工程
+//
+// 跨文件对比（A 文件读 / B 文件写）的前置能力：一个 Archicad 实例只能打开一个工程，
+// 且 ACAPI_ProjectOperation_Open 在 Add-On 命令上下文中会被拒绝（APIERR_REFUSEDCMD），
+// 因此真正的「同时」只能靠多实例。此端点只读，不改任何模型。
+router.get('/instances', async (req, res) => {
+  try {
+    const instances = await describeAllInstances({ post: axios.post });
+    const withMepbridge = instances.filter((i) => i.mepbridge);
+    const distinctProjects = new Set(
+      instances.map((i) => i.projectPath).filter(Boolean)
+    );
+
+    res.json({
+      ok: true,
+      count: instances.length,
+      mepbridgeCount: withMepbridge.length,
+      distinctProjectCount: distinctProjects.size,
+      primaryPort: global.archicadPort || null,
+      scannedPorts: { from: ARCHICAD_PORTS[0], to: ARCHICAD_PORTS[ARCHICAD_PORTS.length - 1] },
+      instances,
+      note: distinctProjects.size > 1
+        ? 'Multiple distinct projects are open; cross-file read/write is possible by addressing instances separately.'
+        : 'Fewer than two distinct projects are open; cross-file comparison needs a second Archicad instance with another project.',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
 module.exports = router;
+module.exports._test = { checkArchicad, checkMEPBridge };

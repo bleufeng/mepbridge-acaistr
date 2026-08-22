@@ -1,7 +1,7 @@
 {
   "_comment": "Single source of truth for the command boundary. The private release gate and the public repository validator both read this file so the two cannot drift apart. cppInstallCommands can only be verified where Sources/ is present (private repo); descriptors is verifiable everywhere.",
-  "cppInstallCommands": 74,
-  "descriptors": 72,
+  "cppInstallCommands": 76,
+  "descriptors": 74,
   "directOnlyCppCommands": [
     "SwitchStory",
     "ChangeStairGeometry"

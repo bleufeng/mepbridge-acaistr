@@ -99,6 +99,19 @@ function extractSection(content, heading) {
   return lines.slice(start + 1, end).join('\n').trim();
 }
 
+// 版本段标题带发布日期（`## [0.1.3] - 2026-08-22`），按前缀匹配可避免解析日期
+function extractSectionByPrefix(content, headingPrefix) {
+  if (content === null) return null;
+  const lines = content.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trim().startsWith(headingPrefix));
+  if (start < 0) return null;
+  const relativeEnd = lines
+    .slice(start + 1)
+    .findIndex((line) => /^##\s/.test(line));
+  const end = relativeEnd < 0 ? lines.length : start + 1 + relativeEnd;
+  return lines.slice(start + 1, end).join('\n').trim();
+}
+
 function compareVersions(left, right) {
   const leftParts = left.split('.').map(Number);
   const rightParts = right.split('.').map(Number);
@@ -185,27 +198,51 @@ if (resolvedBase) {
     .map((file) => file.replaceAll('\\', '/'));
   changedFiles = [...new Set([...diffFiles, ...untrackedFiles])].sort();
 
-  if (changedFiles.length > 0) {
-    const englishUnreleased = extractSection(changelog, '## [Unreleased]');
-    const chineseUnreleased = extractSection(chineseChangelog, '## [未发布]');
-    if (!englishUnreleased) {
-      addFailure('Public changes require a non-empty CHANGELOG.md ## [Unreleased] section.');
-    }
-    if (!chineseUnreleased) {
-      addFailure('Public changes require a non-empty CHANGELOG.zh-CN.md ## [未发布] section.');
-    }
+  previousVersion = readVersionAt(base);
 
-    const baseEnglish = extractSection(readFileAt(base, 'CHANGELOG.md'), '## [Unreleased]');
-    const baseChinese = extractSection(readFileAt(base, 'CHANGELOG.zh-CN.md'), '## [未发布]');
-    if (englishUnreleased && englishUnreleased === baseEnglish) {
-      addFailure('Public changes must update the CHANGELOG.md [Unreleased] section.');
-    }
-    if (chineseUnreleased && chineseUnreleased === baseChinese) {
-      addFailure('Public changes must update the CHANGELOG.zh-CN.md [未发布] section.');
+  // 发布提交（VERSION 相对基准已递增）与开发提交的变更记录要求不同：
+  //   - 开发提交：待发条目累积在 [Unreleased]，必须非空且与基准不同。
+  //   - 发布提交：待发条目全部上移到 [新版本] 段，[Unreleased] 自然为空。
+  // 此前只有前一条规则，导致「干净的发布状态」永远无法通过校验 —— 历史上只能靠
+  // 「永不清空 Unreleased」绕过，于是已随上一版发布的条目仍滞留在 [Unreleased] 里。
+  const isVersionBump = previousVersion !== null
+    && previousVersion !== version
+    && semverPattern.test(previousVersion)
+    && semverPattern.test(version)
+    && compareVersions(version, previousVersion) > 0;
+
+  if (changedFiles.length > 0) {
+    if (isVersionBump) {
+      // 发布提交：要求本次发布的版本段有实质内容，不允许空段占位
+      const englishRelease = extractSectionByPrefix(changelog, `## [${version}]`);
+      const chineseRelease = extractSectionByPrefix(chineseChangelog, `## [${version}]`);
+      if (!englishRelease) {
+        addFailure(`Release ${version} requires a non-empty CHANGELOG.md ## [${version}] section.`);
+      }
+      if (!chineseRelease) {
+        addFailure(`Release ${version} requires a non-empty CHANGELOG.zh-CN.md ## [${version}] section.`);
+      }
+    } else {
+      const englishUnreleased = extractSection(changelog, '## [Unreleased]');
+      const chineseUnreleased = extractSection(chineseChangelog, '## [未发布]');
+      if (!englishUnreleased) {
+        addFailure('Public changes require a non-empty CHANGELOG.md ## [Unreleased] section.');
+      }
+      if (!chineseUnreleased) {
+        addFailure('Public changes require a non-empty CHANGELOG.zh-CN.md ## [未发布] section.');
+      }
+
+      const baseEnglish = extractSection(readFileAt(base, 'CHANGELOG.md'), '## [Unreleased]');
+      const baseChinese = extractSection(readFileAt(base, 'CHANGELOG.zh-CN.md'), '## [未发布]');
+      if (englishUnreleased && englishUnreleased === baseEnglish) {
+        addFailure('Public changes must update the CHANGELOG.md [Unreleased] section.');
+      }
+      if (chineseUnreleased && chineseUnreleased === baseChinese) {
+        addFailure('Public changes must update the CHANGELOG.zh-CN.md [未发布] section.');
+      }
     }
   }
 
-  previousVersion = readVersionAt(base);
   if (previousVersion && previousVersion !== version) {
     if (!semverPattern.test(previousVersion)) {
       addFailure(`Base VERSION is not stable Semantic Versioning: ${previousVersion}`);

@@ -4,9 +4,30 @@ Public user-facing changes. Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-08-22
+
 ### Fixed
 
+- Slab, Roof and Zone creation now accept a closed contour (last point repeating the first). Such input previously produced a zero-length edge and Archicad rejected the whole element with a bare error code. A closed contour is exactly what geometry read-back returns, so reading an outline and creating from it now round-trips.
+- Zone creation was completely broken — every polygon failed. Vertices are now written with the indexing Archicad expects, the polygon header is populated, and the zone is marked as manually created so the supplied outline is honoured instead of being auto-detected from surrounding walls.
+- Zone `zoneName` and `zoneCategory` are now actually applied. Both were previously accepted and echoed back but silently discarded. An unknown category now fails explicitly instead of falling back to the default.
+- Slab `thickness` is now honoured when explicitly requested. In projects whose default slab is a composite structure the scalar value was silently ignored while the response still echoed the requested number.
+- Copying elements now supports Morph and Mesh; selecting either type previously reported "unsupported element types".
+- Degenerate polygon input (fewer than three distinct points, or consecutive duplicate points) now returns a clear validation message instead of a raw Archicad error code.
+- The MCP integration panel no longer misreports connection state. Client identity now comes from the MCP `initialize` handshake, so editor-extension hosts such as CodeBuddy are detected correctly. Hosts that are only configured are shown as "configured" instead of "connected".
 - Public CI now exports and permits only `tests/test-command-capabilities.js` from the otherwise private top-level `tests/` directory, keeping the command-safety check runnable without widening the public source boundary.
+
+### Added
+
+- Read-only endpoint listing every running Archicad instance and the project each one has open, enabling cross-file workflows that need two instances.
+
+### Known limitations
+
+The following are implemented but **not yet verified against Archicad**. Do not rely on them in this release; verification is scheduled for the next version.
+
+- GSM object selection by favourite or project library, including `objectRef` on object creation and the object catalogue query.
+- `targetViewName` on viewport capture.
+- Door, Window and Stair read/write regression coverage.
 
 ## [0.1.2] - 2026-08-17
 

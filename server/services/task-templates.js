@@ -416,6 +416,213 @@ const BUILTIN_TEMPLATES = [
         steps
       };
     }
+  },
+  {
+    id: 'TPL-015',
+    name: '带高程网面地形',
+    category: 'building',
+    keywords: {
+      zh: ['创建网面', '网面地形', '带高程网面', '地形网面'],
+      en: ['create mesh', 'terrain mesh', 'elevated mesh', 'mesh terrain']
+    },
+    description: '使用二维边界点和逐顶点相对高程预览创建 Archicad Mesh。源码与离线契约已完成，待 AC28/AC29 APX 重编及实机验证。',
+    generate: (params = {}) => ({
+      userIntent: '预览创建带逐顶点高程的网面地形',
+      steps: [{
+        action: 'CreateMesh',
+        title: '预览带高程网面地形',
+        params: {
+          polygon: params.polygon || {
+            points: [
+              { x: 0, y: 0 },
+              { x: 10, y: 0 },
+              { x: 10, y: 8 },
+              { x: 0, y: 8 }
+            ],
+            heights: [0, 1.2, 0.8, 0]
+          },
+          level: params.level ?? 0,
+          floorIndex: params.floorIndex ?? 0,
+          dryRun: true,
+          confirmRequired: false
+        },
+        riskLevel: 'create-element'
+      }]
+    })
+  },
+  {
+    id: 'TPL-016',
+    name: '挤出变形体',
+    category: 'building',
+    keywords: {
+      zh: ['创建变形体', '挤出变形体', '多边形挤出', '创建morph'],
+      en: ['create morph', 'extruded morph', 'extrude polygon', 'solid morph']
+    },
+    description: '将简单二维多边形垂直挤出为 Solid Morph。源码与离线契约已完成，待 AC28/AC29 APX 重编及实机验证。',
+    generate: (params = {}) => ({
+      userIntent: '预览创建二维多边形挤出变形体',
+      steps: [{
+        action: 'CreateMorph',
+        title: '预览挤出变形体',
+        params: {
+          polygon: params.polygon || [
+            { x: 0, y: 0 },
+            { x: 4, y: 0 },
+            { x: 4, y: 3 },
+            { x: 0, y: 3 }
+          ],
+          baseLevel: params.baseLevel ?? 0,
+          extrudeHeight: params.extrudeHeight ?? 2.5,
+          floorIndex: params.floorIndex ?? 0,
+          dryRun: true,
+          confirmRequired: false
+        },
+        riskLevel: 'create-element'
+      }]
+    })
+  },
+  {
+    id: 'TPL-017',
+    name: '按收藏夹预览创建墙体',
+    category: 'building',
+    keywords: {
+      zh: ['按收藏夹建墙', '收藏夹创建墙', '使用收藏夹建墙', '按收藏夹创建墙体'],
+      en: ['create wall from favorite', 'wall from favorite', 'place wall favorite', 'favorite wall']
+    },
+    description: '先读取并核对墙体收藏夹，再以 dry-run 预览 CreateFromFavorite。收藏夹名称来自用户参数或语义索引，不在模板中硬编码。',
+    generate: (params = {}) => {
+      const favoriteName = typeof params.favoriteName === 'string' && params.favoriteName.trim() ? params.favoriteName.trim() : undefined;
+      const selector = favoriteName ? { favoriteName } : {};
+      return {
+        userIntent: '读取墙体收藏夹并预览按收藏夹创建墙体',
+        inputRequirements: { favoriteName: '必须选择 elementType=Wall 的收藏夹；缺失或多候选时不得继续写入。' },
+        steps: [
+          {
+            action: 'GetFavorite', title: '读取并核对墙体收藏夹', params: selector,
+            descriptorName: 'mepbridge.get_favorite', commandNamespace: 'MEPBridge', commandName: 'GetFavorite',
+            requiredInputs: ['favoriteName'], expectedElementType: 'Wall', riskLevel: 'read'
+          },
+          {
+            action: 'CreateFromFavorite', title: '预览按收藏夹创建墙体',
+            params: { ...selector, start: params.start || { x: 0, y: 0 }, end: params.end || { x: 6, y: 0 }, floorIndex: params.floorIndex ?? 0, dryRun: true, confirmRequired: false },
+            descriptorName: 'mepbridge.create_from_favorite', commandNamespace: 'MEPBridge', commandName: 'CreateFromFavorite',
+            requiredInputs: ['favoriteName'], expectedElementType: 'Wall', riskLevel: 'write'
+          }
+        ]
+      };
+    }
+  },
+  {
+    id: 'TPL-018',
+    name: '按截面预览创建梁柱',
+    category: 'building',
+    keywords: {
+      zh: ['按截面建梁', '按截面建柱', '截面创建梁柱', '使用复合截面创建梁', '使用复合截面创建柱'],
+      en: ['create beam from profile', 'create column from profile', 'profile beam and column', 'complex profile beam', 'complex profile column']
+    },
+    description: '先读取截面管理器，再用当前项目唯一解析的 profileGuid 预览创建梁和柱；不硬编码截面 GUID 或 index。',
+    generate: (params = {}) => {
+      const selector = typeof params.profileGuid === 'string' && params.profileGuid.trim() ? { profileGuid: params.profileGuid.trim() } : {};
+      return {
+        userIntent: '读取复合截面并预览按截面创建梁柱',
+        inputRequirements: { profileGuid: '必须从 GetProfiles 或语义索引中唯一解析；缺失或多候选时不得继续写入。' },
+        steps: [
+          {
+            action: 'GetProfiles', title: '读取可用复合截面', params: {},
+            descriptorName: 'mepbridge.get_profiles', commandNamespace: 'MEPBridge', commandName: 'GetProfiles', riskLevel: 'read'
+          },
+          {
+            action: 'CreateBeam', title: '预览按截面创建梁',
+            params: { start: params.beamStart || { x: 0, y: 0 }, end: params.beamEnd || { x: 6, y: 0 }, ...selector, dryRun: true, confirmRequired: false },
+            descriptorName: 'mepbridge.create_beam', commandNamespace: 'MEPBridge', commandName: 'CreateBeam',
+            requiredInputs: ['profileGuid'], riskLevel: 'create-element'
+          },
+          {
+            action: 'CreateColumn', title: '预览按截面创建柱',
+            params: { position: params.columnPosition || { x: 0, y: 3 }, height: params.columnHeight ?? 3, floorIndex: params.floorIndex ?? 0, ...selector, dryRun: true, confirmRequired: false },
+            descriptorName: 'mepbridge.create_column', commandNamespace: 'MEPBridge', commandName: 'CreateColumn',
+            requiredInputs: ['profileGuid'], riskLevel: 'create-element'
+          }
+        ]
+      };
+    }
+  },
+  {
+    id: 'TPL-019',
+    name: '批量预览设置图层',
+    category: 'modify',
+    keywords: {
+      zh: ['批量设置图层模板', '批量预览设置图层', '选中构件批量改图层', '批量设置图层'],
+      en: ['batch set layer template', 'preview batch layer change', 'change selected elements layer']
+    },
+    description: '先读取选择集和项目图层，再以 dry-run 预览批量设置图层。元素 GUID 与目标图层必须来自当前项目上下文。',
+    generate: (params = {}) => {
+      const elementGuids = Array.isArray(params.elementGuids) ? params.elementGuids.filter(value => typeof value === 'string' && value.trim()).map(value => value.trim()) : [];
+      const selector = typeof params.layerGuid === 'string' && params.layerGuid.trim()
+        ? { layerGuid: params.layerGuid.trim() }
+        : (typeof params.layerName === 'string' && params.layerName.trim() ? { layerName: params.layerName.trim() } : {});
+      return {
+        userIntent: '读取选择集与图层并预览批量设置图层',
+        inputRequirements: {
+          elementGuids: '必须来自当前 Archicad 选择集或用户明确提供的当前项目元素。',
+          targetLayer: '必须通过 layerGuid 或 layerName 唯一解析；不得使用 layer index。'
+        },
+        steps: [
+          {
+            action: 'GetSelectedElements', title: '读取待修改的当前选择集', params: { onlyEditable: true, includeAabb: false, includeMepInfo: false },
+            descriptorName: 'mepbridge.get_selected_element_details', commandNamespace: 'MEPBridge', commandName: 'GetSelectedElements', riskLevel: 'read'
+          },
+          {
+            action: 'GetLayers', title: '读取项目图层', params: {},
+            descriptorName: 'mepbridge.get_layers', commandNamespace: 'MEPBridge', commandName: 'GetLayers', riskLevel: 'read'
+          },
+          {
+            action: 'SetLayerBatch', title: '预览批量设置图层', params: { elementGuids, ...selector, dryRun: true, confirmRequired: false },
+            descriptorName: 'mepbridge.set_layer_batch', commandNamespace: 'MEPBridge', commandName: 'SetLayerBatch',
+            requiredInputs: ['elementGuids', 'layerGuid|layerName'], riskLevel: 'write'
+          }
+        ]
+      };
+    }
+  },
+  {
+    id: 'TPL-020',
+    name: '预览指派分类',
+    category: 'modify',
+    keywords: {
+      zh: ['指派分类模板', '预览指派分类', '给选中构件设置分类', '指派分类'],
+      en: ['assign classification template', 'preview classification assignment', 'classify selected element']
+    },
+    description: '先读取选择集和分类系统/条目，再以 dry-run 预览指派分类；所有 GUID 均来自当前项目上下文。',
+    generate: (params = {}) => {
+      const selector = {};
+      for (const key of ['elementGuid', 'systemGuid', 'assignItemGuid']) {
+        if (typeof params[key] === 'string' && params[key].trim()) selector[key] = params[key].trim();
+      }
+      return {
+        userIntent: '读取选择集与分类并预览指派分类',
+        inputRequirements: {
+          elementGuid: '必须来自当前 Archicad 选择集或用户明确提供的当前项目元素。',
+          assignItemGuid: '必须从 GetClassifications 或语义索引中唯一解析；不得使用分类 index。'
+        },
+        steps: [
+          {
+            action: 'GetSelectedElements', title: '读取待分类的当前选择集', params: { onlyEditable: true, includeAabb: false, includeMepInfo: false },
+            descriptorName: 'mepbridge.get_selected_element_details', commandNamespace: 'MEPBridge', commandName: 'GetSelectedElements', riskLevel: 'read'
+          },
+          {
+            action: 'GetClassifications', title: '读取分类系统与根条目', params: { includeRootItems: true },
+            descriptorName: 'mepbridge.get_classifications', commandNamespace: 'MEPBridge', commandName: 'GetClassifications', riskLevel: 'read'
+          },
+          {
+            action: 'AssignClassification', title: '预览指派分类',
+            params: { ...selector, replaceExisting: params.replaceExisting !== false, dryRun: true, confirmRequired: false },
+            descriptorName: 'mepbridge.assign_classification', commandNamespace: 'MEPBridge', commandName: 'AssignClassification',
+            requiredInputs: ['elementGuid', 'assignItemGuid'], riskLevel: 'write'
+          }
+        ]
+      };
+    }
   }
 ];
 
@@ -550,6 +757,42 @@ const ENGLISH_TEMPLATE_METADATA = {
       'Floor 3 slab',
     ],
   },
+  'TPL-015': {
+    name: 'Elevated terrain mesh',
+    description: 'Previews an Archicad Mesh from a 2D boundary and per-vertex relative elevations. Source and offline contract are complete; AC28/AC29 APX rebuild and runtime verification remain pending.',
+    userIntent: 'Preview an elevated terrain mesh',
+    stepLabels: ['Preview elevated terrain mesh'],
+  },
+  'TPL-016': {
+    name: 'Extruded Morph',
+    description: 'Previews a simple solid Morph created by vertically extruding a 2D polygon. Source and offline contract are complete; AC28/AC29 APX rebuild and runtime verification remain pending.',
+    userIntent: 'Preview an extruded solid Morph',
+    stepLabels: ['Preview extruded solid Morph'],
+  },
+  'TPL-017': {
+    name: 'Preview a wall from a Favorite',
+    description: 'Reads and verifies a Wall Favorite, then previews CreateFromFavorite without hard-coded Favorite identifiers.',
+    userIntent: 'Read a Wall Favorite and preview creating a wall from it',
+    stepLabels: ['Read and verify the Wall Favorite', 'Preview wall creation from the Favorite'],
+  },
+  'TPL-018': {
+    name: 'Preview profile-based beam and column',
+    description: 'Reads complex profiles, then previews a beam and column using a profile GUID resolved from the current project.',
+    userIntent: 'Read complex profiles and preview a profile-based beam and column',
+    stepLabels: ['Read available complex profiles', 'Preview a profile-based beam', 'Preview a profile-based column'],
+  },
+  'TPL-019': {
+    name: 'Preview batch layer assignment',
+    description: 'Reads the current selection and project layers, then previews assigning a target layer to multiple elements.',
+    userIntent: 'Read selected elements and layers, then preview a batch layer assignment',
+    stepLabels: ['Read the editable selection', 'Read project layers', 'Preview the batch layer assignment'],
+  },
+  'TPL-020': {
+    name: 'Preview classification assignment',
+    description: 'Reads the current selection and project classifications, then previews assigning a classification item.',
+    userIntent: 'Read selected elements and classifications, then preview classification assignment',
+    stepLabels: ['Read the editable selection', 'Read classification systems and root items', 'Preview classification assignment'],
+  }
 };
 
 function formatNumber(value) {
@@ -654,18 +897,22 @@ class TaskTemplateRegistry {
    */
   match(text) {
     const lower = text.toLowerCase().trim();
+    let bestMatch = null;
+    let bestKeywordLength = -1;
     for (const tpl of this.templates) {
       const allKeywords = [
         ...(tpl.keywords?.zh || []),
         ...(tpl.keywords?.en || [])
       ];
       for (const kw of allKeywords) {
-        if (lower.includes(kw.toLowerCase())) {
-          return tpl;
+        const normalizedKeyword = String(kw).toLowerCase();
+        if (lower.includes(normalizedKeyword) && normalizedKeyword.length > bestKeywordLength) {
+          bestMatch = tpl;
+          bestKeywordLength = normalizedKeyword.length;
         }
       }
     }
-    return null;
+    return bestMatch;
   }
 
   /**

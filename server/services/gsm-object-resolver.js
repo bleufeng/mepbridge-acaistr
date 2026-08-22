@@ -1,7 +1,7 @@
 'use strict';
 
 const SOURCES = new Set(['favorite', 'projectLibrary']);
-const STATUSES = new Set(['resolved', 'ambiguous', 'not_found', 'invalid', 'unsupported']);
+const STATUSES = new Set(['resolved', 'ambiguous', 'not_found', 'invalid', 'unsupported', 'stale']);
 
 function text(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -63,9 +63,24 @@ function exactNameCandidates(item, identity, source) {
 
 function candidateCatalog(catalog, source) {
   if (!catalog || typeof catalog !== 'object') return null;
-  const raw = source === 'favorite' ? catalog.favorites : catalog.projectLibrary;
+  const raw = source === 'favorite'
+    ? catalog.favorites
+    : Array.isArray(catalog.projectLibrary)
+      ? catalog.projectLibrary
+      // Normalize the direct GetGsmObjectCatalog APX response so callers can
+      // pass it through without manually reshaping {source, objects}.
+      : catalog.source === 'projectLibrary' ? catalog.objects : undefined;
   if (!Array.isArray(raw)) return null;
   return raw;
+}
+
+function normalizeGsmCatalogResponse(response) {
+  if (!response || typeof response !== 'object') return null;
+  if (response.source !== 'projectLibrary' || !Array.isArray(response.objects)) return null;
+  return {
+    ...response,
+    projectLibrary: response.objects
+  };
 }
 
 function result(status, details = {}) {
@@ -77,6 +92,90 @@ function result(status, details = {}) {
     archicadRequired: false,
     ...details
   };
+}
+
+function catalogMetadata(catalog) {
+  const metadata = catalog?.metadata && typeof catalog.metadata === 'object' ? catalog.metadata : {};
+  return {
+    projectGuid: text(metadata.projectGuid || catalog?.projectGuid),
+    projectId: text(metadata.projectId || catalog?.projectId),
+    revision: text(metadata.revision || catalog?.revision),
+    generatedAt: text(metadata.generatedAt || catalog?.generatedAt),
+    expiresAt: text(metadata.expiresAt || catalog?.expiresAt)
+  };
+}
+
+function expectedContext(input) {
+  const context = input?.context && typeof input.context === 'object' ? input.context : {};
+  return {
+    projectGuid: text(context.projectGuid || input?.projectGuid),
+    projectId: text(context.projectId || input?.projectId),
+    catalogRevision: text(context.catalogRevision || input?.catalogRevision)
+  };
+}
+
+function validateCatalogContext(input, catalog, nowMs) {
+  const metadata = catalogMetadata(catalog);
+  const expected = expectedContext(input);
+  const missingContextFields = [
+    expected.projectGuid && !metadata.projectGuid ? 'projectGuid' : null,
+    expected.projectId && !metadata.projectId ? 'projectId' : null,
+    expected.catalogRevision && !metadata.revision ? 'revision' : null
+  ].filter(Boolean);
+  if (missingContextFields.length > 0) {
+    return result('stale', {
+      code: 'CATALOG_CONTEXT_REQUIRED',
+      message: 'The caller supplied a project/revision context that the GSM catalog cannot prove; refresh it before resolving an object.',
+      expectedContext: expected,
+      catalogContext: metadata,
+      missingContextFields
+    });
+  }
+  for (const key of ['projectGuid', 'projectId']) {
+    if (expected[key] && metadata[key] && normalized(expected[key]) !== normalized(metadata[key])) {
+      return result('stale', {
+        code: 'CATALOG_PROJECT_MISMATCH',
+        message: `The supplied catalog belongs to a different ${key}; refresh it after switching projects.`,
+        expectedContext: expected,
+        catalogContext: metadata
+      });
+    }
+  }
+  if (expected.catalogRevision && metadata.revision && expected.catalogRevision !== metadata.revision) {
+    return result('stale', {
+      code: 'CATALOG_REVISION_MISMATCH',
+      message: 'The supplied catalog revision is stale; refresh the catalog before resolving an object.',
+      expectedContext: expected,
+      catalogContext: metadata
+    });
+  }
+
+  const expiresAt = Date.parse(metadata.expiresAt);
+  if (metadata.expiresAt && Number.isFinite(expiresAt) && expiresAt <= nowMs) {
+    return result('stale', {
+      code: 'CATALOG_EXPIRED',
+      message: 'The supplied GSM catalog has expired; refresh it before resolving an object.',
+      catalogContext: metadata
+    });
+  }
+
+  const maxCatalogAgeMs = typeof input?.maxCatalogAgeMs === 'number' ? input.maxCatalogAgeMs : Number.NaN;
+  const generatedAt = Date.parse(metadata.generatedAt);
+  if (Number.isFinite(maxCatalogAgeMs) && maxCatalogAgeMs >= 0 && metadata.generatedAt &&
+      Number.isFinite(generatedAt) && nowMs - generatedAt > maxCatalogAgeMs) {
+    return result('stale', {
+      code: 'CATALOG_TOO_OLD',
+      message: 'The supplied GSM catalog exceeds maxCatalogAgeMs; refresh it before resolving an object.',
+      catalogContext: metadata,
+      catalogAgeMs: nowMs - generatedAt,
+      maxCatalogAgeMs
+    });
+  }
+  return null;
+}
+
+function hasFavoriteGsmIdentity(identity) {
+  return isGuid(identity.libraryPartGuid) && Boolean(identity.libraryPartName);
 }
 
 function resolveGsmObject(input = {}) {
@@ -115,6 +214,9 @@ function resolveGsmObject(input = {}) {
     });
   }
 
+  const contextFailure = validateCatalogContext(input, input.catalog, Number.isFinite(input.nowMs) ? input.nowMs : Date.now());
+  if (contextFailure) return { ...contextFailure, searchScope: source };
+
   const normalizedCatalog = catalog
     .filter((item) => item && typeof item === 'object')
     .map((item) => ({ item, identity: identityOf(item, source) }));
@@ -122,16 +224,13 @@ function resolveGsmObject(input = {}) {
     ? normalizedCatalog.filter(({ item }) => isGsmObject(item))
     : normalizedCatalog;
 
-  if (source === 'projectLibrary' && gsmCandidates.length !== normalizedCatalog.length) {
-    const rejectedCount = normalizedCatalog.length - gsmCandidates.length;
-    if (gsmCandidates.length === 0) {
-      return result('unsupported', {
-        code: 'NON_GSM_LIBRARY_PART',
-        message: 'projectLibrary resolution only accepts GSM objects; all catalog entries were non-GSM.',
-        searchScope: source,
-        rejectedCount
-      });
-    }
+  if (source === 'projectLibrary' && gsmCandidates.length !== normalizedCatalog.length && gsmCandidates.length === 0) {
+    return result('unsupported', {
+      code: 'NON_GSM_LIBRARY_PART',
+      message: 'projectLibrary resolution only accepts GSM objects; all catalog entries were non-GSM.',
+      searchScope: source,
+      rejectedCount: normalizedCatalog.length
+    });
   }
 
   const matches = gsmCandidates.filter(({ item, identity }) => {
@@ -153,6 +252,17 @@ function resolveGsmObject(input = {}) {
       message: `Multiple exact GSM object matches were found in ${source}; user selection is required.`,
       searchScope: source,
       candidates: matches.map(({ identity }) => identity)
+        .sort((left, right) => `${left.guid || ''}:${left.name || ''}`.localeCompare(`${right.guid || ''}:${right.name || ''}`))
+    });
+  }
+
+  const resolved = matches[0].identity;
+  if (source === 'favorite' && !hasFavoriteGsmIdentity(resolved)) {
+    return result('unsupported', {
+      code: 'FAVORITE_GSM_IDENTITY_REQUIRED',
+      message: 'The favorite matched by name but does not expose a usable GSM libraryPartGuid and libraryPartName.',
+      searchScope: source,
+      favorite: resolved
     });
   }
 
@@ -160,7 +270,8 @@ function resolveGsmObject(input = {}) {
     code: 'OBJECT_RESOLVED',
     message: 'GSM object resolved from the supplied offline catalog.',
     searchScope: source,
-    object: matches[0].identity
+    catalogContext: catalogMetadata(input.catalog),
+    object: resolved
   });
 }
 
@@ -168,5 +279,7 @@ module.exports = {
   resolveGsmObject,
   isGsmObject,
   identityOf,
+  normalizeGsmCatalogResponse,
+  validateCatalogContext,
   STATUSES
 };

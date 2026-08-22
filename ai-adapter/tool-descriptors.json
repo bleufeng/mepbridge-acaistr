@@ -1558,7 +1558,7 @@
                 "z": 3
               }
             ],
-            "diameterMm": 22.0
+            "diameterMm": 22
           }
         }
       }
@@ -1931,7 +1931,7 @@
               "y": 0
             },
             "thickness": 0.24,
-            "height": 3.0,
+            "height": 3,
             "dryRun": true,
             "confirmRequired": false
           }
@@ -2004,7 +2004,7 @@
               "x": 0,
               "y": 0
             },
-            "height": 3.0,
+            "height": 3,
             "dryRun": true,
             "confirmRequired": false
           }
@@ -2661,12 +2661,12 @@
               "x": 4,
               "y": 0
             },
-            "totalHeight": 3.0,
+            "totalHeight": 3,
             "stepNum": 16,
             "flightWidth": 1.2,
             "dryRun": true,
             "confirmRequired": false,
-            "baseLevel": 0.0
+            "baseLevel": 0
           }
         }
       }
@@ -2674,9 +2674,9 @@
     {
       "name": "mepbridge.create_object",
       "title": "MEPBridge create object (architectural)",
-      "description": "Create a GDL object at a position with optional library part name and rotation. API_ObjectID. V2 channel A.",
+      "description": "Create a placeable GSM Object at a position. Supports exact project-library resolution by stable main GUID/name and Object Favorites; ambiguous or stale selectors fail explicitly. Source and offline contract complete; AC28/AC29 APX rebuild and runtime readback pending.",
       "domain": "Building",
-      "status": "v2-extended",
+      "status": "code-complete-pending-compile",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "CreateObject",
@@ -2684,9 +2684,9 @@
       "automationModes": [
         "manual-preview",
         "dry-run-only",
-        "auto-run"
+        "confirmed-run"
       ],
-      "requiresConfirmationDefault": false,
+      "requiresConfirmationDefault": true,
       "rollbackSupport": "created-guid-cleanup",
       "nlTriggers": {
         "zh": [
@@ -2724,6 +2724,10 @@
         "floorIndex": {
           "type": "integer",
           "description": "Story index"
+        },
+        "objectRef": {
+          "type": "object-reference",
+          "description": "Stable GSM selector: {source: favorite|projectLibrary, guid?, name?}. Favorite name resolves through the project Favorite and its stored libraryPart index."
         }
       },
       "commandJson": {
@@ -2740,7 +2744,11 @@
             },
             "angle": 0,
             "dryRun": true,
-            "confirmRequired": false
+            "confirmRequired": false,
+            "objectRef": {
+              "source": "projectLibrary",
+              "name": "Table 01"
+            }
           }
         }
       }
@@ -2823,9 +2831,9 @@
     {
       "name": "mepbridge.create_mesh",
       "title": "MEPBridge create mesh (terrain)",
-      "description": "Create a terrain mesh from a polygon outline. API_MeshID. V2 channel A.",
+      "description": "Create a terrain mesh from a structured polygon outline with optional per-vertex heights. Source and offline contract complete; AC28/AC29 APX rebuild and runtime readback pending.",
       "domain": "Building",
-      "status": "v2-extended",
+      "status": "code-complete-pending-compile",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "CreateMesh",
@@ -2833,9 +2841,9 @@
       "automationModes": [
         "manual-preview",
         "dry-run-only",
-        "auto-run"
+        "confirmed-run"
       ],
-      "requiresConfirmationDefault": false,
+      "requiresConfirmationDefault": true,
       "rollbackSupport": "created-guid-cleanup",
       "nlTriggers": {
         "zh": [
@@ -2860,7 +2868,7 @@
       "paramExtractors": {
         "polygon": {
           "type": "polygon",
-          "description": "Mesh polygon vertices [{x,y}] in meters, at least 3 points"
+          "description": "Mesh polygon with points [{x,y}] and optional heights[]; at least 3 points"
         },
         "level": {
           "type": "number",
@@ -2897,6 +2905,12 @@
                   "x": 0,
                   "y": 10
                 }
+              ],
+              "heights": [
+                0,
+                1.2,
+                0.8,
+                0
               ]
             },
             "level": 0,
@@ -3006,9 +3020,9 @@
     {
       "name": "mepbridge.viewport_capture",
       "title": "MEPBridge viewport capture (visual feedback)",
-      "description": "Capture current viewport as structured visual snapshot (view type + visible elements AABB list + bounds). Used by H4 visual feedback loop for LLM to verify execution results. Read-only, no model modification. V2 H4.1.",
+      "description": "Capture the current or a uniquely named Navigator View Map view as a structured visual snapshot and optional PNG. When targetViewName is supplied, the original window/database/view settings are restored on every completion path. AC28/AC29 APX rebuild and runtime verification pending.",
       "domain": "Building",
-      "status": "v2-h4",
+      "status": "code-complete-pending-compile",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "ViewportCapture",
@@ -3053,6 +3067,10 @@
         "includeImage": {
           "type": "boolean",
           "description": "Capture PNG screenshot as base64 for LLM multimodal vision (default=false, H4.1)"
+        },
+        "targetViewName": {
+          "type": "string",
+          "description": "Exact case-insensitive Navigator View Map name; zero or multiple matches fail rather than silently selecting."
         }
       },
       "commandJson": {
@@ -3065,7 +3083,8 @@
           "addOnCommandParameters": {
             "maxElements": 100,
             "includeAabb": true,
-            "includeImage": false
+            "includeImage": false,
+            "targetViewName": "Ground Floor"
           }
         }
       }
@@ -3073,9 +3092,9 @@
     {
       "name": "mepbridge.get_element_mesh",
       "title": "MEPBridge get element 3D mesh",
-      "description": "Get 3D geometry vertices for specified elements by GUID. Returns AABB + key vertices (wall start/end, column base/top, slab polygon) + thickness/height. Used by H4.4 for precise geometric verification. Read-only. V2 H4.4.",
+      "description": "Read structured 3D geometry by GUID. Mesh elements include polygon vertices, relativeZ, absolute z, level, and elevation range; Morph elements include model-space Body vertices, edges, polygon edge indices, and normals. Read-only; AC28/AC29 APX rebuild and runtime readback pending.",
       "domain": "Building",
-      "status": "v2-h4",
+      "status": "code-complete-pending-compile",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "GetElementMesh",
@@ -4158,7 +4177,7 @@
     {
       "name": "mepbridge.get_elements_by_type",
       "title": "MEPBridge get elements by type",
-      "description": "Query all elements of a specific type from the Archicad model. Returns guid/type/floorIndex/layerIndex per element, with optional AABB. Supports Wall/Column/Beam/Slab/Roof/Door/Window/Object/Stair/MEPRoute. Native element discovery query. P4-2.",
+      "description": "Query all elements of a specific type from the Archicad model. Returns guid/type/floorIndex/layerIndex per element, with optional AABB. Supports Wall/Column/Beam/Slab/Roof/Door/Window/Object/Stair/Mesh/Morph/MEPRoute. Native element discovery query. P4-2.",
       "domain": "Building",
       "status": "runtime-schema-smoke",
       "executionKind": "mepbridge-addon-command",
@@ -4235,6 +4254,8 @@
             "Window",
             "Object",
             "Stair",
+            "Mesh",
+            "Morph",
             "MEPRoute"
           ],
           "description": "Element type to query"
@@ -4333,7 +4354,7 @@
     {
       "name": "mepbridge.get_element_geometry",
       "title": "MEPBridge get element precise geometry (read)",
-      "description": "Get precise geometry of a single element by GUID. Returns type-specific fields: Wall→start/end/thickness/height/length, Column→position/height, Beam→start/end/length, Slab→polygon/thickness/level, Roof→polygon/thickness/baseLevel, Door/Window→width/height/owner. P4-5.",
+      "description": "Get precise geometry of a single element by GUID. Returns type-specific fields: Wall→start/end/thickness/height/length, Column→position/height, Beam→start/end/length, Slab→polygon/thickness/level, Roof→polygon/thickness/baseLevel, Door/Window→width/height/owner, Mesh→vertices/elevation statistics, Morph→vertices/edges/polygons/poly-edges/normals. P4-5.",
       "domain": "Building",
       "status": "runtime-schema-smoke",
       "executionKind": "mepbridge-addon-command",
@@ -4770,27 +4791,47 @@
     {
       "name": "mepbridge.get_favorites",
       "title": "MEPBridge get favorites",
-      "description": "Enumerate project Favorites (收藏夹). Returns name/elementType/folder per favorite. Favorites are identified by unique name (the Archicad API does not expose a stable favorite GUID, so name is the identity). Optional elementType filter. Read-only. Stage-1 semantic enhancement.",
+      "description": "Enumerate project Favorites and, for Object/Lamp entries, return the current GSM libraryPart GUID/name/index in addition to name/elementType/folder. Stable identity is the libraryPart main GUID; index is diagnostic only.",
       "domain": "Project",
       "status": "runtime-schema-smoke",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "GetFavorites",
       "riskLevel": "read",
-      "automationModes": ["manual-preview", "dry-run-only"],
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
       "requiresConfirmationDefault": false,
       "rollbackSupport": "not-required",
       "nlTriggers": {
-        "zh": ["收藏夹", "收藏夹列表", "所有收藏夹", "查询收藏夹", "标准构件"],
-        "en": ["favorites", "favorite list", "all favorites", "get favorites"]
+        "zh": [
+          "收藏夹",
+          "收藏夹列表",
+          "所有收藏夹",
+          "查询收藏夹",
+          "标准构件"
+        ],
+        "en": [
+          "favorites",
+          "favorite list",
+          "all favorites",
+          "get favorites"
+        ]
       },
       "paramExtractors": {
-        "elementType": {"type": "string", "description": "Filter by element type (Wall/Column/.../empty=all)"}
+        "elementType": {
+          "type": "string",
+          "description": "Filter by element type (Wall/Column/.../empty=all)"
+        }
       },
       "commandJson": {
         "command": "API.ExecuteAddOnCommand",
         "parameters": {
-          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "GetFavorites"},
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetFavorites"
+          },
           "addOnCommandParameters": {}
         }
       }
@@ -4805,18 +4846,36 @@
       "commandNamespace": "MEPBridge",
       "commandName": "GetProfiles",
       "riskLevel": "read",
-      "automationModes": ["manual-preview", "dry-run-only"],
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
       "requiresConfirmationDefault": false,
       "rollbackSupport": "not-required",
       "nlTriggers": {
-        "zh": ["截面", "截面列表", "复合截面", "查询截面", "截面管理器"],
-        "en": ["profiles", "profile list", "complex profile", "get profiles", "profile manager"]
+        "zh": [
+          "截面",
+          "截面列表",
+          "复合截面",
+          "查询截面",
+          "截面管理器"
+        ],
+        "en": [
+          "profiles",
+          "profile list",
+          "complex profile",
+          "get profiles",
+          "profile manager"
+        ]
       },
       "paramExtractors": {},
       "commandJson": {
         "command": "API.ExecuteAddOnCommand",
         "parameters": {
-          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "GetProfiles"},
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetProfiles"
+          },
           "addOnCommandParameters": {}
         }
       }
@@ -4831,21 +4890,44 @@
       "commandNamespace": "MEPBridge",
       "commandName": "GetViewMap",
       "riskLevel": "read",
-      "automationModes": ["manual-preview", "dry-run-only"],
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
       "requiresConfirmationDefault": false,
       "rollbackSupport": "not-required",
       "nlTriggers": {
-        "zh": ["视图", "视图列表", "视图映射", "所有视图", "查询视图"],
-        "en": ["views", "view map", "view list", "all views", "get views"]
+        "zh": [
+          "视图",
+          "视图列表",
+          "视图映射",
+          "所有视图",
+          "查询视图"
+        ],
+        "en": [
+          "views",
+          "view map",
+          "view list",
+          "all views",
+          "get views"
+        ]
       },
       "paramExtractors": {
-        "maxDepth": {"type": "integer", "description": "Max recursion depth (1-10, default 5)"}
+        "maxDepth": {
+          "type": "integer",
+          "description": "Max recursion depth (1-10, default 5)"
+        }
       },
       "commandJson": {
         "command": "API.ExecuteAddOnCommand",
         "parameters": {
-          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "GetViewMap"},
-          "addOnCommandParameters": {"maxDepth": 5}
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetViewMap"
+          },
+          "addOnCommandParameters": {
+            "maxDepth": 5
+          }
         }
       }
     },
@@ -4859,21 +4941,46 @@
       "commandNamespace": "MEPBridge",
       "commandName": "GetSectionMarkers",
       "riskLevel": "read",
-      "automationModes": ["manual-preview", "dry-run-only"],
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
       "requiresConfirmationDefault": false,
       "rollbackSupport": "not-required",
       "nlTriggers": {
-        "zh": ["剖面", "立面", "剖面标记", "立面标记", "所有剖面", "查询剖面"],
-        "en": ["sections", "elevations", "section markers", "elevation markers", "all sections"]
+        "zh": [
+          "剖面",
+          "立面",
+          "剖面标记",
+          "立面标记",
+          "所有剖面",
+          "查询剖面"
+        ],
+        "en": [
+          "sections",
+          "elevations",
+          "section markers",
+          "elevation markers",
+          "all sections"
+        ]
       },
       "paramExtractors": {
-        "elementType": {"type": "string", "description": "Filter: Section/Elevation/InteriorElevation/All (default All)"}
+        "elementType": {
+          "type": "string",
+          "description": "Filter: Section/Elevation/InteriorElevation/All (default All)"
+        }
       },
       "commandJson": {
         "command": "API.ExecuteAddOnCommand",
         "parameters": {
-          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "GetSectionMarkers"},
-          "addOnCommandParameters": {"elementType": "All", "includeGeometry": true}
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetSectionMarkers"
+          },
+          "addOnCommandParameters": {
+            "elementType": "All",
+            "includeGeometry": true
+          }
         }
       }
     },
@@ -4887,21 +4994,43 @@
       "commandNamespace": "MEPBridge",
       "commandName": "GetClassifications",
       "riskLevel": "read",
-      "automationModes": ["manual-preview", "dry-run-only"],
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
       "requiresConfirmationDefault": false,
       "rollbackSupport": "not-required",
       "nlTriggers": {
-        "zh": ["分类", "分类系统", "所有分类", "查询分类", "BIM分类"],
-        "en": ["classifications", "classification systems", "all classifications", "get classifications"]
+        "zh": [
+          "分类",
+          "分类系统",
+          "所有分类",
+          "查询分类",
+          "BIM分类"
+        ],
+        "en": [
+          "classifications",
+          "classification systems",
+          "all classifications",
+          "get classifications"
+        ]
       },
       "paramExtractors": {
-        "includeRootItems": {"type": "boolean", "description": "Include root items per system (default false)"}
+        "includeRootItems": {
+          "type": "boolean",
+          "description": "Include root items per system (default false)"
+        }
       },
       "commandJson": {
         "command": "API.ExecuteAddOnCommand",
         "parameters": {
-          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "GetClassifications"},
-          "addOnCommandParameters": {"includeRootItems": false}
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetClassifications"
+          },
+          "addOnCommandParameters": {
+            "includeRootItems": false
+          }
         }
       }
     },
@@ -4915,18 +5044,36 @@
       "commandNamespace": "MEPBridge",
       "commandName": "GetLayers",
       "riskLevel": "read",
-      "automationModes": ["manual-preview", "dry-run-only"],
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
       "requiresConfirmationDefault": false,
       "rollbackSupport": "not-required",
       "nlTriggers": {
-        "zh": ["图层", "图层列表", "所有图层", "查询图层", "隐藏图层"],
-        "en": ["layers", "layer list", "all layers", "get layers", "hidden layers"]
+        "zh": [
+          "图层",
+          "图层列表",
+          "所有图层",
+          "查询图层",
+          "隐藏图层"
+        ],
+        "en": [
+          "layers",
+          "layer list",
+          "all layers",
+          "get layers",
+          "hidden layers"
+        ]
       },
       "paramExtractors": {},
       "commandJson": {
         "command": "API.ExecuteAddOnCommand",
         "parameters": {
-          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "GetLayers"},
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetLayers"
+          },
           "addOnCommandParameters": {}
         }
       }
@@ -4941,26 +5088,68 @@
       "commandNamespace": "MEPBridge",
       "commandName": "FindElementsByProperty",
       "riskLevel": "read",
-      "automationModes": ["manual-preview", "dry-run-only"],
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
       "requiresConfirmationDefault": false,
       "rollbackSupport": "not-required",
       "nlTriggers": {
-        "zh": ["按属性查找", "查找构件", "按属性找墙", "未分类的墙", "找所有墙", "按属性筛选", "通用属性查找"],
-        "en": ["find elements", "find by property", "search elements", "filter by property", "unclassified walls", "find all walls"]
+        "zh": [
+          "按属性查找",
+          "查找构件",
+          "按属性找墙",
+          "未分类的墙",
+          "找所有墙",
+          "按属性筛选",
+          "通用属性查找"
+        ],
+        "en": [
+          "find elements",
+          "find by property",
+          "search elements",
+          "filter by property",
+          "unclassified walls",
+          "find all walls"
+        ]
       },
       "paramExtractors": {
-        "elementType": {"type": "string", "description": "Element type (Wall/Column/Beam/Slab/Roof/Door/Window/Object/Lamp/Mesh/Zone) (required)"},
-        "groupName": {"type": "string", "description": "Property group name"},
-        "propertyName": {"type": "string", "description": "Property name"},
-        "valueString": {"type": "string", "description": "Property value to match (required)"},
-        "propertyGuid": {"type": "string", "description": "Property definition GUID (alternative to groupName+propertyName)"},
-        "filter": {"type": "string", "description": "All/UserDefined/BuiltIn (default All)"},
-        "includeProperty": {"type": "boolean", "description": "Include full property object in response (default true)"}
+        "elementType": {
+          "type": "string",
+          "description": "Element type (Wall/Column/Beam/Slab/Roof/Door/Window/Object/Lamp/Mesh/Zone) (required)"
+        },
+        "groupName": {
+          "type": "string",
+          "description": "Property group name"
+        },
+        "propertyName": {
+          "type": "string",
+          "description": "Property name"
+        },
+        "valueString": {
+          "type": "string",
+          "description": "Property value to match (required)"
+        },
+        "propertyGuid": {
+          "type": "string",
+          "description": "Property definition GUID (alternative to groupName+propertyName)"
+        },
+        "filter": {
+          "type": "string",
+          "description": "All/UserDefined/BuiltIn (default All)"
+        },
+        "includeProperty": {
+          "type": "boolean",
+          "description": "Include full property object in response (default true)"
+        }
       },
       "commandJson": {
         "command": "API.ExecuteAddOnCommand",
         "parameters": {
-          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "FindElementsByProperty"},
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "FindElementsByProperty"
+          },
           "addOnCommandParameters": {
             "elementType": "Wall",
             "groupName": "Classification",
@@ -4982,25 +5171,66 @@
       "commandNamespace": "MEPBridge",
       "commandName": "AssignClassification",
       "riskLevel": "write",
-      "automationModes": ["manual-preview", "dry-run-only", "confirmed-run"],
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "confirmed-run"
+      ],
       "requiresConfirmationDefault": true,
       "rollbackSupport": "undoable",
       "nlTriggers": {
-        "zh": ["构件分类", "查询分类", "元素分类", "读分类", "当前分类", "分配分类", "设置分类", "BIM分类"],
-        "en": ["element classification", "get classification", "read classification", "current classification", "assign classification", "set classification"]
+        "zh": [
+          "构件分类",
+          "查询分类",
+          "元素分类",
+          "读分类",
+          "当前分类",
+          "分配分类",
+          "设置分类",
+          "BIM分类"
+        ],
+        "en": [
+          "element classification",
+          "get classification",
+          "read classification",
+          "current classification",
+          "assign classification",
+          "set classification"
+        ]
       },
       "paramExtractors": {
-        "elementGuid": {"type": "string", "description": "Element GUID (required)"},
-        "systemGuid": {"type": "string", "description": "Optional system filter; when assigning must match assignItemGuid's system"},
-        "assignItemGuid": {"type": "string", "description": "Target classification item GUID (omit for read-only mode)"},
-        "replaceExisting": {"type": "boolean", "description": "Replace an existing item in the same system (default true)"},
-        "dryRun": {"type": "boolean", "description": "Preview without modifying (default true)"},
-        "confirmRequired": {"type": "boolean", "description": "Must be true when dryRun=false"}
+        "elementGuid": {
+          "type": "string",
+          "description": "Element GUID (required)"
+        },
+        "systemGuid": {
+          "type": "string",
+          "description": "Optional system filter; when assigning must match assignItemGuid's system"
+        },
+        "assignItemGuid": {
+          "type": "string",
+          "description": "Target classification item GUID (omit for read-only mode)"
+        },
+        "replaceExisting": {
+          "type": "boolean",
+          "description": "Replace an existing item in the same system (default true)"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Preview without modifying (default true)"
+        },
+        "confirmRequired": {
+          "type": "boolean",
+          "description": "Must be true when dryRun=false"
+        }
       },
       "commandJson": {
         "command": "API.ExecuteAddOnCommand",
         "parameters": {
-          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "AssignClassification"},
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "AssignClassification"
+          },
           "addOnCommandParameters": {
             "elementGuid": "AABBCC-DDDD-EEEE-FFFF-000000000001",
             "dryRun": true
@@ -5011,28 +5241,49 @@
     {
       "name": "mepbridge.get_favorite",
       "title": "MEPBridge get favorite detail",
-      "description": "Read a single Favorite by name. Returns name/elementType/folder plus profile/layer/classification/property/category counts. Favorites are identified by unique name (the Archicad API does not expose a stable favorite GUID, so name is the identity). Read-only. Stage-2 semantic enhancement.",
+      "description": "Read a single Favorite by name, including GSM libraryPart GUID/name/index for Object/Lamp entries. Stable library identity is the main GUID; index is diagnostic only.",
       "domain": "Project",
       "status": "runtime-schema-smoke",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "GetFavorite",
       "riskLevel": "read",
-      "automationModes": ["manual-preview", "dry-run-only"],
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
       "requiresConfirmationDefault": false,
       "rollbackSupport": "not-required",
       "nlTriggers": {
-        "zh": ["收藏夹详情", "查看收藏夹", "收藏夹信息", "读取收藏夹"],
-        "en": ["favorite detail", "get favorite", "read favorite", "favorite info"]
+        "zh": [
+          "收藏夹详情",
+          "查看收藏夹",
+          "收藏夹信息",
+          "读取收藏夹"
+        ],
+        "en": [
+          "favorite detail",
+          "get favorite",
+          "read favorite",
+          "favorite info"
+        ]
       },
       "paramExtractors": {
-        "favoriteName": {"type": "string", "description": "Favorite name (required, identity)"}
+        "favoriteName": {
+          "type": "string",
+          "description": "Favorite name (required, identity)"
+        }
       },
       "commandJson": {
         "command": "API.ExecuteAddOnCommand",
         "parameters": {
-          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "GetFavorite"},
-          "addOnCommandParameters": {"favoriteName": "Standard Wall 200"}
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetFavorite"
+          },
+          "addOnCommandParameters": {
+            "favoriteName": "Standard Wall 200"
+          }
         }
       }
     },
@@ -5046,30 +5297,74 @@
       "commandNamespace": "MEPBridge",
       "commandName": "CreateFromFavorite",
       "riskLevel": "write",
-      "automationModes": ["manual-preview", "dry-run-only", "confirmed-run"],
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "confirmed-run"
+      ],
       "requiresConfirmationDefault": true,
       "rollbackSupport": "undoable",
       "nlTriggers": {
-        "zh": ["从收藏夹创建", "用收藏夹建墙", "按收藏夹创建构件", "收藏夹生成"],
-        "en": ["create from favorite", "create wall from favorite", "instantiate favorite", "place favorite"]
+        "zh": [
+          "从收藏夹创建",
+          "用收藏夹建墙",
+          "按收藏夹创建构件",
+          "收藏夹生成"
+        ],
+        "en": [
+          "create from favorite",
+          "create wall from favorite",
+          "instantiate favorite",
+          "place favorite"
+        ]
       },
       "paramExtractors": {
-        "favoriteName": {"type": "string", "description": "Favorite name (required)"},
-        "start": {"type": "point2d", "description": "Start point {x,y} in meters (Wall/Beam)"},
-        "end": {"type": "point2d", "description": "End point {x,y} in meters (Wall/Beam)"},
-        "position": {"type": "point2d", "description": "Position {x,y} in meters (Column)"},
-        "floorIndex": {"type": "integer", "description": "Story index (optional)"},
-        "dryRun": {"type": "boolean", "description": "Preview without creating (default true)"},
-        "confirmRequired": {"type": "boolean", "description": "Must be true when dryRun=false"}
+        "favoriteName": {
+          "type": "string",
+          "description": "Favorite name (required)"
+        },
+        "start": {
+          "type": "point2d",
+          "description": "Start point {x,y} in meters (Wall/Beam)"
+        },
+        "end": {
+          "type": "point2d",
+          "description": "End point {x,y} in meters (Wall/Beam)"
+        },
+        "position": {
+          "type": "point2d",
+          "description": "Position {x,y} in meters (Column)"
+        },
+        "floorIndex": {
+          "type": "integer",
+          "description": "Story index (optional)"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Preview without creating (default true)"
+        },
+        "confirmRequired": {
+          "type": "boolean",
+          "description": "Must be true when dryRun=false"
+        }
       },
       "commandJson": {
         "command": "API.ExecuteAddOnCommand",
         "parameters": {
-          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "CreateFromFavorite"},
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateFromFavorite"
+          },
           "addOnCommandParameters": {
             "favoriteName": "Standard Wall 200",
-            "start": {"x": 0, "y": 0},
-            "end": {"x": 4, "y": 0},
+            "start": {
+              "x": 0,
+              "y": 0
+            },
+            "end": {
+              "x": 4,
+              "y": 0
+            },
             "dryRun": true
           }
         }
@@ -5085,23 +5380,51 @@
       "commandNamespace": "MEPBridge",
       "commandName": "ApplyFavorite",
       "riskLevel": "write",
-      "automationModes": ["manual-preview", "dry-run-only", "confirmed-run"],
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "confirmed-run"
+      ],
       "requiresConfirmationDefault": true,
       "rollbackSupport": "undoable",
       "nlTriggers": {
-        "zh": ["应用收藏夹", "套用收藏夹", "把收藏夹应用到", "用收藏夹更新构件"],
-        "en": ["apply favorite", "apply favorite to element", "match favorite settings"]
+        "zh": [
+          "应用收藏夹",
+          "套用收藏夹",
+          "把收藏夹应用到",
+          "用收藏夹更新构件"
+        ],
+        "en": [
+          "apply favorite",
+          "apply favorite to element",
+          "match favorite settings"
+        ]
       },
       "paramExtractors": {
-        "elementGuid": {"type": "string", "description": "Target element GUID (required)"},
-        "favoriteName": {"type": "string", "description": "Favorite name (required, same type as target)"},
-        "dryRun": {"type": "boolean", "description": "Preview without changing (default true)"},
-        "confirmRequired": {"type": "boolean", "description": "Must be true when dryRun=false"}
+        "elementGuid": {
+          "type": "string",
+          "description": "Target element GUID (required)"
+        },
+        "favoriteName": {
+          "type": "string",
+          "description": "Favorite name (required, same type as target)"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Preview without changing (default true)"
+        },
+        "confirmRequired": {
+          "type": "boolean",
+          "description": "Must be true when dryRun=false"
+        }
       },
       "commandJson": {
         "command": "API.ExecuteAddOnCommand",
         "parameters": {
-          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "ApplyFavorite"},
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "ApplyFavorite"
+          },
           "addOnCommandParameters": {
             "elementGuid": "AABBCC-DDDD-EEEE-FFFF-000000000001",
             "favoriteName": "Standard Wall 200",
@@ -5120,24 +5443,56 @@
       "commandNamespace": "MEPBridge",
       "commandName": "SaveFavorite",
       "riskLevel": "write",
-      "automationModes": ["manual-preview", "dry-run-only", "confirmed-run"],
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "confirmed-run"
+      ],
       "requiresConfirmationDefault": true,
       "rollbackSupport": "best-effort",
       "nlTriggers": {
-        "zh": ["保存收藏夹", "存为收藏夹", "另存为收藏夹", "收藏当前构件"],
-        "en": ["save favorite", "save as favorite", "store favorite", "create favorite from element"]
+        "zh": [
+          "保存收藏夹",
+          "存为收藏夹",
+          "另存为收藏夹",
+          "收藏当前构件"
+        ],
+        "en": [
+          "save favorite",
+          "save as favorite",
+          "store favorite",
+          "create favorite from element"
+        ]
       },
       "paramExtractors": {
-        "elementGuid": {"type": "string", "description": "Source element GUID (required)"},
-        "favoriteName": {"type": "string", "description": "New favorite name (required)"},
-        "folder": {"type": "array", "description": "Optional folder hierarchy (array of names)"},
-        "dryRun": {"type": "boolean", "description": "Preview without saving (default true)"},
-        "confirmRequired": {"type": "boolean", "description": "Must be true when dryRun=false"}
+        "elementGuid": {
+          "type": "string",
+          "description": "Source element GUID (required)"
+        },
+        "favoriteName": {
+          "type": "string",
+          "description": "New favorite name (required)"
+        },
+        "folder": {
+          "type": "array",
+          "description": "Optional folder hierarchy (array of names)"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Preview without saving (default true)"
+        },
+        "confirmRequired": {
+          "type": "boolean",
+          "description": "Must be true when dryRun=false"
+        }
       },
       "commandJson": {
         "command": "API.ExecuteAddOnCommand",
         "parameters": {
-          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "SaveFavorite"},
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "SaveFavorite"
+          },
           "addOnCommandParameters": {
             "elementGuid": "AABBCC-DDDD-EEEE-FFFF-000000000001",
             "favoriteName": "My Wall 240",
@@ -5156,28 +5511,206 @@
       "commandNamespace": "MEPBridge",
       "commandName": "SetLayerBatch",
       "riskLevel": "write",
-      "automationModes": ["manual-preview", "dry-run-only", "confirmed-run"],
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "confirmed-run"
+      ],
       "requiresConfirmationDefault": true,
       "rollbackSupport": "undoable",
       "nlTriggers": {
-        "zh": ["批量改图层", "设置图层", "移动到图层", "改图层", "批量设置图层"],
-        "en": ["set layer batch", "change layer", "move to layer", "batch set layer", "assign layer"]
+        "zh": [
+          "批量改图层",
+          "设置图层",
+          "移动到图层",
+          "改图层",
+          "批量设置图层"
+        ],
+        "en": [
+          "set layer batch",
+          "change layer",
+          "move to layer",
+          "batch set layer",
+          "assign layer"
+        ]
       },
       "paramExtractors": {
-        "elementGuids": {"type": "array", "description": "Element GUIDs to move (required, non-empty)"},
-        "layerGuid": {"type": "string", "description": "Target layer GUID (alternative to layerName)"},
-        "layerName": {"type": "string", "description": "Target layer name (alternative to layerGuid)"},
-        "dryRun": {"type": "boolean", "description": "Preview without changing (default true)"},
-        "confirmRequired": {"type": "boolean", "description": "Must be true when dryRun=false"}
+        "elementGuids": {
+          "type": "array",
+          "description": "Element GUIDs to move (required, non-empty)"
+        },
+        "layerGuid": {
+          "type": "string",
+          "description": "Target layer GUID (alternative to layerName)"
+        },
+        "layerName": {
+          "type": "string",
+          "description": "Target layer name (alternative to layerGuid)"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Preview without changing (default true)"
+        },
+        "confirmRequired": {
+          "type": "boolean",
+          "description": "Must be true when dryRun=false"
+        }
       },
       "commandJson": {
         "command": "API.ExecuteAddOnCommand",
         "parameters": {
-          "addOnCommandId": {"commandNamespace": "MEPBridge", "commandName": "SetLayerBatch"},
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "SetLayerBatch"
+          },
           "addOnCommandParameters": {
-            "elementGuids": ["AABBCC-DDDD-EEEE-FFFF-000000000001"],
+            "elementGuids": [
+              "AABBCC-DDDD-EEEE-FFFF-000000000001"
+            ],
             "layerName": "Structure",
             "dryRun": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_morph",
+      "title": "MEPBridge create extruded morph",
+      "description": "Create a simple solid Morph by vertically extruding a structured 2D polygon. Source and offline contract complete; AC28/AC29 APX rebuild and runtime readback pending.",
+      "domain": "Building",
+      "status": "code-complete-pending-compile",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateMorph",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "创建变形体",
+          "新建变形体",
+          "创建Morph",
+          "异形体",
+          "自由造型",
+          "挤出变形体"
+        ],
+        "en": [
+          "create morph",
+          "new morph",
+          "add morph",
+          "freeform body",
+          "extruded morph"
+        ]
+      },
+      "paramExtractors": {
+        "polygon": {
+          "type": "polygon",
+          "description": "Structured 2D polygon [{x,y}], at least 3 unique points"
+        },
+        "baseLevel": {
+          "type": "number",
+          "description": "Absolute/project Z coordinate of the bottom face in meters"
+        },
+        "extrudeHeight": {
+          "type": "number",
+          "description": "Positive vertical extrusion height in meters"
+        },
+        "floorIndex": {
+          "type": "integer",
+          "description": "Story index"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateMorph"
+          },
+          "addOnCommandParameters": {
+            "polygon": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 4,
+                "y": 0
+              },
+              {
+                "x": 4,
+                "y": 3
+              },
+              {
+                "x": 0,
+                "y": 3
+              }
+            ],
+            "baseLevel": 0,
+            "extrudeHeight": 2.5,
+            "floorIndex": 0,
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_gsm_object_catalog",
+      "title": "MEPBridge get project GSM object catalog",
+      "description": "Read-only catalog of placeable GSM Object library parts currently registered in the project. Supports optional case-insensitive substring filtering. The main GUID is the stable identity; libraryPartIndex is session diagnostics only. Source and offline contract complete; AC28/AC29 APX rebuild and runtime readback pending.",
+      "domain": "Project",
+      "status": "code-complete-pending-compile",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetGsmObjectCatalog",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "GSM对象目录",
+          "项目图库对象",
+          "库件目录",
+          "搜索GSM对象",
+          "对象库件"
+        ],
+        "en": [
+          "GSM object catalog",
+          "project library objects",
+          "search GSM objects",
+          "object library parts"
+        ]
+      },
+      "paramExtractors": {
+        "query": {
+          "type": "string",
+          "description": "Optional substring filter for name, file name or stable main GUID."
+        },
+        "maxResults": {
+          "type": "integer",
+          "description": "Maximum results (1-500, default 200)."
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetGsmObjectCatalog"
+          },
+          "addOnCommandParameters": {
+            "query": "",
+            "maxResults": 200
           }
         }
       }
