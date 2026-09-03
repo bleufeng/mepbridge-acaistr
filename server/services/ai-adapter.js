@@ -9,6 +9,16 @@ const { migrateLegacyFile } = require('./runtime-paths');
 const { decrypt: decryptLlmConfig } = require('./llm-config-crypto');
 const { normalizeUiLocale, isEnglishUiLocale } = require('./ui-locale');
 const semanticIndex = require('./semantic-index');
+// NL 参数提取器：与 task-templates.js 共用同一份实现。
+// 此前这些函数只定义在本文件内部，模板路径取不到，导致 TPL-011 生成的 deltaMm
+// 恒为零并被 Add-On 以 ZERO_DELTA 拒绝（成因见 nl-param-extractors.js 顶部说明）。
+const {
+  extractDiameterMm,
+  extractElementType,
+  extractWaypoints,
+  extractDelta,
+  extractTargetStoryIndex
+} = require('./nl-param-extractors');
 
 const CONFIG_FILE = migrateLegacyFile('.llm-config.json');
 // D.5: 加载 tool-descriptors.json 作为命令注册中心
@@ -239,6 +249,7 @@ class AIAdapter {
     if (hasLLM) {
       // ─── LLM 优先路径 ───
       // L1: LLM 语义理解（systemPrompt 已从 descriptors 自动生成）
+      let llmFailure = null;
       try {
         const plan = await this.llm.generatePlan(text, planContext);
         if (plan && plan.steps && plan.steps.length > 0) {
@@ -251,7 +262,11 @@ class AIAdapter {
           }
         }
       } catch (error) {
-        console.error('[AI Adapter] LLM call failed:', error.message);
+        // 记下失败原因向上传递：LLM 不可用时用户只看到「反应很慢然后降级了」，
+        // 却不知道是密钥失效、超时还是网络不通。降级本身能给出结果，
+        // 但配置问题必须让用户看见，否则会一直误以为 LLM 在工作。
+        llmFailure = describeLlmFailure(error, this.llm);
+        console.error(`[AI Adapter] LLM call failed: ${error.message} (${llmFailure.reason})`);
       }
 
       // L2: descriptor nlTriggers 匹配（LLM 失败/降级时使用）
@@ -259,17 +274,17 @@ class AIAdapter {
       if (descriptorMatch) {
         console.log(`[AI Adapter] NL matched descriptor (after LLM): ${descriptorMatch.name}`);
         const plan = this.buildPlanFromDescriptor(descriptorMatch, text, planContext.language);
-        return this.enrichPlan(plan, text, planContext);
+        return this.enrichPlan(attachLlmFailure(plan, llmFailure), text, planContext);
       }
 
       // L3: fallback 硬编码
       const fallbackPlan = this.fallbackGeneratePlan(text, planContext);
       if (fallbackPlan && !fallbackPlan.unsupported) {
-        return this.enrichPlan(fallbackPlan, text, planContext);
+        return this.enrichPlan(attachLlmFailure(fallbackPlan, llmFailure), text, planContext);
       }
 
       // L4: 无法识别 → 友好回复
-      return this.buildUnrecognizedResponse(text, planContext.language);
+      return attachLlmFailure(this.buildUnrecognizedResponse(text, planContext.language), llmFailure);
     }
 
     // ─── 无 LLM 路径（跳过 LLM 语义理解） ───
@@ -907,223 +922,6 @@ class AIAdapter {
   }
 }
 
-// D.2 辅助：从自然语言提取位移参数
-// 支持 "x=300,y=-200,z=100"、"z=3000"、"往上抬200"、"向下1000mm" 等格式
-function extractDiameterMm(text) {
-  // 匹配 "100mm"、"100毫米"、"100 mm"、"直径100"、"DN100"、"100mm水管" 等
-  // 1. DN100 / DN20 等公称直径
-  const dnMatch = text.match(/DN\s*(\d+(?:\.\d+)?)/i);
-  if (dnMatch) return parseFloat(dnMatch[1]);
-
-  // 2. "直径100mm" / "直径100" / "diameter 100mm"
-  const diaMatch = text.match(/(?:直径|diameter)\s*(\d+(?:\.\d+)?)\s*(mm|毫米)?/i);
-  if (diaMatch) return parseFloat(diaMatch[1]);
-
-  // 3. "100mm水管" / "100毫米管" / "100mm pipe"（数字后跟 mm/毫米 且前后有管/pipe 语义）
-  const mmMatch = text.match(/(\d+(?:\.\d+)?)\s*(mm|毫米)\s*(?:水管|管道|管|pipe|tube)?/i);
-  if (mmMatch) return parseFloat(mmMatch[1]);
-
-  return null;
-}
-
-// 从自然语言提取 Archicad 构件类型（用于 GetElementsByType）
-// 支持 "查询所有墙"、"所有柱"、"列出梁"、"get walls"、"columns" 等
-function extractElementType(text) {
-  const lowerText = text.toLowerCase();
-
-  // 中英文构件类型映射表
-  const typeMap = [
-    { type: 'Wall',       zh: ['墙', '墙体', '墙构件'] },
-    { type: 'Column',     zh: ['柱', '柱子', '柱构件'] },
-    { type: 'Beam',       zh: ['梁', '梁构件'] },
-    { type: 'Slab',       zh: ['板', '楼板', '板构件'] },
-    { type: 'Roof',       zh: ['屋顶', '屋面'] },
-    { type: 'Window',     zh: ['窗', '窗户'] },
-    { type: 'Door',       zh: ['门'] },
-    { type: 'Object',     zh: ['对象', '物件', '家具'] },
-    { type: 'Lamp',       zh: ['灯', '灯具'] },
-    { type: 'Mesh',       zh: ['网格', '地形'] },
-    { type: 'Zone',       zh: ['区域', '房间'] },
-    { type: 'CurtainWall', zh: ['幕墙'] },
-    { type: 'Shell',      zh: ['壳体'] },
-    { type: 'Skylight',   zh: ['天窗'] }
-  ];
-
-  // 英文匹配（单复数）
-  const enMap = [
-    { type: 'Wall',       en: ['wall', 'walls'] },
-    { type: 'Column',     en: ['column', 'columns'] },
-    { type: 'Beam',       en: ['beam', 'beams'] },
-    { type: 'Slab',       en: ['slab', 'slabs'] },
-    { type: 'Roof',       en: ['roof', 'roofs'] },
-    { type: 'Window',     en: ['window', 'windows'] },
-    { type: 'Door',       en: ['door', 'doors'] },
-    { type: 'Object',     en: ['object', 'objects'] },
-    { type: 'Lamp',       en: ['lamp', 'lamps'] },
-    { type: 'Mesh',       en: ['mesh', 'meshes'] },
-    { type: 'Zone',       en: ['zone', 'zones'] },
-    { type: 'CurtainWall', en: ['curtainwall', 'curtain wall'] },
-    { type: 'Shell',      en: ['shell', 'shells'] },
-    { type: 'Skylight',   en: ['skylight', 'skylights'] }
-  ];
-
-  // 1. 中文匹配
-  for (const item of typeMap) {
-    for (const zh of item.zh) {
-      if (text.includes(zh)) return item.type;
-    }
-  }
-
-  // 2. 英文匹配（词边界）
-  for (const item of enMap) {
-    for (const en of item.en) {
-      const regex = new RegExp(`\\b${en}\\b`, 'i');
-      if (regex.test(lowerText)) return item.type;
-    }
-  }
-
-  return null;
-}
-
-// F.3.3 新增：从自然语言提取管道路径点
-// 支持 "从(0,0,3)到(5,0,3)"、"起点(0,0,3) 终点(5,0,3)"、"A点到B" 等格式
-function extractWaypoints(text) {
-  // 1. "从...到..." 格式 — 支持括号和逗号分隔坐标
-  const fromToMatch = text.match(/从\s*[\[（(]?\s*(-?[\d.]+)\s*[,\s，]\s*(-?[\d.]+)\s*[,\s，]\s*(-?[\d.]+)\s*[\]）)]?\s*到\s*[\[（(]?\s*(-?[\d.]+)\s*[,\s，]\s*(-?[\d.]+)\s*[,\s，]\s*(-?[\d.]+)\s*[\]）)]?/);
-  if (fromToMatch) {
-    return {
-      waypoints: [
-        { x: parseFloat(fromToMatch[1]), y: parseFloat(fromToMatch[2]), z: parseFloat(fromToMatch[3]) },
-        { x: parseFloat(fromToMatch[4]), y: parseFloat(fromToMatch[5]), z: parseFloat(fromToMatch[6]) }
-      ],
-      start: { x: parseFloat(fromToMatch[1]), y: parseFloat(fromToMatch[2]), z: parseFloat(fromToMatch[3]) },
-      end: { x: parseFloat(fromToMatch[4]), y: parseFloat(fromToMatch[5]), z: parseFloat(fromToMatch[6]) }
-    };
-  }
-
-  // 2. "起点...终点..." 格式
-  const startEndMatch = text.match(/起点\s*[\[（(]?\s*(-?[\d.]+)\s*[,\s，]\s*(-?[\d.]+)\s*[,\s，]\s*(-?[\d.]+)\s*[\]）)]?\s*终点\s*[\[（(]?\s*(-?[\d.]+)\s*[,\s，]\s*(-?[\d.]+)\s*[,\s，]\s*(-?[\d.]+)\s*[\]）)]?/);
-  if (startEndMatch) {
-    return {
-      waypoints: [
-        { x: parseFloat(startEndMatch[1]), y: parseFloat(startEndMatch[2]), z: parseFloat(startEndMatch[3]) },
-        { x: parseFloat(startEndMatch[4]), y: parseFloat(startEndMatch[5]), z: parseFloat(startEndMatch[6]) }
-      ],
-      start: { x: parseFloat(startEndMatch[1]), y: parseFloat(startEndMatch[2]), z: parseFloat(startEndMatch[3]) },
-      end: { x: parseFloat(startEndMatch[4]), y: parseFloat(startEndMatch[5]), z: parseFloat(startEndMatch[6]) }
-    };
-  }
-
-  return null;
-}
-
-function extractDelta(text) {
-  const delta = { x: 0, y: 0, z: 0 };
-
-  // 匹配 "x=数字"、"x:数字"、"x  数字" 等
-  const axisPatterns = [
-    { axis: 'x', regex: /x\s*[=:：]?\s*(-?\d+(?:\.\d+)?)/i },
-    { axis: 'y', regex: /y\s*[=:：]?\s*(-?\d+(?:\.\d+)?)/i },
-    { axis: 'z', regex: /z\s*[=:：]?\s*(-?\d+(?:\.\d+)?)/i }
-  ];
-  axisPatterns.forEach(({ axis, regex }) => {
-    const m = text.match(regex);
-    if (m) delta[axis] = parseFloat(m[1]);
-  });
-
-  const numberPattern = '(-?\\d+(?:\\.\\d+)?)';
-  const directionalPatterns = [
-    { axis: 'x', sign: 1, words: '(?:(?:\\u5411|\\u5f80)?\\u53f3|right)' },
-    { axis: 'x', sign: -1, words: '(?:(?:\\u5411|\\u5f80)?\\u5de6|left)' },
-    { axis: 'y', sign: 1, words: '(?:(?:\\u5411|\\u5f80)?\\u524d|forward)' },
-    { axis: 'y', sign: -1, words: '(?:(?:\\u5411|\\u5f80)?\\u540e|backward)' },
-    { axis: 'z', sign: 1, words: '(?:\\u5411\\u4e0a|\\u4e0a\\u79fb|\\u62ac\\u9ad8|up)' },
-    { axis: 'z', sign: -1, words: '(?:\\u5411\\u4e0b|\\u4e0b\\u79fb|\\u964d\\u4f4e|down)' },
-  ];
-
-  // Prefer numbers adjacent to a direction so a story number is not reused as a move distance.
-  if (!axisPatterns.some(({ regex }) => regex.test(text))) {
-    for (const pattern of directionalPatterns) {
-      const afterDirection = new RegExp(`${pattern.words}\\s*(?:\\u79fb\\u52a8|by|to|=|:)?\\s*${numberPattern}\\s*(?:mm|\\u6beb\\u7c73)?`, 'i');
-      const beforeDirection = new RegExp(`${numberPattern}\\s*(?:mm|\\u6beb\\u7c73)?\\s*${pattern.words}`, 'i');
-      const match = text.match(afterDirection) || text.match(beforeDirection);
-      if (match) {
-        const rawValue = parseFloat(match[1]);
-        if (Number.isFinite(rawValue) && rawValue !== 0) {
-          delta[pattern.axis] = pattern.sign * Math.abs(rawValue);
-        }
-        break;
-      }
-    }
-  }
-
-  return delta;
-}
-
-function extractTargetStoryIndex(text) {
-  const normalized = String(text || '').toLowerCase();
-
-  const words = {
-    basement: -1,
-    ground: 0,
-    first: 0,
-    second: 1,
-    third: 2,
-    fourth: 3,
-    fifth: 4,
-    sixth: 5,
-    seventh: 6,
-    eighth: 7,
-    ninth: 8,
-    tenth: 9,
-  };
-
-  const explicitIndex = normalized.match(/(?:target\s*)?(?:story|storey|floor|level)\s*index\s*(?:=|:|to)?\s*(-?\d+)/i)
-    || normalized.match(/targetStoryIndex\s*(?:=|:)\s*(-?\d+)/i)
-    || normalized.match(/\u697c\u5c42\u7d22\u5f15\s*(?:=|:|\u4e3a)?\s*(-?\d+)/);
-  if (explicitIndex) return Number(explicitIndex[1]);
-
-  const storyValue = '(basement|ground|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|b\\d+|\\d+)';
-  const contextual = normalized.match(new RegExp(`(?:story|storey|floor|level)\\s*(?:=|:|to|onto|on)?\\s*${storyValue}`, 'i'));
-  const ordinalBefore = normalized.match(new RegExp(`${storyValue}(?:st|nd|rd|th)?\\s*(?:story|storey|floor|level)`, 'i'));
-  const compact = normalized.match(/\b(b\d+|\d+f|f\d+)\b/i);
-  const chineseMatches = Array.from(normalized.matchAll(/(?:\u7b2c\s*)?(\d+|[\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341\u9996])\s*\u5c42/g));
-
-  let raw = null;
-  if (contextual) raw = contextual[1];
-  else if (ordinalBefore) raw = ordinalBefore[1];
-  else if (compact) raw = compact[1];
-  else if (chineseMatches.length > 0) raw = chineseMatches[chineseMatches.length - 1][1];
-  if (!raw) return null;
-
-  const chineseWords = {
-    '\u9996': 0,
-    '\u4e00': 0,
-    '\u4e8c': 1,
-    '\u4e09': 2,
-    '\u56db': 3,
-    '\u4e94': 4,
-    '\u516d': 5,
-    '\u4e03': 6,
-    '\u516b': 7,
-    '\u4e5d': 8,
-    '\u5341': 9,
-  };
-
-  if (Object.prototype.hasOwnProperty.call(words, raw)) return words[raw];
-  if (Object.prototype.hasOwnProperty.call(chineseWords, raw)) return chineseWords[raw];
-
-  const basementMatch = raw.match(/^b(\d+)$/i);
-  if (basementMatch) return -Number(basementMatch[1]);
-
-  const floorMatch = raw.match(/^(?:f)?(\d+)(?:f)?$/i);
-  if (!floorMatch) return null;
-
-  const oneBasedFloor = Number(floorMatch[1]);
-  if (!Number.isFinite(oneBasedFloor)) return null;
-  return Math.max(0, oneBasedFloor - 1);
-}
-
 function stripCommandNamespace(action) {
   const raw = String(action || '').trim();
   if (!raw) return { commandNamespace: null, commandName: '' };
@@ -1172,6 +970,94 @@ function normalizePoint(point) {
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value || {}));
+}
+
+// LLM 调用失败的可读归因。
+//
+// 为什么要分类而不是直接抛 error.message：LLM 不可用时本地降级仍能给出计划，
+// 于是用户只感觉到「等了很久」，看不出是密钥失效、超时还是网络不通——
+// 会一直误以为 LLM 在正常工作。原因必须回传到 UI。
+//
+// 措辞原则（维护者 2026-09-03 定）：**给出可自行处理的动作**，而不是只说「已降级」。
+// LLM 不可用是配置或网络问题，用户能修；说清哪一项坏了、去哪儿改，比强调兜底更有用。
+// 每条 zh/en 都必须含一句用户能照做的处置建议。
+function describeLlmFailure(error, llm) {
+  const provider = llm && llm.provider ? llm.provider : 'unknown';
+  const model = llm && llm.model ? llm.model : 'unknown';
+  const status = error && error.response ? error.response.status : null;
+  const code = error && error.code ? error.code : null;
+  const timeoutMs = llm && Number.isFinite(Number(llm.planTimeoutMs)) ? Number(llm.planTimeoutMs) : null;
+  const timeoutText = timeoutMs ? `${Math.round(timeoutMs / 1000)} 秒` : '超时时限';
+  const timeoutTextEn = timeoutMs ? `${Math.round(timeoutMs / 1000)}s` : 'the timeout';
+  const fallbackZh = '本次已用本地命令匹配给出计划，可直接执行。';
+  const fallbackEn = 'This request was answered by local command matching, so the plan is still usable.';
+
+  let reason = 'unknown';
+  let zh = `${provider} 调用失败`;
+  let en = `The ${provider} call failed`;
+
+  if (code === 'ECONNABORTED' || code === 'ETIMEDOUT' || /timeout|aborted/i.test(error.message || '')) {
+    reason = 'timeout';
+    zh = `LLM 未响应：${provider} / ${model} 在 ${timeoutText}内没有返回。`
+      + `请检查网络能否访问该服务、模型名是否正确，或在「LLM 配置」中换一个更快的模型。${fallbackZh}`;
+    en = `The LLM did not respond: ${provider} / ${model} returned nothing within ${timeoutTextEn}. `
+      + `Check that the service is reachable and the model name is correct, or pick a faster model in LLM settings. ${fallbackEn}`;
+  } else if (status === 401 || status === 403) {
+    reason = 'auth';
+    zh = `LLM 凭据被拒（HTTP ${status}）：${provider} 不接受当前 API Key。`
+      + `请在「LLM 配置」中重新填写有效的 API Key 并保存。${fallbackZh}`;
+    en = `The LLM rejected the credentials (HTTP ${status}): ${provider} did not accept the current API key. `
+      + `Enter a valid API key in LLM settings and save. ${fallbackEn}`;
+  } else if (status === 429) {
+    reason = 'rate-limit';
+    zh = `LLM 触发限流（HTTP 429）：${provider} 暂时拒绝了请求。`
+      + `请稍后重试，或在服务商后台确认配额与计费状态。${fallbackZh}`;
+    en = `The LLM rate-limited the request (HTTP 429): ${provider} temporarily refused it. `
+      + `Retry later, or check your quota and billing status with the provider. ${fallbackEn}`;
+  } else if (status === 404 || (/model/i.test(error.message || '') && status >= 400)) {
+    reason = 'model';
+    zh = `LLM 模型不存在（HTTP ${status}）：${provider} 不认识模型「${model}」。`
+      + `请在「LLM 配置」中改为该服务商实际提供的模型名。${fallbackZh}`;
+    en = `The LLM model was not found (HTTP ${status}): ${provider} does not recognise "${model}". `
+      + `Change it in LLM settings to a model this provider actually offers. ${fallbackEn}`;
+  } else if (code === 'ENOTFOUND' || code === 'ECONNREFUSED' || code === 'EAI_AGAIN') {
+    reason = 'network';
+    zh = `无法连接 LLM 服务（${code}）：连不上 ${provider}。`
+      + `请检查网络、代理设置，以及「LLM 配置」里的服务地址是否正确。${fallbackZh}`;
+    en = `Could not reach the LLM service (${code}): ${provider} is unreachable. `
+      + `Check your network, proxy settings, and the endpoint in LLM settings. ${fallbackEn}`;
+  } else if (status >= 500) {
+    reason = 'provider-error';
+    zh = `LLM 服务端故障（HTTP ${status}）：${provider} 自身报错，非本地配置问题。`
+      + `请稍后重试或查看服务商状态页。${fallbackZh}`;
+    en = `The LLM service failed (HTTP ${status}): the error came from ${provider}, not from local configuration. `
+      + `Retry later or check the provider's status page. ${fallbackEn}`;
+  } else {
+    zh = `LLM 调用失败：${provider} 返回「${error.message}」。`
+      + `请在「LLM 配置」中核对服务地址、API Key 与模型名。${fallbackZh}`;
+    en = `The LLM call failed: ${provider} returned "${error.message}". `
+      + `Verify the endpoint, API key and model name in LLM settings. ${fallbackEn}`;
+  }
+
+  return {
+    failed: true,
+    reason,
+    provider,
+    model,
+    httpStatus: status,
+    code,
+    timeoutMs,
+    detail: error.message,
+    // UI 可据此把提示渲染为「需用户处理」而非普通信息
+    userActionRequired: true,
+    messageZh: zh,
+    messageEn: en
+  };
+}
+
+function attachLlmFailure(plan, llmFailure) {
+  if (!plan || !llmFailure) return plan;
+  return { ...plan, llmFailure };
 }
 
 module.exports = new AIAdapter();

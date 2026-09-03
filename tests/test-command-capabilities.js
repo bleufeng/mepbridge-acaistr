@@ -61,6 +61,10 @@ assert.deepStrictEqual(
   { dryRun: true, confirmRequired: true }
 );
 assert.deepStrictEqual(
+  getCommandSafetyCapabilities('CreateStory'),
+  { dryRun: true, confirmRequired: true }
+);
+assert.deepStrictEqual(
   getCommandSafetyCapabilities('DeleteMEPElements'),
   { dryRun: false, confirmRequired: false }
 );

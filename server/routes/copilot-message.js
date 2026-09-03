@@ -54,6 +54,61 @@ async function fetchSelectionContext() {
 }
 
 /**
+ * 找出模板生成的步骤里缺失的必需参数。
+ *
+ * 只覆盖「C++ 侧会硬拒绝零值」的字段——即 Add-On 明确返回 ZERO_DELTA / ZERO_VECTOR /
+ * MISSING_ANGLE 的那几个。不做泛化校验：模板的其它默认值（墙厚、层高等）是合理的
+ * 工程缺省，不是缺参数。
+ *
+ * @returns {{action:string, param:string}|null}
+ */
+function findMissingRequiredParams(steps) {
+  const zeroVectorCommands = new Set(['MoveSelectedElements', 'MoveElements']);
+  const zeroVectorField = { MoveSelectedElements: 'deltaMm', MoveElements: 'deltaMm' };
+
+  for (const step of steps || []) {
+    const action = step.action || '';
+    const params = step.params || {};
+
+    if (zeroVectorCommands.has(action)) {
+      const field = zeroVectorField[action];
+      const v = params[field];
+      const allZero = !v
+        || (Math.abs(Number(v.x) || 0) < 1e-9
+          && Math.abs(Number(v.y) || 0) < 1e-9
+          && Math.abs(Number(v.z) || 0) < 1e-9);
+      if (allZero) return { action, param: field };
+    }
+
+    if (action === 'MoveBuildingElements') {
+      const v = params.vector;
+      const allZero = !v
+        || (Math.abs(Number(v.x) || 0) < 1e-9
+          && Math.abs(Number(v.y) || 0) < 1e-9
+          && Math.abs(Number(v.z) || 0) < 1e-9);
+      if (allZero) return { action, param: 'vector' };
+    }
+  }
+  return null;
+}
+
+/**
+ * 把缺失参数翻译成用户能照做的一句话。
+ * 不回显 C++ 错误码：`ZERO_DELTA` 说明不了「该补什么」。
+ */
+function describeMissingParam(missing, english) {
+  const isDelta = missing.param === 'deltaMm' || missing.param === 'vector';
+  if (isDelta) {
+    return english
+      ? 'I could not find a move distance in your request. Tell me the direction and distance, for example "move right 500mm" or "x=300, y=-200".'
+      : '未能从您的指令中识别出移动距离。请说明方向与数值，例如「向右移动 500mm」或「x=300, y=-200」。';
+  }
+  return english
+    ? `The request is missing a required value: ${missing.param}. Please state it explicitly.`
+    : `指令缺少必需参数：${missing.param}。请明确说明该值。`;
+}
+
+/**
  * POST /api/copilot/message
  * Copilot NL → Operation Plan *
  * 请求 body: { message: string }
@@ -111,6 +166,27 @@ router.post('/', async (req, res) => {
     if (templatePlan) {
       console.log(`[Copilot][H5.5] Template matched: ${templatePlan.userIntent}, ${templatePlan.steps.length} steps`);
 
+      // 缺必需参数时在此拦住，不把注定失败的请求送去 Archicad。
+      //
+      // 变换类命令的 C++ 侧会拒绝零值（MoveSelectedElements/MoveElements 返回
+      // `ZERO_DELTA`、MoveBuildingElements 返回 `ZERO_VECTOR`），用户看到的是一句
+      // 英文错误码，读不出「我该补什么」。在这里给出可操作的提示更有用，
+      // 也省掉一次无谓的 Archicad 往返。
+      const missing = findMissingRequiredParams(templatePlan.steps);
+      if (missing) {
+        console.log(`[Copilot][H5.5] Template ${templatePlan.templateId} missing param: ${missing.param} (action=${missing.action})`);
+        return res.json({
+          message: describeMissingParam(missing, english),
+          isMepAction: false,
+          action: null,
+          needsMoreInput: {
+            templateId: templatePlan.templateId,
+            action: missing.action,
+            param: missing.param
+          }
+        });
+      }
+
       // 转换模板计划为 UI 期望的 Copilot 响应格式
       const steps = templatePlan.steps.map((step, idx) => ({
         id: `step_${idx + 1}`,
@@ -153,15 +229,27 @@ router.post('/', async (req, res) => {
     // 调用 AI 适配器生成计划（双模式架构：有 LLM 走 LLM 优先，无 LLM 走纯本地）
     const plan = await aiAdapter.generatePlan(message, context);
 
+    // LLM 配置不可用时，即使本地降级成功也要把原因告诉用户。
+    // 否则用户只感觉到「等了很久然后出结果了」，不知道 LLM 其实一直没生效
+    // （密钥失效／模型名错／超时／网络不通），会长期误以为在用 LLM。
+    const llmNotice = plan.llmFailure
+      ? (english ? plan.llmFailure.messageEn : plan.llmFailure.messageZh)
+      : null;
+    if (llmNotice) {
+      console.warn(`[Copilot] LLM unavailable (${plan.llmFailure.reason}): ${plan.llmFailure.detail}`);
+    }
+
     // D5: 无法识别意图 → 返回友好提示（不执行任何命令）
     if (plan.unsupported) {
       console.log('[Copilot] Intent unrecognized, returning friendly reply');
+      const baseMessage = plan.message || (english
+        ? 'Sorry, I could not understand the request. Please describe it more specifically.'
+        : '抱歉，我未能理解您的意图。请尝试更具体的描述。');
       return res.json({
-        message: plan.message || (english
-          ? 'Sorry, I could not understand the request. Please describe it more specifically.'
-          : '抱歉，我未能理解您的意图。请尝试更具体的描述。'),
+        message: llmNotice ? `${llmNotice}\n\n${baseMessage}` : baseMessage,
         isMepAction: false,
-        action: null
+        action: null,
+        ...(plan.llmFailure ? { llmFailure: plan.llmFailure } : {})
       });
     }
 
@@ -182,16 +270,33 @@ router.post('/', async (req, res) => {
       status: 'pending'
     }));
 
+    // 缺必需参数时同样拦住（descriptor/fallback 路径也可能给出零位移）
+    const missingFromPlan = findMissingRequiredParams(steps);
+    if (missingFromPlan) {
+      console.log(`[Copilot] Plan missing param: ${missingFromPlan.param} (action=${missingFromPlan.action})`);
+      const hint = describeMissingParam(missingFromPlan, english);
+      return res.json({
+        message: llmNotice ? `${llmNotice}\n\n${hint}` : hint,
+        isMepAction: false,
+        action: null,
+        needsMoreInput: { action: missingFromPlan.action, param: missingFromPlan.param },
+        ...(plan.llmFailure ? { llmFailure: plan.llmFailure } : {})
+      });
+    }
+
+    const planMessage = plan.userIntent
+      ? (english
+        ? `Parsed request: "${plan.userIntent}". Generated a ${steps.length}-step operation plan.`
+        : `已解析指令："${plan.userIntent}"，生成 ${steps.length} 步操作计划。`)
+      : (english
+        ? `Generated a ${steps.length}-step operation plan.`
+        : `已生成 ${steps.length} 步操作计划。`);
+
     const response = {
-      message: plan.userIntent
-        ? (english
-          ? `Parsed request: "${plan.userIntent}". Generated a ${steps.length}-step operation plan.`
-          : `已解析指令："${plan.userIntent}"，生成 ${steps.length} 步操作计划。`)
-        : (english
-          ? `Generated a ${steps.length}-step operation plan.`
-          : `已生成 ${steps.length} 步操作计划。`),
+      message: llmNotice ? `${llmNotice}\n\n${planMessage}` : planMessage,
       isMepAction: steps.length > 0,
       reasoning: plan.reasoning || '',  // V2: 返回 LLM CAD-CoT 思考过程
+      ...(plan.llmFailure ? { llmFailure: plan.llmFailure } : {}),
       action: {
         title: plan.userIntent || message.slice(0, 50),
         warning: plan.warningText || (plan.isMutation

@@ -214,11 +214,29 @@ for (const filePath of files) {
 
 const commandBoundary = parseJson(path.join(root, 'ai-adapter/command-boundary.json'));
 const expectedDescriptors = commandBoundary?.descriptors;
+const expectedServerTools = commandBoundary?.serverTools;
 const descriptorRegistry = parseJson(path.join(root, 'ai-adapter/tool-descriptors.json'));
 if (typeof expectedDescriptors !== 'number') {
   failures.push('ai-adapter/command-boundary.json must declare a numeric descriptors count.');
-} else if (descriptorRegistry && (!Array.isArray(descriptorRegistry.descriptors) || descriptorRegistry.descriptors.length !== expectedDescriptors)) {
-  failures.push(`Core descriptor count must be ${expectedDescriptors}.`);
+} else if (typeof expectedServerTools !== 'number') {
+  failures.push('ai-adapter/command-boundary.json must declare a numeric serverTools count.');
+} else if (descriptorRegistry && !Array.isArray(descriptorRegistry.descriptors)) {
+  failures.push('ai-adapter/tool-descriptors.json must contain a descriptors array.');
+} else if (descriptorRegistry) {
+  // descriptors counts only addon-backed tools; server-endpoint tools are counted
+  // separately so that adding one never changes the value baked into the APX.
+  const entries = descriptorRegistry.descriptors;
+  const addonCount = entries.filter((entry) => entry && entry.executionKind === 'mepbridge-addon-command').length;
+  const serverCount = entries.filter((entry) => entry && entry.executionKind === 'server-endpoint').length;
+  if (addonCount !== expectedDescriptors) {
+    failures.push(`Core descriptor count must be ${expectedDescriptors}, found ${addonCount} mepbridge-addon-command descriptors.`);
+  }
+  if (serverCount !== expectedServerTools) {
+    failures.push(`Server tool count must be ${expectedServerTools}, found ${serverCount} server-endpoint descriptors.`);
+  }
+  if (addonCount + serverCount !== entries.length) {
+    failures.push(`Descriptor total mismatch: ${entries.length} entries but ${addonCount} + ${serverCount} counted.`);
+  }
 }
 
 const moduleRegistry = parseJson(path.join(root, 'modules/registry.json'));

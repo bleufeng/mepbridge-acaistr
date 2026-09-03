@@ -43,6 +43,15 @@ class LLMAdapter {
     this.model = config.model;
     // D5: 持有 descriptors 引用，用于自动生成 systemPrompt
     this.descriptors = config.descriptors || [];
+    // 规划请求的超时。
+    //
+    // 原值 30s：LLM 不可用时（密钥失效／模型名错／网络不通）用户要盯着界面等满
+    // 30 秒才降级，而本地 descriptor 匹配 <5ms 就能给出同样正确的单命令计划——
+    // 那 30 秒完全没有收益。10s 足够正常应答，又把不可用场景的等待压到可接受。
+    // 视觉校验（vision）另有 60s，因图像请求确实更慢，不受此值影响。
+    this.planTimeoutMs = Number.isFinite(Number(config.planTimeoutMs))
+      ? Number(config.planTimeoutMs)
+      : 10000;
   }
 
   // 生成操作计划
@@ -782,7 +791,7 @@ ${selectionSection}
           'anthropic-version': '2023-06-01',
           'content-type': 'application/json'
         },
-        timeout: 30000
+        timeout: this.planTimeoutMs
       }
     );
 
@@ -808,7 +817,7 @@ ${selectionSection}
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json'
         },
-        timeout: 30000
+        timeout: this.planTimeoutMs
       }
     );
 
@@ -833,7 +842,7 @@ ${selectionSection}
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json'
         },
-        timeout: 30000
+        timeout: this.planTimeoutMs
       }
     );
 

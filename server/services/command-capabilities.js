@@ -24,18 +24,22 @@ const DRY_RUN_AND_CONFIRM_COMMANDS = new Set([
   'CreateRoof',
   'CreateSlab',
   'CreateStair',
+  'CreateStory',
   'CreateTakeOff',
   'CreateWall',
   'CreateWindow',
   'CreateZone',
   'DeleteElements',
+  'EditBuildingElement',
   'MirrorSelectedElements',
+  'MoveBuildingElements',
   'MoveSelectedElements',
   'RotateSelectedElements',
   'SaveFavorite',
   'SetLayerBatch',
   'SetSelectedElements',
   'SetStories',
+  'SwitchStory',
 ]);
 
 const CONFIRM_ONLY_COMMANDS = new Set([
@@ -81,4 +85,9 @@ module.exports = {
   applyDefaultSafetyParameters,
   getCommandSafetyCapabilities,
   normalizeCommandSafetyParameters,
+  // P1-05：plan-chain-engine 曾手工维护第三份 mutation 清单（漏 18 条 —— 那些步骤
+  // 拿不到注入的 dryRun:false，Add-On 回落默认 dryRun=true，于是"执行成功"但没写入）。
+  // 导出集合本身，使清单只有这一处定义。
+  DRY_RUN_AND_CONFIRM_COMMANDS,
+  CONFIRM_ONLY_COMMANDS,
 };

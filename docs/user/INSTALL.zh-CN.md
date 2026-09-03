@@ -1,8 +1,8 @@
-# MEPbridge ACAIstr v0.1.3 安装说明
+# MEPbridge ACAIstr v0.1.4 安装说明
 
 本说明适用于 Archicad 28 和 Archicad 29 的 Windows 发布包。
 
-中文优先界面请下载 `MEPbridge-ACAIstr-v0.1.3-win64-zh-CN.zip`，英文优先界面请下载 `MEPbridge-ACAIstr-v0.1.3-win64-en-US.zip`。首次安装不要使用独立 APX 更新文件，也不要使用 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`。
+中文优先界面请下载 `MEPbridge-ACAIstr-v0.1.4-win64-zh-CN.zip`，英文优先界面请下载 `MEPbridge-ACAIstr-v0.1.4-win64-en-US.zip`。首次安装不要使用独立 APX 更新文件，也不要使用 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`。
 
 ## 环境要求
 
@@ -36,8 +36,8 @@ Archicad-29\MEPBridge.apx
 
 只能安装与 Archicad 主版本一致的 APX。
 
-`MEPbridge-ACAIstr-v0.1.3-AC28-win64.apx` 和
-`MEPbridge-ACAIstr-v0.1.3-AC29-win64.apx` 只更新原生 Add-On，不包含
+`MEPbridge-ACAIstr-v0.1.4-AC28-win64.apx` 和
+`MEPbridge-ACAIstr-v0.1.4-AC29-win64.apx` 只更新原生 Add-On，不包含
 Server、UI、MCP Server、生产依赖和安装脚本，仅适用于已经完成完整安装的用户。
 
 ## 如何判断该只换 APX 还是重装完整包
@@ -61,7 +61,7 @@ Server、UI、MCP Server、生产依赖和安装脚本，仅适用于已经完�
 4. 确认该目录内只有一个有效的 `.apx` 文件。
 5. 启动 Archicad 并执行 Ping：回报的版本必须等于新版本号，命令数与 descriptor 数必须与发布说明一致。若版本仍显示旧值，说明 Archicad 加载了旧副本或复制时文件被锁定 —— 从第 1 步重做。
 
-**v0.1.3 必须重装完整包。** 它除 Add-On 之外还改动了 Server、MCP Server 和 descriptor 注册表。
+**v0.1.4 必须重装完整包。** 它同时更新 Add-On、Server、MCP Server 和 descriptor 注册表。
 
 ## 自动安装
 
@@ -299,7 +299,7 @@ node <发布包根目录>\tools\mepbridge-mcp-server.js
 - Archicad 加载 Add-On 时没有错误。
 - MEPbridge ACAIstr 菜单显示三个独立菜单项。
 - Workbench 可以打开 `http://127.0.0.1:19780/`。
-- `/health` 显示版本 `0.1.3`。
-- 对已发布的 v0.1.3 安装包，Ping 显示 76 个注册 C++ 命令和 74 个 descriptor/MCP 工具。
+- `/health` 显示版本 `0.1.4`。
+- 对已发布的 v0.1.4 安装包，Ping 显示 79 个注册 C++ 命令和 78 个 Add-On descriptor/MCP 工具；Workbench Server 另有 4 个 server 工具。
 
 执行写入、删除、批量或几何修改前，应使用测试或已备份的 PLN。

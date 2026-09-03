@@ -21,6 +21,26 @@
 const DEFAULT_PORT = 19723;
 const DEFAULT_HOST = '127.0.0.1';
 
+// Archicad 实例端口扫描域。与 server/services/archicad-instances.js 的 DEFAULT_PORTS
+// 和 server/services/instance-targeting.js 的 [MIN_PORT, MAX_PORT] 必须一致。
+const MIN_PORT = 19723;
+const MAX_PORT = 19743;
+
+/**
+ * 把端口号构造成端点 URL。
+ *
+ * 双实例场景下 AC28 与 AC29 各占一个端口（实测 19723 / 19724），此时「当前端点」
+ * 这个概念本身就不足以定位目标实例 —— 调用方必须显式指定端口。D-1 的
+ * targetPort/targetProject 走的是这条路径，而不是 global.archicadPort。
+ */
+function endpointForPort(port) {
+  const parsed = typeof port === 'number' ? port : parseInt(port, 10);
+  if (!Number.isInteger(parsed) || parsed < MIN_PORT || parsed > MAX_PORT) {
+    throw new RangeError(`Archicad port ${port} is outside the scan range [${MIN_PORT}, ${MAX_PORT}]`);
+  }
+  return `http://${DEFAULT_HOST}:${parsed}`;
+}
+
 /**
  * 获取当前 Archicad JSON API 端口
  * 优先级：global.archicadPort > ARCHICAD_ENDPOINT 环境变量 > 默认 19723
@@ -58,11 +78,15 @@ function getArchicadEndpoint() {
 
 /**
  * 强制刷新端口探测（供 status.js 之外的地方在需要时主动探测）
- * 扫描 19723-19743，找到第一个响应 API.GetProductInfo 的端口
+ *
+ * 扫描 19723-19743。**命中首个存活端口即返回** —— 这在双实例下是刻意的：主端口必须
+ * 确定性、不得在实例间跳变，否则写命令会漂移到错误的工程文件。要拿到全部存活实例
+ * 请用 archicad-instances.js 的 discoverInstances；要写入特定实例请用
+ * instance-targeting.js 的 targetPort/targetProject，而不是改这里的语义。
  */
 async function refreshArchicadPort(axiosInstance) {
   const axios = axiosInstance || require('axios');
-  for (let port = 19723; port <= 19743; port++) {
+  for (let port = MIN_PORT; port <= MAX_PORT; port++) {
     try {
       const response = await axios.post(
         `http://${DEFAULT_HOST}:${port}`,
@@ -83,7 +107,10 @@ async function refreshArchicadPort(axiosInstance) {
 module.exports = {
   DEFAULT_PORT,
   DEFAULT_HOST,
+  MIN_PORT,
+  MAX_PORT,
   getArchicadPort,
   getArchicadEndpoint,
+  endpointForPort,
   refreshArchicadPort
 };

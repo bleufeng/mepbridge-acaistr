@@ -10,7 +10,10 @@ const { APP_VERSION } = require('./services/app-version');
 const app = express();
 const PORT = process.env.PORT || 19780;
 const HOST = process.env.HOST || '127.0.0.1';
-const JSON_LIMIT = process.env.MEPBRIDGE_JSON_LIMIT || '1mb';
+// D-2 snapshots carry complete geometry/property readback and can exceed 1 MB
+// for a building-scale selection. Keep the local API bounded, but leave room
+// for persisted geometry templates and full snapshot previews.
+const JSON_LIMIT = process.env.MEPBRIDGE_JSON_LIMIT || '10mb';
 const BUILD_INFO = {
   version: APP_VERSION,
   buildDate: process.env.MEPBRIDGE_BUILD_DATE || null,
@@ -33,13 +36,26 @@ function isAllowedCorsOrigin(origin) {
   }
 }
 
-function getDescriptorCount() {
+function getDescriptorStats() {
   try {
     const descriptorPath = path.join(__dirname, '../ai-adapter/tool-descriptors.json');
     const registry = JSON.parse(fs.readFileSync(descriptorPath, 'utf8'));
-    return Array.isArray(registry.descriptors) ? registry.descriptors.length : null;
+    const descriptors = Array.isArray(registry.descriptors) ? registry.descriptors : [];
+    const addonCommands = descriptors.filter(d => d.executionKind === 'mepbridge-addon-command').length;
+    const serverTools = descriptors.filter(d => d.executionKind === 'server-endpoint').length;
+    return {
+      descriptorCount: descriptors.length,
+      totalDescriptors: descriptors.length,
+      addonCommands,
+      serverTools
+    };
   } catch (_) {
-    return null;
+    return {
+      descriptorCount: null,
+      totalDescriptors: null,
+      addonCommands: null,
+      serverTools: null
+    };
   }
 }
 
@@ -76,6 +92,9 @@ const learningMemoryRouter = require('./routes/learning-memory');   // H9: 学�
 const proactiveIntelRouter = require('./routes/proactive-intelligence'); // H10: 主动智能
 const mcpStatusRouter = require('./routes/mcp-status');             // MCP host integration status
 const gsmObjectsRouter = require('./routes/gsm-objects');           // Offline GSM catalog resolution
+const snapshotReplayRouter = require('./routes/snapshot-replay');   // D-2: element snapshot & preview-first replay
+const buildingJsonRouter = require('./routes/building-json');       // AUD-4: local Building JSON export
+const cadLayersRouter = require('./routes/cad-layers');             // CAD-0: read-only layer recognition
 
 // FO-2 (2026-06-26): 启动选择集事件监听服务（C++ SelectionChangeHandler → 文件信号 → SSE）
 const selectionEventService = require('./services/selection-events');
@@ -99,6 +118,9 @@ app.use('/api/learning-memory', learningMemoryRouter); // H9: 学习记忆（纠
 app.use('/api/proactive', proactiveIntelRouter);      // H10: 主动智能（缺口检测+建议+预判）
 app.use('/api/mcp', mcpStatusRouter);                 // MCP plugin host status
 app.use('/api/gsm-objects', gsmObjectsRouter);        // v0.1.3: offline catalog resolver, no live AC enumeration
+app.use('/api/snapshot-replay', snapshotReplayRouter); // D-2: capture / preview / apply（preview-first 回放）
+app.use('/api/building-json', buildingJsonRouter);     // AUD-4: local Building JSON export（只读导出）
+app.use('/api/cad-layers', cadLayersRouter);             // CAD-0: read-only layer recognition（只读建议）
 
 // 健康检查
 app.get('/health', (req, res) => {
@@ -107,7 +129,7 @@ app.get('/health', (req, res) => {
     status: 'ok',
     version: APP_VERSION,
     build: BUILD_INFO,
-    descriptorCount: getDescriptorCount(),
+    ...getDescriptorStats(),
     moduleCount: moduleStats.total,
     moduleCommandCount: moduleStats.commands
   });
@@ -135,6 +157,17 @@ app.get('/guide', (req, res) => {
   res.redirect(RELEASE_LOCALE === 'en-US' ? '/help.en-US.html' : '/help.html');
 });
 
+// 未匹配的 API 请求必须在 SPA fallback 之前明确返回 JSON 404。
+// 否则未知 /api/* 会被下面的 app.get('*') 当作 UI 路由返回 index.html/200，
+// 使调用方无法区分“API 路径不存在”和“请求成功”。
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    ok: false,
+    error: 'API route not found',
+    path: req.originalUrl
+  });
+});
+
 // 静态文件服务（必须在 SPA fallback 之前）
 const uiPath = path.join(__dirname, '../ai-adapter/ui/v0.1.0/dist');
 console.log(`📂 UI Path: ${uiPath}`);
@@ -144,8 +177,6 @@ app.use(express.static(uiPath));
 app.get('*', (req, res) => {
   res.sendFile(path.join(uiPath, 'index.html'));
 });
-
-// API 404 不会到这里，因为已在上面的路由中处理
 
 // 启动服务
 app.listen(PORT, HOST, () => {

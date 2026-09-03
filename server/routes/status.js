@@ -23,14 +23,22 @@ function getDescriptorStats() {
     const registry = JSON.parse(fs.readFileSync(descriptorPath, 'utf8'));
     const descriptors = Array.isArray(registry.descriptors) ? registry.descriptors : [];
     const commandNames = new Set(descriptors.map(d => d.commandName).filter(Boolean));
+    const addonCommands = descriptors.filter(d => d.executionKind === 'mepbridge-addon-command').length;
+    const serverTools = descriptors.filter(d => d.executionKind === 'server-endpoint').length;
     return {
       descriptorCount: descriptors.length,
-      descriptorCommandCount: commandNames.size
+      descriptorCommandCount: commandNames.size,
+      totalDescriptors: descriptors.length,
+      addonCommands,
+      serverTools
     };
   } catch (_) {
     return {
       descriptorCount: null,
-      descriptorCommandCount: null
+      descriptorCommandCount: null,
+      totalDescriptors: null,
+      addonCommands: null,
+      serverTools: null
     };
   }
 }

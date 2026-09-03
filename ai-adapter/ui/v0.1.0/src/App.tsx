@@ -867,6 +867,7 @@ export default function App() {
   useEffect(() => {
     if (!mepbridgeConnected) return;
     if (!autoSyncSelection) return;
+    if (isExecutingPlan || isChainRunning) return;
 
     let isCancelled = false;
     let timeoutId: NodeJS.Timeout | null = null;
@@ -951,7 +952,7 @@ export default function App() {
       isCancelled = true;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [workbenchMode, mepbridgeConnected, autoSyncSelection]);
+  }, [workbenchMode, mepbridgeConnected, autoSyncSelection, isExecutingPlan, isChainRunning]);
 
   // BASE 手动命令和扫描结果也通过 baseResult 回流到 Copilot 真实视口。
   useEffect(() => {
@@ -1116,6 +1117,34 @@ export default function App() {
     } finally {
       setIsLoadingTemplates(false);
     }
+  };
+
+  // User template replay must always use the latest server-owned plan. A page
+  // loaded before an asset fix can otherwise replay stale coordinates forever.
+  const refreshUserTemplate = async (templateId: string): Promise<TaskTemplate | null> => {
+    const res = await fetch(`/api/user-assets/load?locale=${encodeURIComponent(lang)}`);
+    const data = await res.json();
+    if (!res.ok || !data.success || !Array.isArray(data.templates)) {
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    return data.templates.find((t: TaskTemplate) => t.id === templateId) || null;
+  };
+
+  const requestJson = async (input: string, init?: RequestInit): Promise<any> => {
+    const response = await fetch(input, {
+      headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+      ...init
+    });
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch (_) {
+      data = null;
+    }
+    if (!response.ok || data?.ok === false || data?.success === false) {
+      throw new Error(data?.error || data?.message || `HTTP ${response.status}`);
+    }
+    return data;
   };
 
   // P3: 删除用户模板
@@ -1941,9 +1970,6 @@ export default function App() {
           throw new Error(result.validation?.errors?.join(", ") || result.error || "Unknown error");
         }
 
-        // Wait between steps
-        await new Promise(resolve => setTimeout(resolve, 500));
-
       } catch (err: any) {
         // Mark step as error
         setActivePlan((prev) => {
@@ -1990,9 +2016,29 @@ export default function App() {
 
   // Helper: Replay user template according to current autonomy mode
   const replayUserTemplate = async (tpl: TaskTemplate) => {
-    const hasPlaceholders = Array.isArray(tpl.placeholders) && tpl.placeholders.length > 0;
+    let latestTemplate: TaskTemplate | null;
+    try {
+      latestTemplate = await refreshUserTemplate(tpl.id);
+    } catch (err) {
+      console.error("[App] Refresh template before replay error:", err);
+      setSystemError(lang === "zh-CN"
+        ? "无法刷新用户模板，已停止执行。请确认服务端可用后重试。"
+        : "Could not refresh the user template; execution stopped. Confirm the server is available and retry.");
+      triggerToast(lang === "zh-CN" ? "用户模板刷新失败" : "User template refresh failed");
+      return;
+    }
+
+    if (!latestTemplate) {
+      setSystemError(lang === "zh-CN"
+        ? `未在服务端找到用户模板 ${tpl.id}，已停止执行。请刷新模板列表。`
+        : `User template ${tpl.id} was not found on the server; execution stopped. Refresh the template list.`);
+      triggerToast(lang === "zh-CN" ? "用户模板已不存在" : "User template not found");
+      return;
+    }
+
+    const hasPlaceholders = Array.isArray(latestTemplate.placeholders) && latestTemplate.placeholders.length > 0;
     if (autonomyMode === "copilot-auto" && !hasPlaceholders) {
-      const filledPlan = tpl.plan;
+      const filledPlan = latestTemplate.plan;
       setActivePlan(filledPlan);
       setExecutionResultData(filledPlan.parameters || []);
       setShowPlanCard(true);
@@ -2011,7 +2057,7 @@ export default function App() {
       return;
     }
 
-    setReplayTemplate(tpl);
+    setReplayTemplate(latestTemplate);
   };
 
   // Helper: Perform readback verification
@@ -2646,6 +2692,7 @@ export default function App() {
                   {mepbridgeConnected ? "ONLINE" : "OFFLINE"}
                 </div>
               </div>
+
             </div>
           </div>
 
@@ -5752,12 +5799,12 @@ export default function App() {
               ) : (
                 /* AI Copilot Mode Templates */
                 <>
-                  {/* AI Scenario 1: 示例首层房间墙体 (参照文件首层真实坐标，24面墙) */}
+                  {/* AI Scenario 1: 示例首层房间墙体 (参照文件首层真实坐标，19面墙) */}
                   <button
                     onClick={() => selectQuickSuggestion(lang === "zh-CN" ? "建示例首层房间墙体" : "Build ground floor walls")}
                     className="w-full bg-zinc-800 border border-zinc-705 rounded py-1.5 px-2.5 text-[10px] text-zinc-200 outline-none hover:border-emerald-500 font-mono text-left cursor-pointer transition-colors"
                   >
-                    🏠 {lang === "zh-CN" ? "示例首层房间墙体（15.3×14.3m，24面墙）" : "Ground Floor Walls (15.3×14.3m, 24 walls)"}
+                    🏠 {lang === "zh-CN" ? "示例首层房间墙体（15.3×14.3m，19面墙）" : "Ground Floor Walls (15.3×14.3m, 19 walls)"}
                   </button>
 
                   {/* AI Scenario 2: 示例布置首层风管 (参照文件首层真实坐标) */}

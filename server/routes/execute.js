@@ -13,7 +13,8 @@ const {
   DynamicResolutionError,
   resolveDynamicCommandParameters
 } = require('../services/dynamic-command-resolver');
-const { getArchicadEndpoint } = require('../services/archicad-endpoint');
+const { getArchicadEndpoint, endpointForPort } = require('../services/archicad-endpoint');
+const { resolveTargetInstance } = require('../services/instance-targeting');
 const { normalizeCommandSafetyParameters } = require('../services/command-capabilities');
 
 // Archicad JSON API 端点：动态解析（global.archicadPort > 环境变量 > 默认 19723）
@@ -95,7 +96,30 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const endpoint = ARCHICAD_ENDPOINT();
+    // D-1 目标实例寻址：顶层 targetPort / targetProject（所有 body 格式通用）。
+    // 未提供时行为与历史完全一致（默认端点）；提供了就必须解析成功，
+    // 未命中/多候选/类型非法显式失败 —— 绝不静默回落默认端口。
+    let endpoint = ARCHICAD_ENDPOINT();
+    const targeting = await resolveTargetInstance(body, {
+      post: (url, data, config) => axios.post(url, data, config),
+      probeTimeout: 1500,
+    });
+    if (targeting.requested) {
+      if (!targeting.ok) {
+        const isUnreachable = targeting.errorType === 'TARGET_PORT_NOT_LIVE'
+          || targeting.errorType === 'NO_ARCHICAD_INSTANCES';
+        console.warn(`[Execute][D1] target resolve failed: ${targeting.errorType} - ${targeting.message}`);
+        return res.status(isUnreachable ? 503 : 400).json({
+          ok: false,
+          error: targeting.message,
+          errorType: targeting.errorType,
+          detail: targeting.detail
+        });
+      }
+      endpoint = endpointForPort(targeting.port);
+      console.log(`[Execute][D1] resolved target -> port ${targeting.port} (mode: ${targeting.mode})`);
+    }
+
     const dynamicResolution = await resolveDynamicCommandParameters(archicadCommand, endpoint);
 
     console.log(`[Execute] ${archicadCommand.command} -> Archicad @ ${endpoint}`);
@@ -131,6 +155,7 @@ router.post('/', async (req, res) => {
         ok: true,
         response: archicadResult,
         command: archicadCommand,
+        ...(targeting.requested ? { target: { port: targeting.port, mode: targeting.mode } } : {}),
         ...(dynamicResolution ? { dynamicResolution } : {})
       });
     } else {
@@ -140,6 +165,7 @@ router.post('/', async (req, res) => {
         error: addOnResponse?.error?.message || addOnResponse?.error || archicadResult.error?.message || 'Archicad command failed',
         response: archicadResult,
         command: archicadCommand,
+        ...(targeting.requested ? { target: { port: targeting.port, mode: targeting.mode } } : {}),
         ...(dynamicResolution ? { dynamicResolution } : {})
       });
     }

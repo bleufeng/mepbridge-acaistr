@@ -10,7 +10,11 @@ permissions:
   contents: read
 
 jobs:
+  # This workflow targets the public export repository only. The private engineering
+  # repository intentionally contains internal paths that these boundary checks reject,
+  # so the guard below keeps it from failing there.
   validate:
+    if: github.repository == 'bleufeng/mepbridge-acaistr'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,6 +53,9 @@ jobs:
       - name: Verify no hardcoded MEP system identifiers
         run: node tools/validate-mep-system-identifiers.js
 
+      - name: Verify descriptor featureArea contract
+        run: node tools/validate-descriptor-contract.js
+
       - name: Verify command safety capability whitelist
         run: node tests/test-command-capabilities.js
 
@@ -57,17 +64,6 @@ jobs:
 
       - name: Check JavaScript syntax
         run: find server modules tools -name "*.js" -print0 | xargs -0 -n1 node --check
-
-      - name: Verify core descriptor boundary
-        run: |
-          node -e "
-          const b = require('./ai-adapter/command-boundary.json');
-          const d = require('./ai-adapter/tool-descriptors.json');
-          if (d.descriptors.length !== b.descriptors) {
-            throw new Error('Expected ' + b.descriptors + ' core descriptors, found ' + d.descriptors.length);
-          }
-          console.log('descriptor boundary ok: ' + d.descriptors.length);
-          "
 
       - name: Lint and build UI
         run: |
