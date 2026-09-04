@@ -1803,9 +1803,9 @@
         ],
         "parameters": [
           {
-            "item": "执行模式",
-            "expected": "dryRun=true 且 confirmRequired=false",
-            "actual": "预览",
+            "item": "Execution mode",
+            "expected": "dryRun=true and confirmRequired=false",
+            "actual": "Preview",
             "status": "ok"
           }
         ]
@@ -1909,9 +1909,9 @@
         ],
         "parameters": [
           {
-            "item": "执行模式",
-            "expected": "dryRun=true 且 confirmRequired=false",
-            "actual": "预览",
+            "item": "Execution mode",
+            "expected": "dryRun=true and confirmRequired=false",
+            "actual": "Preview",
             "status": "ok"
           }
         ]
