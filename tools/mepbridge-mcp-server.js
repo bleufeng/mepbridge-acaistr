@@ -395,6 +395,50 @@ function callPing() {
   });
 }
 
+// ── 调用本地 Server 的 HTTP 端点（executionKind = server-endpoint）──
+//
+// server-endpoint 类工具由本地 Server 承载、不经 Add-On，因此没有 commandNamespace /
+// commandName / commandJson。与 postRegistry 的区别：后者是 fire-and-forget（错误吞掉），
+// 而工具调用必须把失败暴露给调用方，否则 LLM 会把静默失败当成功。
+function callServerEndpoint(spec, args = {}) {
+  const method = (spec.method || 'GET').toUpperCase();
+  const sendsBody = method !== 'GET' && method !== 'HEAD';
+  const payload = sendsBody ? JSON.stringify(args || {}) : null;
+
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        hostname: SERVER_URL.hostname,
+        port: SERVER_URL.port,
+        path: spec.path,
+        method,
+        headers: payload
+          ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+          : {},
+        timeout: spec.timeoutMs || 30000,
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          let parsed;
+          try { parsed = JSON.parse(data); }
+          catch { parsed = { ok: false, error: 'Response was not JSON', raw: data.slice(0, 500) }; }
+          // 非 2xx 不当成功：否则 404/500 会被包成看似正常的工具结果
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            parsed = { ok: false, statusCode: res.statusCode, ...(parsed && typeof parsed === 'object' ? parsed : { raw: parsed }) };
+          }
+          resolve(parsed);
+        });
+      }
+    );
+    req.on('error', (e) => reject(e));
+    req.on('timeout', () => { req.destroy(); reject(new Error(`Server endpoint timeout (${spec.timeoutMs || 30000}ms): ${spec.path}`)); });
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
 // ── 根据工具名找 descriptor ──
 function findDescriptorByToolName(toolName) {
   // 使用预构建的映射表查找（避免全局下划线→点号替换的歧义）
@@ -435,7 +479,47 @@ async function executeTool(toolName, args = {}) {
     };
   }
 
-  const commandJson = buildCommandJson(desc, args);
+  // 按 executionKind 分派。server-endpoint 类由本地 Server 承载，不经 Add-On，
+  // 因此不构造 addOnCommandParameters，也不要求 commandNamespace/commandName。
+  //
+  // 技术债（v0.1.4 批次 D 后清理）：上面的 mepbridge_ping 仍是按工具名硬编码的特例，
+  // 它事实上也属于 server-endpoint（直接调 /api/ping）。收编它需要同时调整
+  // tests/test-t5-e2e-all-descriptors.js 的 NS-01 断言（nsCount['MEPBridge'] === 74 会变 73），
+  // 故与那 6 处硬编码 74 一并处理，避免同时改动两个变量。
+  if (desc.executionKind === 'server-endpoint') {
+    if (!desc.serverEndpoint || !desc.serverEndpoint.path) {
+      return {
+        content: [{ type: 'text', text: `❌ Descriptor '${toolName}' is a server-endpoint but declares no serverEndpoint.path` }],
+        isError: true,
+      };
+    }
+    try {
+      const result = await callServerEndpoint(desc.serverEndpoint, args);
+      const isSuccess = result && result.ok !== false;
+      return {
+        content: [{ type: 'text', text: `${isSuccess ? '✅' : '⚠️'} ${toolName}\n\n${JSON.stringify(result, null, 2)}` }],
+        isError: !isSuccess,
+      };
+    } catch (e) {
+      return {
+        content: [{ type: 'text', text: `❌ ${toolName} failed: ${e.message}\nEndpoint: ${SERVER_ENDPOINT}${desc.serverEndpoint.path}` }],
+        isError: true,
+      };
+    }
+  }
+
+  // buildCommandJson 必须在 try 内：它对 desc.commandJson 做 JSON.parse(JSON.stringify(...))，
+  // descriptor 缺失该字段时会抛异常。而 descriptorToMcpTool 对缺失字段是容错的（回落 'N/A'），
+  // 于是工具会正常出现在 tools/list、一调用就把整个 MCP server 打崩 —— 最坏的失败模式。
+  let commandJson;
+  try {
+    commandJson = buildCommandJson(desc, args);
+  } catch (e) {
+    return {
+      content: [{ type: 'text', text: `❌ Malformed descriptor '${toolName}': ${e.message}` }],
+      isError: true,
+    };
+  }
 
   try {
     const result = await callExecute(commandJson);

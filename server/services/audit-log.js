@@ -15,6 +15,20 @@ const { migrateLegacyDirectory } = require('./runtime-paths');
 
 const AUDIT_LOG_DIR = migrateLegacyDirectory('.audit-logs', 'audit-logs');
 
+// chainId 会被拼进文件路径（`chain_${chainId}.json`），因此必须在拼接前限制字符集，
+// 否则构成路径穿越。已实证：`GET /api/plan-chain/audit/x%2F..%2F..%2F...%2Fprobe`
+// 使 chain_x 段被 `..` 抵消，逃出 audit-logs 读到任意可 JSON.parse 的 .json 文件，
+// 且响应回传全文。校验放在服务层而非仅路由层，使任何调用方都受保护（防御深度）。
+//
+// 格式来自 plan-chain-engine.js:1097 的 `chain_${Date.now()}_${base36(6)}`。
+// 允许可选的重复 chain_ 前缀：磁盘上文件名实际是 chain_chain_<ts>_<rand>.json
+// （路由传入的 chainId 本身已含 chain_ 前缀）。
+const CHAIN_ID_PATTERN = /^(?:chain_)?\d{10,}_[a-z0-9]{1,12}$/;
+
+function isSafeChainId(value) {
+  return typeof value === 'string' && CHAIN_ID_PATTERN.test(value);
+}
+
 class AuditLogger {
   constructor() {
     this._ensureDir(AUDIT_LOG_DIR);
@@ -44,6 +58,12 @@ class AuditLogger {
    */
   log(entry) {
     try {
+      // 写侧同样校验：chainId 目前由引擎生成不受外部控制，但若将来有端点允许
+      // 传入 chainId，无校验的写路径会变成任意位置文件写入 —— 比读穿越更严重。
+      if (!isSafeChainId(entry && entry.chainId)) {
+        console.error('[AuditLogger] rejected unsafe chainId:', entry && entry.chainId);
+        return;
+      }
       const dateDir = this._getDateDir();
       this._ensureDir(dateDir);
 
@@ -165,6 +185,8 @@ class AuditLogger {
    * 查询指定 chainId 的完整日志
    */
   getChainLog(chainId) {
+    // 拒绝任何不符合生成格式的 chainId —— 见文件头 CHAIN_ID_PATTERN 的路径穿越说明
+    if (!isSafeChainId(chainId)) return null;
     try {
       // 在所有日期目录中查找
       if (!fs.existsSync(AUDIT_LOG_DIR)) return null;
@@ -268,3 +290,4 @@ class AuditLogger {
 }
 
 module.exports = new AuditLogger();
+module.exports._test = { isSafeChainId, CHAIN_ID_PATTERN };

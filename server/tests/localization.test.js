@@ -93,13 +93,35 @@ function assertVerifiedStarterMutationTemplates(label, assets) {
   assert.strictEqual(cableCarrier.plan.steps[0].params.waypoints.length, 5);
 }
 
+const STARTER_TEMPLATE_IDS = [
+  'tpl-starter-project-overview',
+  'tpl-starter-read-selection',
+  'tpl-starter-room-walls',
+  'tpl-starter-scan-structure',
+  'tpl-starter-partition-walls',
+  'tpl-starter-replicate-stair',
+  'tpl-starter-create-shell-on-floors',
+  'tpl-starter-create-elevated-mesh',
+  'tpl-starter-create-extruded-morph',
+  'tpl-starter-create-wall-from-favorite',
+  'tpl-starter-create-structural-member-from-profile',
+  'tpl-starter-batch-set-layer',
+  'tpl-starter-assign-classification',
+];
+
 function main() {
   const chinese = readStarterAssets('zh-CN');
   const english = readStarterAssets('en-US');
 
-  assert.strictEqual(chinese.templates.length, 13);
+  assert.deepStrictEqual(
+    chinese.templates.map((template) => template.id),
+    STARTER_TEMPLATE_IDS
+  );
   assert.strictEqual(chinese.commands.length, 5);
-  assert.strictEqual(english.templates.length, chinese.templates.length);
+  assert.deepStrictEqual(
+    english.templates.map((template) => template.id),
+    STARTER_TEMPLATE_IDS
+  );
   assert.strictEqual(english.commands.length, chinese.commands.length);
   assertNoCjk('English starter assets', english);
   assertVerifiedStarterMutationTemplates('Chinese starter assets', chinese);
@@ -115,7 +137,10 @@ function main() {
   );
 
   const localizedEnglish = userAssetsTest.localizeStarterAssets(chinese, 'en-US');
-  assert.strictEqual(localizedEnglish.templates.length, 13);
+  assert.deepStrictEqual(
+    localizedEnglish.templates.map((template) => template.id),
+    STARTER_TEMPLATE_IDS
+  );
   assert.strictEqual(localizedEnglish.commands.length, 5);
   assertNoCjk('Localized starter assets', localizedEnglish);
   assertVerifiedStarterMutationTemplates('Localized English starter assets', localizedEnglish);

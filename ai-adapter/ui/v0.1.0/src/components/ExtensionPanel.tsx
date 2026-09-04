@@ -9,10 +9,13 @@ import LearningMemoryPanel from "./LearningMemoryPanel";
 import AuditLogPanel from "./AuditLogPanel";
 import ProactiveSuggestions from "./ProactiveSuggestions";
 import ModuleCatalogPanel from "./ModuleCatalogPanel";
+import InstancesSnapshotsPanel from "./InstancesSnapshotsPanel";
+import BuildingJsonPanel from "./BuildingJsonPanel";
+import CadLayerRecognitionPanel from "./CadLayerRecognitionPanel";
 import type { TaskTemplate, CustomNLCommand } from "../userAssets";
-import { Bookmark, Zap, Brain, FileText, Lightbulb, Database, ChevronDown, Package, Download, Upload, Save, RotateCcw, Boxes } from "lucide-react";
+import { Bookmark, Zap, Brain, FileText, Lightbulb, Database, ChevronDown, Package, Download, Upload, Save, RotateCcw, Boxes, Server, FileJson, Layers } from "lucide-react";
 
-type ExtTab = "modules" | "knowledge" | "memory" | "audit" | "proactive" | "templates" | "commands" | "preset";
+type ExtTab = "modules" | "knowledge" | "memory" | "audit" | "proactive" | "templates" | "commands" | "preset" | "instances" | "buildingJson" | "cadLayers";
 
 interface ExtensionPanelProps {
   lang: "zh-CN" | "en-US";
@@ -49,6 +52,9 @@ const TAB_CONFIG: Array<{
   { id: "templates", zh: "用户模板", en: "Templates", icon: Bookmark, color: "pink" },
   { id: "commands", zh: "自定义命令", en: "Commands", icon: Zap, color: "cyan" },
   { id: "preset", zh: "预设管理", en: "Preset", icon: Package, color: "emerald" },
+  { id: "instances", zh: "实例与快照", en: "Instances", icon: Server, color: "teal" },
+  { id: "buildingJson", zh: "Building JSON", en: "Building JSON", icon: FileJson, color: "orange" },
+  { id: "cadLayers", zh: "CAD 图层", en: "CAD Layers", icon: Layers, color: "lime" },
 ];
 
 const COLOR_CLASSES: Record<string, { active: string; inactive: string; border: string }> = {
@@ -60,7 +66,18 @@ const COLOR_CLASSES: Record<string, { active: string; inactive: string; border: 
   pink: { active: "text-pink-400 border-pink-500", inactive: "text-zinc-500 hover:text-pink-400/70", border: "border-pink-500/20" },
   cyan: { active: "text-cyan-400 border-cyan-500", inactive: "text-zinc-500 hover:text-cyan-400/70", border: "border-cyan-500/20" },
   emerald: { active: "text-emerald-400 border-emerald-500", inactive: "text-zinc-500 hover:text-emerald-400/70", border: "border-emerald-500/20" },
+  teal: { active: "text-teal-400 border-teal-500", inactive: "text-zinc-500 hover:text-teal-400/70", border: "border-teal-500/20" },
+  orange: { active: "text-orange-400 border-orange-500", inactive: "text-zinc-500 hover:text-orange-400/70", border: "border-orange-500/20" },
+  lime: { active: "text-lime-400 border-lime-500", inactive: "text-zinc-500 hover:text-lime-400/70", border: "border-lime-500/20" },
 };
+
+// Pending extension previews are visible but inactive. They must not render
+// panels or call their APIs until the owner confirms each feature is complete.
+const PREVIEW_TABS = new Set<ExtTab>(["instances", "buildingJson", "cadLayers"]);
+const PREVIEW_LABEL = {
+  "zh-CN": "预告",
+  "en-US": "Planned",
+} as const;
 
 export function ExtensionPanel({
   lang,
@@ -84,8 +101,8 @@ export function ExtensionPanel({
 
   const zh = lang === "zh-CN";
   const orderedTabs = (mode === "copilot"
-    ? ["modules", "templates", "commands", "preset", "proactive", "knowledge", "memory", "audit"]
-    : ["modules", "commands", "templates", "preset", "audit", "knowledge", "memory", "proactive"]
+    ? ["modules", "templates", "commands", "preset", "proactive", "knowledge", "memory", "audit", "instances", "buildingJson", "cadLayers"]
+    : ["modules", "commands", "templates", "preset", "audit", "knowledge", "memory", "proactive", "instances", "buildingJson", "cadLayers"]
   ).map((id) => TAB_CONFIG.find((tab) => tab.id === id)).filter(Boolean) as typeof TAB_CONFIG;
   const modeBadge = mode === "copilot"
     ? (zh ? "AI 自动模式" : "AI Auto")
@@ -259,16 +276,30 @@ export function ExtensionPanel({
           const Icon = tab.icon;
           const colors = COLOR_CLASSES[tab.color];
           const isActive = activeTab === tab.id;
+          const isPreview = PREVIEW_TABS.has(tab.id);
           return (
             <button
               key={tab.id}
-              onClick={() => { setActiveTab(tab.id); }}
+              type="button"
+              disabled={isPreview}
+              aria-disabled={isPreview}
+              title={isPreview ? PREVIEW_LABEL[lang] : undefined}
+              onClick={() => { if (!isPreview) setActiveTab(tab.id); }}
               className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold border-b-2 transition-all whitespace-nowrap ${
-                isActive ? colors.active : `border-transparent ${colors.inactive}`
+                isPreview
+                  ? "border-transparent text-zinc-600 cursor-not-allowed"
+                  : isActive
+                    ? colors.active
+                    : `border-transparent ${colors.inactive}`
               }`}
             >
               <Icon className="w-3 h-3" />
               {zh ? tab.zh : tab.en}
+              {isPreview && (
+                <span className="rounded bg-zinc-800/80 px-1 py-0.5 font-mono text-[8px] uppercase text-zinc-500">
+                  {PREVIEW_LABEL[lang]}
+                </span>
+              )}
             </button>
           );
         })}

@@ -1,6 +1,6 @@
 {
   "name": "mepbridge-acaistr-server",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "MEPBridge ACAIstr Backend Server",
   "main": "server.js",
   "scripts": {
@@ -14,6 +14,8 @@
     "test:modules": "node ../modules/project-insights/tests/module.test.js && node tests/extension-manager.test.js",
     "test:capabilities": "node ../tests/test-command-capabilities.js",
     "test:runtime": "node ../tests/Test-AC29RuntimeRegression.js",
+    "test:runtime:d1": "node ../tests/Test-D1InstanceTargetingAcceptance.js --phase=discover",
+    "test:runtime:d2": "node ../tests/Test-D2SnapshotReplayAcceptance.js --phase=capture",
     "test:release-gate": "node ../tests/test-public-version.js && node ../tests/test-release-go-no-go.js",
     "test:localization": "node tests/release-locale.test.js && node tests/localization.test.js && node tests/localization-routes.test.js"
   },

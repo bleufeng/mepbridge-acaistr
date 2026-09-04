@@ -1,8 +1,8 @@
-# MEPbridge ACAIstr v0.1.3 Installation
+# MEPbridge ACAIstr v0.1.4 Installation
 
 This guide applies to the Windows release packages for Archicad 28 and Archicad 29.
 
-Download `MEPbridge-ACAIstr-v0.1.3-win64-en-US.zip` for an English-first installation or `MEPbridge-ACAIstr-v0.1.3-win64-zh-CN.zip` for a Chinese-first installation. Do not use an APX-only update or GitHub's automatically generated `Source code.zip` / `Source code.tar.gz` for first-time installation.
+Download `MEPbridge-ACAIstr-v0.1.4-win64-en-US.zip` for an English-first installation or `MEPbridge-ACAIstr-v0.1.4-win64-zh-CN.zip` for a Chinese-first installation. Do not use an APX-only update or GitHub's automatically generated `Source code.zip` / `Source code.tar.gz` for first-time installation.
 
 ## Requirements
 
@@ -36,8 +36,8 @@ Archicad-29\MEPBridge.apx
 
 Use only the APX matching the installed Archicad major version.
 
-The standalone `MEPbridge-ACAIstr-v0.1.3-AC28-win64.apx` and
-`MEPbridge-ACAIstr-v0.1.3-AC29-win64.apx` assets update only the native Add-On.
+The standalone `MEPbridge-ACAIstr-v0.1.4-AC28-win64.apx` and
+`MEPbridge-ACAIstr-v0.1.4-AC29-win64.apx` assets update only the native Add-On.
 They do not include the Server, UI, MCP Server, production dependencies, or
 installer and are intended only for an existing complete installation.
 
@@ -80,7 +80,7 @@ Two rules apply to both types:
    If the version still shows the old value, Archicad loaded a cached copy or the
    file was locked during the copy — repeat from step 1.
 
-**v0.1.3 requires a full package update.** It changes the Server, the MCP Server
+**v0.1.4 requires a full package update.** It changes the Add-On, Server, MCP Server
 and the descriptor registry in addition to the Add-On.
 
 ## Automatic Installation
@@ -319,7 +319,7 @@ User data is generally compatible across versions; if a data format incompatibil
 - Archicad loads the Add-On without an error.
 - The MEPbridge ACAIstr menu shows three independent menu items.
 - The Workbench opens at `http://127.0.0.1:19780/`.
-- `/health` reports version `0.1.3`.
-- For the released v0.1.3 package, Ping reports 76 registered C++ commands and 74 descriptor/MCP tools.
+- `/health` reports version `0.1.4`.
+- For the released v0.1.4 package, Ping reports 79 registered C++ commands and 78 Add-On descriptor/MCP tools; the Workbench Server additionally provides 4 server tools.
 
 Use a test or backed-up PLN before running write, delete, batch, or geometry-changing commands.

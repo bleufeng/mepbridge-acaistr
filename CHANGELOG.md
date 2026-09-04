@@ -2,7 +2,34 @@
 
 Public user-facing changes. Versions follow Semantic Versioning.
 
-## [Unreleased]
+## [0.1.4] - 2026-09-03
+
+### Added
+
+- New commands for moving and editing existing building elements by GUID: `MoveBuildingElements` translates walls, columns, beams, slabs, objects, lamps, zones, meshes and morphs, and moves windows and doors while keeping them in their host wall; `EditBuildingElement` changes wall height/thickness/endpoints, window and door width/height/sill, and column and beam dimensions, masking only the fields actually requested so unrequested values do not drift.
+- `CreateWall`, `CreateColumn`, `CreateObject` and `CreateLamp` accept an optional `absoluteZ`. The story is resolved from the project story structure and the resolved `resolvedFloorIndex`/`resolvedStoryLevel` are echoed back, so placing an element at a known elevation no longer requires switching the active story first.
+- `CreateStory` inserts a story above or below an existing one, preview-first and gated on `confirmRequired`. It only inserts: it does not delete stories or change the elevation of existing ones. Archicad cannot undo a story-structure change, so the command verifies the full story snapshot afterwards.
+- `SwitchStory` is now available as the `set_active_story` tool. It reports `previousStoryIndex` so the original active story can be restored explicitly after a task.
+- Mirror and rotate accept an explicit GUID list, so they no longer depend on what happens to be selected in Archicad.
+- Deleting more than 50 elements now requires `acknowledgeCount` to echo the count reported by the dry run. Unlike `confirmRequired`, which is a constant a template can set once and carry forever, this value is only knowable from the specific preview, so it evidences that the preview was actually read.
+- Four tools for working across two open projects at once: list the running Archicad instances and the project each has open; capture an element snapshot from one instance; compare two snapshots; and replay a snapshot into another instance. These are served by the local Workbench Server rather than the Add-On, since scanning for other instances is something no single instance can do.
+- Snapshot comparison reports what exists only in A, only in B, and which paired elements differ in geometry, properties, classifications, layer or story, with a per-type count so a "11 morphs here, none there" difference is visible at a glance. Element identifiers are project-local and cannot be used to pair across projects, so elements are grouped by type and story and matched by nearest position within a stated tolerance; the report carries that tolerance and the matching strategy so any conclusion can be re-checked. Floating-point exact equality is never used.
+- Snapshot replay supports Wall, Column, Beam, Slab and Zone geometry with explicit story mapping. Layer, classification and element-property data may be saved as snapshot metadata, but replay does not restore them; the preview marks attribute replay as unsupported in v0.1.4.
+### Fixed
+
+- Walls ignored a requested `height` whenever the wall tool defaulted to top-linked, silently substituting the story height instead. Explicit heights are now honoured; previously 2 m, 4 m and 12 m all produced a 3 m wall.
+- Walls were placed 90 degrees to the left of the drawn line because the reference line followed the tool setting rather than the centre line. Walls now follow the supplied line.
+- Window sill height was written to the wrong field and had no effect. It now uses the parapet-height field, is validated against the wall top, and the opening inherits the host wall's story, which fixes windows landing on the wrong floor when the host wall was not on the active story.
+- `set_active_story` had its `dryRun` and `confirmRequired` parameters stripped before reaching the Add-On, so it could only ever preview and never actually switched the story.
+- `create_stair` no longer reports a tread depth that does not describe the stair. The scalar tread-depth field does not drive Archicad's stair geometry and always read back as a fixed value regardless of the request, so asserting on it was meaningless. The request is now rejected as unsupported with a stated reason, and the response carries `resolvedGoing`, computed from the baseline length and step count, which is the tread depth the stair actually has.
+- Copying elements is now all-or-nothing. Sources that could not be read, or whose type was unsupported, were silently skipped, so a copy could report success while creating fewer elements than requested. All sources are validated before anything is created, the batch runs in one undoable command, and a failure mid-batch rolls back what it made and reports the cleanup outcome.
+- Copying elements produced one undo step per element, so reversing one copy operation required as many presses of Ctrl+Z as there were elements. The batch is now a single undo step.
+- The limit on how many elements could be copied was only enforced when the elements came from the Archicad selection; passing GUIDs explicitly bypassed it entirely. The Add-On now enforces the limit on both paths.
+- Deleting elements had no quantity limit at all, while copying, which is reversible, was capped at nine. Deletion is now capped at 200 elements per call and copying at 500, matching batch creation.
+- Snapshot replay could leave behind every element it created. Its rollback submitted all created elements for deletion in a single call, which the Add-On refuses above its per-call limit, so a replay that created more than 200 elements cleaned up none of them. Rollback is now chunked, one failing chunk no longer abandons the rest, and any remaining elements are counted and reported.
+- Replay verification no longer treats a different default layer, classification or property value as failure. Verification compares the created element type, its geometry and the mapped target story, matching the published geometry-only scope.
+- Deletion previews listed bare GUIDs, which a person cannot check. Both the preview and the result now report each element's type, layer and story, plus a breakdown by type, layer and story for batches too large to read line by line.
+- `POST /api/undo` claimed to undo the last operation but called an Archicad command that does not exist, so it always failed while returning a success-shaped response. It now returns 501 and explains that the Archicad JSON API exposes no undo command and that Ctrl+Z in Archicad is the way to reverse a step.
 
 ## [0.1.3] - 2026-08-22
 

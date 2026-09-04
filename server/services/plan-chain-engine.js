@@ -26,6 +26,39 @@ function ARCHICAD_ENDPOINT() {
 const SERVER_ENDPOINT = process.env.SERVER_ENDPOINT || 'http://127.0.0.1:19780';
 const EXECUTE_ENDPOINT = `${SERVER_ENDPOINT}/api/execute`;
 
+// 未解析的模板占位符检测。LLM 生成计划时会写 "${上一步获得的各柱GUID}" 这类引用，
+// 期待结果回灌把它替换成真实值。回灌曾是死代码（见 _refineRemainingSteps 注释），
+// 于是占位符被原样送去执行 —— 审计日志有实证。
+//
+// 匹配 ${...} 与 {{...}} 两种常见写法。递归遍历 params/commandJson，返回首个命中
+// 及其路径，便于失败信息定位到具体字段而非只说"有占位符"。
+const PLACEHOLDER_PATTERN = /\$\{[^}]*\}|\{\{[^}]*\}\}/;
+
+function findUnresolvedPlaceholder(value, path = 'step', depth = 0) {
+  if (depth > 8 || value == null) return null;
+
+  if (typeof value === 'string') {
+    return PLACEHOLDER_PATTERN.test(value) ? { path, value } : null;
+  }
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i += 1) {
+      const hit = findUnresolvedPlaceholder(value[i], `${path}[${i}]`, depth + 1);
+      if (hit) return hit;
+    }
+    return null;
+  }
+  if (typeof value === 'object') {
+    for (const [key, child] of Object.entries(value)) {
+      // description / reasoning 等叙述字段允许含占位符样式文本，不参与执行
+      if (key === 'description' || key === 'reasoning' || key === 'title' || key.startsWith('_')) continue;
+      const hit = findUnresolvedPlaceholder(child, `${path}.${key}`, depth + 1);
+      if (hit) return hit;
+    }
+    return null;
+  }
+  return null;
+}
+
 // V2 H6.2: 审计日志服务
 const auditLogger = require('./audit-log');
 
@@ -85,17 +118,19 @@ const APPROVAL_PRESETS = {
   }
 };
 
-// 风险等级排序（从低到高），用于闸门判断
-const RISK_LEVEL_ORDER = [
-  'read',                    // 只读查询
-  'create-element',          // 创建元素（新 V2 分级）
-  'low-mutation',            // 低风险修改
-  'medium-mutation',         // 中等风险修改（旋转/镜像）
-  'high-mutation',           // 高风险修改
-  'batch-create',            // 批量创建
-  'delete-all',              // 删除全部
-  'irreversible'             // 不可逆操作
-];
+// 风险等级排序（从低到高），用于闸门判断。
+// P1-04：定义已迁到 command-registry.js，与注册表的别名/未知值处理保持单一来源 ——
+// 此处 re-export 仅为兼容既有导出契约（routes 与测试都从本模块取）。
+const {
+  RISK_LEVEL_ORDER,
+  riskOrder,
+  maxRiskLevel,
+  canonicalRiskLevel,
+  isKnownCommand,
+  getRegistryRiskLevel,
+  getRegistryError,
+} = require('./command-registry');
+const { getCommandSafetyCapabilities } = require('./command-capabilities');
 
 // ─── PlanChain 核心 ───
 
@@ -155,6 +190,12 @@ class PlanChain {
     // 规范化每步：确保有完整元数据
     const normalizedSteps = steps.map((step, idx) => this._normalizeStep(step, idx));
 
+    // Complete built-in templates keep the fast path: their later steps do not
+    // need an LLM round-trip after every successful command. Unknown/LLM plans
+    // remain conservative unless their producer explicitly marks them deterministic.
+    const requiresStepRefinement = draft.requiresStepRefinement === true ||
+      (draft.requiresStepRefinement !== false && draft.deterministic !== true);
+
     // 推断整体风险等级
     const overallRisk = this._inferOverallRisk(normalizedSteps);
 
@@ -167,6 +208,10 @@ class PlanChain {
       confidence: draft.confidence || 0,
       isMutation: draft.isMutation || false,
       warningText: draft.warningText || null,
+      source: draft.source || 'generated-plan',
+      templateId: draft.templateId || null,
+      deterministic: !requiresStepRefinement,
+      requiresStepRefinement,
       steps: normalizedSteps,
       executionLog: [],
       approvalPolicy: { ...this.approvalPolicy },
@@ -299,6 +344,7 @@ class PlanChain {
     this.chain.status = 'running';
     this.chain.startedAt = new Date().toISOString();
     this.onProgress({ type: 'chain_start', chain: this.chain });
+    let hadStepFailure = false;
 
     try {
       for (let i = 0; i < this.chain.steps.length; i++) {
@@ -316,6 +362,9 @@ class PlanChain {
         }
 
         const result = await this.executeStep(i);
+        if (result.status === 'failed' || result.status === 'fatal') {
+          hadStepFailure = true;
+        }
         if (result.status === 'fatal') {
           // 致命失败：停止整条链
           this.chain.status = 'failed';
@@ -327,14 +376,21 @@ class PlanChain {
 
       // 正常完成所有步骤
       if (this.chain.status === 'running') {
-        this.chain.status = 'completed';
+        this.chain.status = hadStepFailure || this.chain.stats.failed > 0 ? 'failed' : 'completed';
         this.chain.completedAt = new Date().toISOString();
-        this.onProgress({ type: 'chain_complete', chain: this.chain });
+        this.onProgress({
+          type: this.chain.status === 'completed' ? 'chain_complete' : 'chain_failed',
+          chain: this.chain
+        });
       }
     } catch (error) {
       this.chain.status = 'error';
       this.chain.error = error.message;
       this.onProgress({ type: 'chain_error', chain: this.chain, error: error.message });
+    }
+
+    if (!this.chain.completedAt && ['completed', 'failed', 'error', 'cancelled'].includes(this.chain.status)) {
+      this.chain.completedAt = new Date().toISOString();
     }
 
     // V2 H6.2: 审计日志 — 记录链结束
@@ -361,6 +417,16 @@ class PlanChain {
     const step = this.chain.steps[stepIndex];
     if (!step) return { status: 'failed', error: `步骤 ${stepIndex} 不存在` };
 
+    // 结果回灌可将后续步骤标记为跳过（refinement.skip）—— 例如其依赖的前一步失败。
+    // 该字段此前从未被生产也从未被消费；现在生产了，必须在此尊重它，否则等于没跳。
+    if (step._skipped) {
+      step.status = 'skipped';
+      step.skipReason = step._skipReason || 'skipped by refinement';
+      this._logExecution(step, 'skipped');
+      this.onProgress({ type: 'step_skipped', stepIndex, step });
+      return { status: 'skipped', stepResult: step };
+    }
+
     this.currentStepIndex = stepIndex;
     step.status = 'running';
     step.startedAt = new Date().toISOString();
@@ -372,6 +438,8 @@ class PlanChain {
     if (!gate1Result.pass) {
       step.status = 'failed';
       step.error = `Gate 1 Schema 校验失败: ${gate1Result.reason}`;
+      step.completedAt = new Date().toISOString();
+      this.chain.stats.failed++;
       this._logExecution(step, 'gate1_failed');
       this.onProgress({ type: 'step_failed', stepIndex, totalSteps: this.chain.steps.length, step, data: gate1Result });
       return { status: 'failed', error: step.error, fatal: false };
@@ -463,6 +531,7 @@ class PlanChain {
         step.status = 'completed';
         step.result = handled.retryResult;
         this.failureCount--; // 重试成功不计数
+        this.chain.stats.failed--; // 失败统计必须与最终步骤状态一致
         this.onProgress({ type: 'step_complete', stepIndex, totalSteps: this.chain.steps.length, step, data: { retried: true } });
         return { status: 'ok', stepResult: handled.retryResult };
       }
@@ -490,7 +559,7 @@ class PlanChain {
     this._logExecution(step, 'completed');
 
     // 8️⃣ H2.4 结果回灌：将执行结果传给 LLM 精细化后续步骤参数
-    if (this.llm && stepIndex < this.chain.steps.length - 1) {
+    if (this.llm && this.chain.requiresStepRefinement && stepIndex < this.chain.steps.length - 1) {
       await this._refineRemainingSteps(stepIndex, execResult);
     }
 
@@ -630,6 +699,28 @@ class PlanChain {
     if (!step.commandNamespace) {
       return { pass: false, reason: '缺少 commandNamespace' };
     }
+
+    // 未解析的模板占位符必须在此拦截。审计日志实证过 "${上一步获得的各柱GUID}" 被原样
+    // 送去执行 —— 根因是结果回灌为死代码（已修），但即便回灌正常，LLM 也可能给出
+    // 无法解析的占位符。此处是最后一道防线：占位符是"数据未就绪"的信号，不是有效参数。
+    const unresolved = findUnresolvedPlaceholder(step);
+    if (unresolved) {
+      return { pass: false, reason: `存在未解析的占位符 ${unresolved.path}: ${unresolved.value}` };
+    }
+
+    // P1-04：params 必须是普通对象。数组/字符串会被原样塞进 addOnCommandParameters，
+    // C++ 侧 schema 校验失败的报错离现场很远，在此拒绝定位更准。
+    if (step.params !== undefined && step.params !== null) {
+      if (typeof step.params !== 'object' || Array.isArray(step.params)) {
+        return { pass: false, reason: `params 必须是对象，实际为 ${Array.isArray(step.params) ? 'array' : typeof step.params}` };
+      }
+    }
+
+    // P1-04：命令白名单。commandNamespace 有 'MEPBridge' 默认值、永不为空，因此上面
+    // 那两条存在性检查等于没有命令校验 —— 任何字符串都能通过闸门直到 C++ 才失败。
+    const gateCheck = this._checkGate1Command(step);
+    if (!gateCheck.pass) return gateCheck;
+
     // commandJson 结构校验
     if (step.commandJson && step.commandJson.command !== 'API.ExecuteAddOnCommand') {
       // 非 MEPBridge 命令额外检查白名单
@@ -648,17 +739,58 @@ class PlanChain {
     return { pass: true };
   }
 
+  /**
+   * P1-04：解析该步真正会发往 Add-On 的命令名并核对注册表。
+   *
+   * 只对 MEPBridge Add-On 命令生效：带 commandJson 且 command 不是
+   * API.ExecuteAddOnCommand 的步骤走官方 JSON 命令路径，由上面的 API.* 白名单负责，
+   * 此时 step.action 只是个标签，不应拿去查 Add-On 注册表。
+   */
+  _checkGate1Command(step) {
+    const usesAddOn = !step.commandJson || step.commandJson.command === 'API.ExecuteAddOnCommand';
+    if (!usesAddOn) return { pass: true };
+
+    const addOnId = step.commandJson?.parameters?.addOnCommandId;
+    const namespace = addOnId?.commandNamespace || step.commandNamespace || 'MEPBridge';
+    const commandName = addOnId?.commandName || step.action;
+
+    if (namespace !== 'MEPBridge') {
+      return { pass: false, reason: `commandNamespace ${namespace} 不受支持（仅 MEPBridge）` };
+    }
+
+    // 注册表读不出来时拒绝全部：闸门无法查询依据时放行等于没有闸门。
+    const registryError = getRegistryError();
+    if (registryError) {
+      return { pass: false, reason: `命令注册表不可用，无法校验命令白名单：${registryError}` };
+    }
+
+    if (!isKnownCommand(commandName)) {
+      return { pass: false, reason: `命令 ${commandName} 未在命令注册表中（未知命令不得进入 Add-On）` };
+    }
+
+    // commandJson 与 action 不一致意味着"审批看到的是 A、实际执行 B"。
+    // 闸门预览与用户确认都基于 step.action，此处必须一致。
+    if (addOnId?.commandName && step.action && addOnId.commandName !== step.action) {
+      return {
+        pass: false,
+        reason: `commandJson 命令 ${addOnId.commandName} 与 action ${step.action} 不一致`
+      };
+    }
+
+    return { pass: true };
+  }
+
   _needsGate2(step) {
     const policy = this.approvalPolicy.gate2PlanPreview;
     if (policy === 'always') return true;
     if (policy === 'never') return false;
     if (policy === 'high-risk') {
-      const order = RISK_LEVEL_ORDER.indexOf(step.riskLevel || 'read');
-      return order >= RISK_LEVEL_ORDER.indexOf('medium-mutation');
+      return riskOrder(step.riskLevel || 'read') >= riskOrder('medium-mutation');
     }
     if (policy === 'mutation') {
-      return ['low-mutation', 'high-mutation', 'mutation', 'create-element', 'medium-mutation', 'batch-create']
-        .includes(step.riskLevel);
+      // 高于 'read' 即为 mutation。此前是一份字面量清单，漏掉注册表里的 'write'
+      // （5 条真实写命令），也漏掉任何未知等级 —— 用序号比较后两者都被覆盖。
+      return riskOrder(step.riskLevel || 'read') > riskOrder('read');
     }
     return false;
   }
@@ -668,12 +800,10 @@ class PlanChain {
     if (policy === 'always') return true;
     if (policy === 'never') return false;
     if (policy === 'high-risk') {
-      const order = RISK_LEVEL_ORDER.indexOf(step.riskLevel || 'read');
-      return order >= RISK_LEVEL_ORDER.indexOf('medium-mutation');
+      return riskOrder(step.riskLevel || 'read') >= riskOrder('medium-mutation');
     }
     if (policy === 'mutation') {
-      return ['low-mutation', 'high-mutation', 'mutation', 'create-element', 'medium-mutation', 'batch-create']
-        .includes(step.riskLevel);
+      return riskOrder(step.riskLevel || 'read') > riskOrder('read');
     }
     return false;
   }
@@ -701,16 +831,24 @@ class PlanChain {
       }
     };
 
-    // V2 修复：对支持 dryRun/confirmRequired 的命令，PlanChain 自动执行时强制注入 dryRun:false, confirmRequired:true
-    // 否则 commandJson 默认 dryRun:true 只做预览不创建
-    const CREATE_COMMANDS = ['CreateWall', 'CreateColumn', 'CreateBeam', 'CreateSlab', 'CreateRoof',
-      'CreateDoor', 'CreateWindow', 'CreatePipe', 'CreateDuct', 'CreateCableCarrier', 'CreatePipeSystem',
-      'MoveSelectedElements', 'MoveElements', 'EditSelectedElements', 'EditElements',
-      'RotateSelectedElements', 'MirrorSelectedElements', 'CopyElements', 'AutoRoutePipe',
-      'CreateStair'];
-    if (CREATE_COMMANDS.includes(step.action) && payload.parameters?.addOnCommandParameters) {
-      payload.parameters.addOnCommandParameters.dryRun = false;
-      payload.parameters.addOnCommandParameters.confirmRequired = true;
+    // P1-05：安全参数注入由能力表派生，不再手工维护第三份 mutation 清单。
+    //
+    // 原来的 CREATE_COMMANDS 是手写的 20 条，漏了 18 条真实 mutation
+    // （DeleteElements / CreateZone / CreateMesh / CreateMorph / BatchCreateElements /
+    //  ChangeElementGeometry / SetLayerBatch / SetStories / …）。漏掉的后果不是报错而是
+    // **静默不写**：Add-On 拿不到 dryRun 就回落自身默认 dryRun=true，只做预览，
+    // 而响应 status 仍是 ok —— 链路报告"执行成功"，模型里什么也没变。
+    //
+    // 能力表 command-capabilities.js 由 tests/test-command-capabilities.js 与 Sources/
+    // 逐条比对维护，是 dryRun/confirmRequired 支持情况的唯一权威来源。
+    // 这里必须**强制**赋值而非 applyDefaultSafetyParameters 的"缺失才补"：
+    // 计划里可能带着 dryRun:true（LLM 抄了 descriptor 的默认值），预览语义会吞掉写入。
+    const addOnParams = payload.parameters?.addOnCommandParameters;
+    if (addOnParams && typeof addOnParams === 'object') {
+      const commandName = payload.parameters?.addOnCommandId?.commandName || step.action;
+      const capabilities = getCommandSafetyCapabilities(commandName);
+      if (capabilities.dryRun) addOnParams.dryRun = false;
+      if (capabilities.confirmRequired) addOnParams.confirmRequired = true;
     }
 
     console.log(`[PlanChain] Executing step ${this.currentStepIndex + 1}/${this.chain.steps.length}: ${step.action}`);
@@ -735,6 +873,14 @@ class PlanChain {
   }
 
   async _capturePreState(step) {
+    if (!this._dependsOnCurrentSelection(step)) {
+      return {
+        timestamp: new Date().toISOString(),
+        skipped: true,
+        reason: 'step does not depend on the current selection'
+      };
+    }
+
     // 记录当前选择集作为前置状态
     try {
       const response = await axios.post(ARCHICAD_ENDPOINT(), {
@@ -753,6 +899,16 @@ class PlanChain {
   async _postCheck(step, execResult) {
     // 对于 mutation 操作，执行后重新读取选择集验证变化
     if (!execResult.ok) return { verified: false, reason: 'execution failed' };
+    if (!this._dependsOnCurrentSelection(step)) {
+      const readbackVerified = execResult.addOnResponse?.readbackVerified ?? null;
+      const verificationPassed = execResult.addOnResponse?.verification?.passed ?? null;
+      return {
+        verified: readbackVerified !== false && verificationPassed !== false,
+        method: 'command-response',
+        readbackVerified,
+        verificationPassed
+      };
+    }
     try {
       const response = await axios.post(ARCHICAD_ENDPOINT(), {
         command: 'API.ExecuteAddOnCommand',
@@ -765,6 +921,12 @@ class PlanChain {
     } catch (e) {
       return { verified: null, error: e.message };
     }
+  }
+
+  _dependsOnCurrentSelection(step) {
+    if (!step || step.riskLevel === 'read') return false;
+    if (step.params?.useCurrentSelection === true) return true;
+    return /SelectedElements|Selection/i.test(step.action || '');
   }
 
   // ── 内部方法：失败处理 H2.5 + H6.1 智能重试增强 ──
@@ -956,49 +1118,97 @@ class PlanChain {
   }
 
   // ── 内部方法：H2.4 结果回灌 ──
+  //
+  // 曾是功能死代码：原实现用 setImmediate 调用 refineStepWithResult 且**完全不接收返回值**，
+  // 而该方法返回新对象 {refined, step, reasoning, skip}、不原地修改入参 —— 于是每步都真实
+  // 花掉一次 LLM 调用、结果被丢弃，GUID 绑定永不发生。审计日志实证：字面量占位符
+  // "${上一步获得的各柱GUID}" 未解析即被送去执行。
+  //
+  // 正确消费模板见失败重试路径（refinement.refined && !refinement.skip → Object.assign）。
+  // 此处按同一模式回写到下一步，并消费此前从未被读取的 skip 字段。
+  //
+  // 同时去掉 setImmediate：它使回写发生在下一步已开始执行之后，即便接收返回值也来不及。
 
   async _refineRemainingSteps(completedStepIndex, execResult) {
     if (!this.llm) return;
-    try {
-      const completedStep = this.chain.steps[completedStepIndex];
-      const remainingSteps = this.chain.steps.slice(completedStepIndex + 1);
-      if (remainingSteps.length === 0) return;
 
-      // 异步回灌（不阻塞主流程）
-      setImmediate(async () => {
-        try {
-          await this.llm.refineStepWithResult(
-            completedStep,
-            execResult,
-            remainingSteps
-          );
-        } catch (e) {
-          console.warn('[PlanChain] Background refinement failed:', e.message);
-        }
-      });
+    const nextIndex = completedStepIndex + 1;
+    const nextStep = this.chain.steps[nextIndex];
+    if (!nextStep) return;
+
+    const completedStep = this.chain.steps[completedStepIndex];
+    const remainingSteps = this.chain.steps.slice(nextIndex);
+
+    let refinement;
+    try {
+      refinement = await this.llm.refineStepWithResult(completedStep, execResult, remainingSteps);
     } catch (e) {
-      console.warn('[PlanChain] Refine scheduling failed:', e.message);
+      // 回灌失败不中断链：下一步保留原参数继续，未解析占位符会在 Gate1 被拦截
+      console.warn('[PlanChain] Refinement call failed:', e.message);
+      return;
     }
+
+    if (!refinement || typeof refinement !== 'object') return;
+
+    // skip：LLM 判断该步已无必要（例如其依赖的前一步失败）。此前该字段从未被消费。
+    if (refinement.skip) {
+      nextStep._skipped = true;
+      nextStep._skipReason = refinement.reasoning || 'LLM refinement requested skip';
+      console.log(`[PlanChain] Step ${nextIndex} marked skip by refinement: ${nextStep._skipReason}`);
+      return;
+    }
+
+    if (!refinement.refined || !refinement.step) return;
+
+    // 只回写 params 与 commandJson。不接受 LLM 改动 action / riskLevel 等安全字段 ——
+    // 那是 P1-04（Gate1 安全字段可被 LLM 覆盖）的同类风险，不在此处引入新入口。
+    if (refinement.step.params && typeof refinement.step.params === 'object') {
+      nextStep.params = { ...(nextStep.params || {}), ...refinement.step.params };
+    }
+    if (refinement.step.commandJson) {
+      nextStep.commandJson = refinement.step.commandJson;
+    }
+    nextStep._refined = true;
+    if (refinement.reasoning) nextStep._refineReason = refinement.reasoning;
   }
 
   // ── 内部工具方法 ──
 
+  // P1-04：安全字段一律由引擎决定，不接受计划来源（LLM / 自定义模板）覆盖。
+  //
+  // 原实现把 `...step` 放在**最后**展开，于是 step 里的任何键都能盖掉上面的默认值：
+  // LLM 返回 `{action:'DeleteElements', riskLevel:'read'}` 就得到一个 read 级的删除步骤，
+  // 在 copilot-auto 下 autoRun 且跳过 Gate2/Gate3。status/behavior/_retryCount 同理可伪造。
+  //
+  // 现在 `...step` 先展开（保留 title/description/dependsOn 等无害元数据），
+  // 安全字段随后覆盖，其中 riskLevel 取「注册表声明 / 本地推断 / 计划声明」三者最高值 ——
+  // 计划方只能把风险**调高**，永远不能调低。
   _normalizeStep(step, idx) {
-    const riskLevel = step.riskLevel ||
+    const action = step.action || step.commandName || `unknown_${idx}`;
+
+    const inferredRisk =
       (['CreateWall', 'CreateColumn', 'CreateBeam', 'CreateSlab', 'CreateRoof', 'CreateDoor', 'CreateWindow',
-          'CreatePipe', 'CreateDuct', 'CreateCableCarrier', 'CreatePipeSystem'].includes(step.action) ? 'create-element' :
-       ['MoveSelectedElements', 'MoveElements', 'CopyElements', 'EditSelectedElements', 'EditElements'].includes(step.action) ? 'low-mutation' :
-       ['RotateSelectedElements', 'MirrorSelectedElements'].includes(step.action) ? 'medium-mutation' :
-       ['DeleteMEPElements'].includes(step.action) ? 'high-mutation' :
-       'read');
+          'CreatePipe', 'CreateDuct', 'CreateCableCarrier', 'CreatePipeSystem'].includes(action) ? 'create-element' :
+       ['MoveSelectedElements', 'MoveElements', 'CopyElements', 'EditSelectedElements', 'EditElements'].includes(action) ? 'low-mutation' :
+       ['RotateSelectedElements', 'MirrorSelectedElements'].includes(action) ? 'medium-mutation' :
+       ['DeleteMEPElements'].includes(action) ? 'high-mutation' :
+       null);
+
+    // 注册表是权威来源（74 条 descriptor 各自声明 riskLevel）；本地推断只作补充，
+    // 覆盖注册表未声明的命令。两者都查不到时才回落 'read'。
+    let riskLevel = maxRiskLevel(getRegistryRiskLevel(action), inferredRisk);
+    // 计划声明只能抬高。未知等级字符串（拼错/伪造）在 canonicalRiskLevel 里就被丢弃，
+    // 不会因为 indexOf 返回 -1 而变成"比 read 还低"。
+    riskLevel = maxRiskLevel(riskLevel, canonicalRiskLevel(step.riskLevel)) || 'read';
 
     return {
+      ...step,                   // 无害元数据（title/description/dependsOn/expected…）
       id: `step_${idx + 1}`,
-      action: step.action || step.commandName || `unknown_${idx}`,
-      title: step.title || step.action || `Step ${idx + 1}`,
+      action,
+      title: step.title || action || `Step ${idx + 1}`,
       description: step.description || '',
       expected: step.expected || '',
-      params: step.params || {},
+      params: (step.params && typeof step.params === 'object' && !Array.isArray(step.params)) ? step.params : {},
       commandJson: step.commandJson || null,
       commandNamespace: step.commandNamespace || 'MEPBridge',
       descriptorName: step.descriptorName || null,
@@ -1011,8 +1221,8 @@ class PlanChain {
       startedAt: null,
       completedAt: null,
       _retryCount: 0,
+      _skipped: false,
       rollbackSuggested: false,
-      ...step                  // 允许原始字段覆盖
     };
   }
 
@@ -1020,7 +1230,7 @@ class PlanChain {
     let maxOrder = -1;
     let maxRisk = null;
     for (const s of steps) {
-      const order = RISK_LEVEL_ORDER.indexOf(s.riskLevel || 'read');
+      const order = riskOrder(s.riskLevel || 'read');
       if (order > maxOrder) {
         maxOrder = order;
         maxRisk = s.riskLevel;
@@ -1102,6 +1312,7 @@ class PlanChain {
 
 module.exports = {
   PlanChain,
+  _test: { findUnresolvedPlaceholder, riskOrder, maxRiskLevel },
   APPROVAL_PRESETS,
   RISK_LEVEL_ORDER
 };

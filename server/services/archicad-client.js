@@ -75,29 +75,6 @@ class ArchicadClient {
       };
     }
   }
-
-  // 撤销操作
-  async undo() {
-    try {
-      const response = await axios.post(
-        this.endpoint,
-        {
-          command: 'API.Undo'
-        },
-        { timeout: 5000 }
-      );
-
-      return {
-        success: response.data.succeeded || false,
-        error: response.data.error?.message
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
 }
 
 function parseCommandName(commandName) {

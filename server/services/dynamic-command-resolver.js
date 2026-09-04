@@ -5,6 +5,15 @@ const axios = require('axios');
 // tests/test-polygon-contour-contract.js 会 diff 两边。
 const DEFAULT_COPY_ALLOWED_TYPES = ['MEPRoute', 'Wall', 'Column', 'Beam', 'Slab', 'Roof', 'Mesh', 'Morph'];
 
+// 必须与 Sources/CopyElementsCommand.cpp 的 MaxSourceGuids 保持一致。
+// tests/test-batch-limit-contract.js 会 diff 两边。
+//
+// 此前这里是硬编码的 `>= 10`，且只作用于「从选择集解析」这条路径 —— 显式传 sourceGuids
+// 时函数在第 27 行就 `status: skipped` 返回了，压根走不到计数校验。于是实际语义是
+// 「选择集路径限 9 个，显式路径无上限」。现在 C++ 侧是唯一真闸门（两条路径都过它），
+// 这里保留同值预检只为把错误提前到调用层、给出可读的 409，而非作为唯一防线。
+const MAX_COPY_SOURCE_GUIDS = 500;
+
 class DynamicResolutionError extends Error {
   constructor(code, message, statusCode = 400, detail = {}) {
     super(message);
@@ -25,6 +34,15 @@ async function resolveDynamicCommandParameters(archicadCommand, endpoint) {
   archicadCommand.parameters.addOnCommandParameters = params;
 
   if (Array.isArray(params.sourceGuids) && params.sourceGuids.length > 0) {
+    // 显式路径也要过上限：此前这里直接 return，使上限只对选择集路径生效。
+    if (params.sourceGuids.length > MAX_COPY_SOURCE_GUIDS) {
+      throw new DynamicResolutionError(
+        'COPY_TOO_MANY_SOURCE_GUIDS',
+        `CopyElements supports at most ${MAX_COPY_SOURCE_GUIDS} source GUIDs; request has ${params.sourceGuids.length}.`,
+        409,
+        { sourceCount: params.sourceGuids.length, maxItems: MAX_COPY_SOURCE_GUIDS }
+      );
+    }
     return {
       type: 'copy-elements-source-guids',
       status: 'skipped',
@@ -54,18 +72,18 @@ async function resolveDynamicCommandParameters(archicadCommand, endpoint) {
   if (elements.length === 0) {
     throw new DynamicResolutionError(
       'COPY_NO_SELECTION',
-      'CopyElements requires 1-9 selected elements in Archicad.',
+      `CopyElements requires 1-${MAX_COPY_SOURCE_GUIDS} selected elements in Archicad.`,
       409,
       { selectedCount: selected.selectedCount || 0 }
     );
   }
 
-  if (elements.length >= 10) {
+  if (elements.length > MAX_COPY_SOURCE_GUIDS) {
     throw new DynamicResolutionError(
       'COPY_TOO_MANY_SELECTED_ELEMENTS',
-      `CopyElements supports fewer than 10 selected elements; current selection has ${elements.length}.`,
+      `CopyElements supports at most ${MAX_COPY_SOURCE_GUIDS} selected elements; current selection has ${elements.length}.`,
       409,
-      { selectedCount: elements.length, maxExclusive: 10 }
+      { selectedCount: elements.length, maxItems: MAX_COPY_SOURCE_GUIDS }
     );
   }
 
@@ -152,5 +170,6 @@ function unwrapAddOnResponse(archicadResult) {
 
 module.exports = {
   DynamicResolutionError,
-  resolveDynamicCommandParameters
+  resolveDynamicCommandParameters,
+  MAX_COPY_SOURCE_GUIDS
 };

@@ -79,6 +79,10 @@ function localizeStarterAssets(assets, locale) {
   };
 }
 
+function visibleTemplates(templates) {
+  return (templates || []).filter((template) => template.geometryTemplate === undefined);
+}
+
 // 确保 user-data/ 和 backups/ 目录存在（新用户首次启动自动创建）
 (function ensureUserDataDirs() {
   try {
@@ -238,7 +242,11 @@ router.get('/load', (req, res) => {
         storedAssets = starterAssets;
       }
     }
-    const assets = localizeStarterAssets(storedAssets, locale);
+    const storedVisibleAssets = {
+      ...storedAssets,
+      templates: visibleTemplates(storedAssets.templates)
+    };
+    const assets = localizeStarterAssets(storedVisibleAssets, locale);
     const tier = getCurrentTier();
     res.json({
       success: true,
@@ -288,6 +296,13 @@ router.post('/templates', (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Missing required fields: id, name, plan'
+      });
+    }
+
+    if (template.geometryTemplate !== undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'geometryTemplate user templates are not supported in v0.1.4'
       });
     }
 

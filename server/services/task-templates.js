@@ -13,6 +13,7 @@ const path = require('path');
 const fs = require('fs');
 const { migrateLegacyFile } = require('./runtime-paths');
 const { normalizeUiLocale } = require('./ui-locale');
+const { extractTemplateParams } = require('./nl-param-extractors');
 
 const TEMPLATES_FILE = migrateLegacyFile('.task-templates.json');
 
@@ -111,7 +112,7 @@ const BUILTIN_TEMPLATES = [
     name: '首层双跑楼梯与平台楼板',
     category: 'building',
     keywords: {
-      zh: ['示例楼梯', '创建楼梯', '首层楼梯', '建楼梯', '画楼梯', '示例创建首层楼梯', '楼梯楼板', '楼梯平台', '两段楼梯', '2段楼梯'],
+      zh: ['示例楼梯', '示例首层楼梯', '创建楼梯', '首层楼梯', '建楼梯', '画楼梯', '示例创建首层楼梯', '楼梯楼板', '楼梯平台', '两段楼梯', '2段楼梯'],
       en: ['sample stair', 'create stair', 'ground floor stair', 'build stair', 'two flight stair', 'landing slab']
     },
     description: '\u{6309} AC28 \u{6587}\u{4ef6}\u{9996}\u{5c42}\u{5df2}\u{6709}\u{6784}\u{4ef6}\u{53c2}\u{6570}\u{521b}\u{5efa}\u{ff1a}2\u{6bb5}10\u{6b65}\u{697c}\u{68af} + 1\u{5757}\u{8fde}\u{63a5}\u{697c}\u{68af}\u{697c}\u{677f}\u{ff0c}\u{540c}\u{56fe}\u{5c42}\u{4f4d}\u{7f6e}\u{3002}\u{697c}\u{68af}\u{9ad8}1.5m\u{3001}\u{5bbd}1.2m\u{ff1b}\u{5e73}\u{53f0}\u{697c}\u{677f}\u{539a}0.24m\u{3001}level=1.5m\u{ff0c}\u{5750}\u{6807}(-0.4,-5.62)\u{5230}(1.1,-2.87)\u{3002}\u{53c2}\u{6570}\u{6765}\u{81ea}\u{5f53}\u{524d}\u{6587}\u{4ef6} mesh/AABB \u{8bfb}\u{53d6}\u{7ed3}\u{679c}\u{3002}',
@@ -135,15 +136,16 @@ const BUILTIN_TEMPLATES = [
       ].map(translatePoint);
 
       // Derived from current file mesh/AABB:
-      // Stair A AABB: x 1.093790198..4.64, y -4.071811192..-2.868188808
-      // Stair B AABB: x 1.020000012..4.566209814, y -5.621811181..-4.418188796
+      // Stable Archicad baseline readback is 3.5m for each flight.
+      // Upper: x 1.093790198..4.593790198; lower: x 1.066209814..4.566209814.
+      // STAIR-0 boundary: each CreateStair step uses a two-point straight baseline.
       const upperFlightWaypoints = [
         { x: 1.093790198, y: -3.47 },
-        { x: 4.64, y: -3.47 }
+        { x: 4.593790198, y: -3.47 }
       ].map(translatePoint);
       const lowerFlightWaypoints = [
         { x: 4.566209814, y: -5.02 },
-        { x: 1.020000012, y: -5.02 }
+        { x: 1.066209814, y: -5.02 }
       ].map(translatePoint);
 
       return {
@@ -157,13 +159,13 @@ const BUILTIN_TEMPLATES = [
           },
           {
             action: 'CreateStair',
-            title: `\u{521b}\u{5efa}\u{4e0a}\u{8dd1}\u{697c}\u{68af}\u{6bb5} 10\u{6b65}\u{9ad8}1.5m\u{5bbd}1.2m\u{ff0c}baseLevel=1.5m\u{ff0c}mesh\u{4e2d}\u{7ebf} (1.09,-3.47)->(4.64,-3.47)`,
+            title: `\u{521b}\u{5efa}\u{4e0a}\u{8dd1}\u{697c}\u{68af}\u{6bb5} 10\u{6b65}\u{9ad8}1.5m\u{5bbd}1.2m\u{ff0c}baseLevel=1.5m\u{ff0c}3.5m\u{4e2d}\u{7ebf} (1.09,-3.47)->(4.59,-3.47)`,
             params: { start: upperFlightWaypoints[0], end: upperFlightWaypoints[upperFlightWaypoints.length - 1], waypoints: upperFlightWaypoints, totalHeight, baseLevel: upperFlightBaseLevel, stepNum, flightWidth, floorIndex, dryRun: true, confirmRequired: true },
             riskLevel: 'create-element'
           },
           {
             action: 'CreateStair',
-            title: `\u{521b}\u{5efa}\u{4e0b}\u{8dd1}\u{697c}\u{68af}\u{6bb5} 10\u{6b65}\u{9ad8}1.5m\u{5bbd}1.2m\u{ff0c}baseLevel=0m\u{ff0c}mesh\u{4e2d}\u{7ebf} (4.57,-5.02)->(1.02,-5.02)`,
+            title: `\u{521b}\u{5efa}\u{4e0b}\u{8dd1}\u{697c}\u{68af}\u{6bb5} 10\u{6b65}\u{9ad8}1.5m\u{5bbd}1.2m\u{ff0c}baseLevel=0m\u{ff0c}3.5m\u{4e2d}\u{7ebf} (4.57,-5.02)->(1.07,-5.02)`,
             params: { start: lowerFlightWaypoints[0], end: lowerFlightWaypoints[lowerFlightWaypoints.length - 1], waypoints: lowerFlightWaypoints, totalHeight, baseLevel: lowerFlightBaseLevel, stepNum, flightWidth, floorIndex, dryRun: true, confirmRequired: true },
             riskLevel: 'create-element'
           }
@@ -309,13 +311,14 @@ const BUILTIN_TEMPLATES = [
         { x: 1.1, y: -2.87 },
         { x: -0.4, y: -2.87 }
       ].map(translatePoint);
+      // STAIR-0 boundary: two separate straight flights, never a multi-vertex stair baseline.
       const upperFlightWaypoints = [
         { x: 1.093790198, y: -3.47 },
-        { x: 4.64, y: -3.47 }
+        { x: 4.593790198, y: -3.47 }
       ].map(translatePoint);
       const lowerFlightWaypoints = [
         { x: 4.566209814, y: -5.02 },
-        { x: 1.020000012, y: -5.02 }
+        { x: 1.066209814, y: -5.02 }
       ].map(translatePoint);
 
       const steps = [];
@@ -924,13 +927,32 @@ class TaskTemplateRegistry {
     if (!tpl) return null;
 
     try {
-      // 模板 generate 函数可能需要从 context 提取参数
-      const params = context.templateParams || {};
+      // 从原文提取参数，再让显式传入的 templateParams 覆盖。
+      //
+      // 此前这里只读 `context.templateParams`，而全仓无任何调用方填充过该字段，
+      // 于是 TPL-011「移动选中」恒生成 `deltaMm: {x:0,y:0,z:0}`，送到 Add-On
+      // 必然被 `ZERO_DELTA` 拒绝——用户说的「向右移动 500mm」被整句丢弃。
+      // 模板匹配优先于 descriptor 匹配（copilot-message.js 的顺序），
+      // 所以这条路径不提参数就等于变换类命令永远拿不到参数。
+      //
+      // 提取器与 descriptor 路径共用 `nl-param-extractors.js`，避免两条路径
+      // 对同一句话给出不同参数——那种不一致比参数缺失更难排查。
+      const extracted = extractTemplateParams(text);
+      const params = { ...extracted, ...(context.templateParams || {}) };
       const locale = normalizeUiLocale(context.locale || context.language);
       const plan = localizeGeneratedPlan(tpl, tpl.generate(params), locale);
       if (plan && plan.steps && plan.steps.length > 0) {
-        console.log(`[TaskTemplates] Template matched: ${tpl.id} (${tpl.name}), generated ${plan.steps.length} steps`);
-        return plan;
+        const requiresStepRefinement = plan.requiresStepRefinement === true ||
+          Boolean(plan.inputRequirements && Object.keys(plan.inputRequirements).length > 0);
+        console.log(`[TaskTemplates] Template matched: ${tpl.id} (${tpl.name}), generated ${plan.steps.length} steps, extractedParams=${JSON.stringify(Object.keys(extracted))}`);
+        return {
+          ...plan,
+          source: 'builtin-template',
+          templateId: tpl.id,
+          extractedParams: extracted,
+          deterministic: !requiresStepRefinement,
+          requiresStepRefinement
+        };
       }
     } catch (e) {
       console.error('[TaskTemplates] Generate failed for', tpl.id, e.message);
