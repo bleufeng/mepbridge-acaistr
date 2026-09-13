@@ -148,6 +148,12 @@ function extractorSpecToJsonSchema(key, spec = {}, defaultValue) {
     case 'guid':
     case 'string':
       return { type: 'string', description };
+    case 'object':
+      return {
+        type: 'object',
+        description,
+        additionalProperties: true,
+      };
     case 'object-reference':
       return {
         type: 'object',

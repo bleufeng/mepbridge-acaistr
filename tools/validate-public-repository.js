@@ -215,6 +215,7 @@ for (const filePath of files) {
 const commandBoundary = parseJson(path.join(root, 'ai-adapter/command-boundary.json'));
 const expectedDescriptors = commandBoundary?.descriptors;
 const expectedServerTools = commandBoundary?.serverTools;
+const expectedCppCommands = commandBoundary?.cppInstallCommands;
 const descriptorRegistry = parseJson(path.join(root, 'ai-adapter/tool-descriptors.json'));
 if (typeof expectedDescriptors !== 'number') {
   failures.push('ai-adapter/command-boundary.json must declare a numeric descriptors count.');
@@ -236,6 +237,59 @@ if (typeof expectedDescriptors !== 'number') {
   }
   if (addonCount + serverCount !== entries.length) {
     failures.push(`Descriptor total mismatch: ${entries.length} entries but ${addonCount} + ${serverCount} counted.`);
+  }
+
+  const proseChecks = [
+    {
+      relativePath: 'README.md',
+      patterns: [
+        `${expectedCppCommands} registered C\\+\\+ commands`,
+        `${expectedDescriptors} Add-On descriptor`,
+        `${expectedServerTools} (?:local )?Workbench Server tools`
+      ]
+    },
+    {
+      relativePath: 'README.zh-CN.md',
+      patterns: [
+        `${expectedCppCommands} 个注册 C\\+\\+ 命令`,
+        `${expectedDescriptors} 个 Add-On descriptor`,
+        `${expectedServerTools} 个本地 Workbench Server 工具`
+      ]
+    },
+    {
+      relativePath: 'docs/contributors/PUBLIC_SOURCE_BOUNDARY.md',
+      patterns: [
+        `${expectedCppCommands} registered C\\+\\+ commands`,
+        `${expectedDescriptors} Add-On descriptors`,
+        `${expectedServerTools} server tools`
+      ]
+    }
+  ];
+  for (const proseCheck of proseChecks) {
+    const prosePath = path.join(root, proseCheck.relativePath);
+    if (!fs.existsSync(prosePath)) {
+      failures.push(`Boundary prose file is missing: ${proseCheck.relativePath}`);
+      continue;
+    }
+    const prose = fs.readFileSync(prosePath, 'utf8').replace(/\s+/g, ' ');
+    for (const pattern of proseCheck.patterns) {
+      if (!new RegExp(pattern, 'i').test(prose)) {
+        failures.push(
+          `${proseCheck.relativePath} must declare the exported boundary ` +
+          `${expectedCppCommands} C++ commands, ${expectedDescriptors} Add-On descriptors, and ` +
+          `${expectedServerTools} server tools.`
+        );
+        break;
+      }
+    }
+  }
+  const prohibitedDevelopmentCommands = entries
+    .map((entry) => entry?.commandName)
+    .filter((commandName) => typeof commandName === 'string');
+  for (const prohibitedCommandName of ['CreateComplexElement']) {
+    if (prohibitedDevelopmentCommands.includes(prohibitedCommandName)) {
+      failures.push(`Public descriptor registry must not contain excluded command: ${prohibitedCommandName}`);
+    }
   }
 }
 

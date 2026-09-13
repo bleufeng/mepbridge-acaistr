@@ -2,6 +2,27 @@
 
 Public user-facing changes. Versions follow Semantic Versioning.
 
+## [0.1.5] - 2026-09-04
+
+### Added
+
+- `EditBuildingElement` now also edits Column height and position, Beam start/end, and Slab thickness and level, while keeping the precise-field mask and readback contract used by Wall and openings.
+- New `MultiplyElements` command performs controlled vector or two-direction array multiplication for Wall, Column, Beam, Slab, Roof, Mesh and Morph by explicit GUID. It is dry-run and confirmation gated, runs in one undoable transaction, returns every created GUID, and reports rollback cleanup if any copy fails.
+- New read-only `GetAttributes` command inventories Building Materials, Composites, Surfaces, Fills, Pens, Line Types, Complex Profiles, Layer Combinations and Zone Categories.
+- New read-only `GetDocumentationElements` command inventories Dimension, Text, Label, Detail, Worksheet, Section and Elevation elements; marker geometry continues to use `GetSectionMarkers`.
+- New `CreateText` command creates a minimal native single-line text element with content, anchor position, optional size, pen and story, then reads it back; actual creation is preview-gated and confirmation-gated, and mismatch cleanup is reported.
+- New `CreateDimension` command creates a minimal native static linear dimension from exactly two measured points, with optional dimension-line location, one associated element and story. Angle, radius, level, chain, custom style and custom text stay unsupported; creation is preview-gated and confirmation-gated with native readback and mismatch cleanup.
+- New `CreateLabel` command creates a minimal native single-line text label with an anchor, optional leader points, one parent element and story. Symbol labels, GDL label parts, rich text, multiple parents and custom templates stay unsupported; creation is preview-gated and confirmation-gated with native readback and mismatch cleanup.
+- New `ChangeStorySettings` command edits the absolute elevation or the height to the adjacent upper real story of one existing story. It is preview and confirmation gated, verifies the complete story snapshot, reports best-effort rollback after a readback mismatch, and rejects Teamwork projects.
+- New `DeleteStory` command deletes one existing story only when the exact index and expected name are supplied. It previews by default, requires explicit confirmation, verifies the complete story snapshot, restores shifted story levels, and reports non-rollbackable states explicitly.
+- New `TrimElements` command performs the first supported native trim round: one Wall target with one Roof operator, using KeepInside or KeepOutside. Other element combinations remain explicit failures rather than silent fallbacks.
+- New `CreateSolidOperation` command performs the first supported native solid-operation round: two Morph elements with Subtract or Add, followed by independent result readback. Other combinations and operation types remain explicit failures.
+
+### Fixed
+
+- Roof geometry readback now returns the full closed PlaneRoof contour in model coordinates. The contour was stored in pivot-local coordinates and only its first point was converted back, so geometry-based comparison and copy workflows could see a shifted or incomplete outline.
+- Stair rule prechecks now compare riser height, going and `2R+G` with a 1 mm tolerance instead of strict floating-point equality, preventing valid native stairs from being rejected by rounding noise while still failing closed on real rule conflicts.
+
 ## [0.1.4] - 2026-09-03
 
 ### Added

@@ -13,6 +13,10 @@ const {
 } = require('../services/runtime-paths');
 const { APP_VERSION } = require('../services/app-version');
 const { normalizeUiLocale } = require('../services/ui-locale');
+const {
+  getCommandSafetyCapabilities,
+  normalizeCommandSafetyParameters
+} = require('../services/command-capabilities');
 
 // 用户数据统一存放到 user-data/ 目录（便于用户查找、备份、迁移）
 const USER_DATA_DIR = migrateLegacyDirectory('user-data', 'user-data');
@@ -46,12 +50,12 @@ function createStarterAssets(locale, metadata = {}) {
     return null;
   }
 
-  return {
+  return normalizeUserAssetsSafety({
     schemaVersion: 'user-asset-1',
     templates: Array.isArray(starter.templates) ? starter.templates : [],
     commands: Array.isArray(starter.commands) ? starter.commands : [],
     ...metadata,
-  };
+  });
 }
 
 function localizeStarterAssets(assets, locale) {
@@ -67,7 +71,7 @@ function localizeStarterAssets(assets, locale) {
     (starter.commands || []).map((command) => [command.id, command])
   );
 
-  return {
+  return normalizeUserAssetsSafety({
     ...assets,
     notes: starter.notes || assets.notes,
     templates: (assets.templates || []).map((template) =>
@@ -76,11 +80,124 @@ function localizeStarterAssets(assets, locale) {
     commands: (assets.commands || []).map((command) =>
       localizedCommands.get(command.id) || command
     ),
-  };
+  });
 }
 
 function visibleTemplates(templates) {
   return (templates || []).filter((template) => template.geometryTemplate === undefined);
+}
+
+// 用户采集模板可携带可选 nameEn（英文 UI 显示名）。en-US 下用 nameEn 替换展示名；
+// 其余 locale 展示原始 name。替换只发生在 /load 展示层，存储与 /export 保持原数据。
+function localizeTemplateDisplayNames(assets, locale) {
+  if (normalizeUiLocale(locale) !== 'en-US' || !assets || !Array.isArray(assets.templates)) {
+    return assets;
+  }
+  return {
+    ...assets,
+    templates: assets.templates.map((template) => {
+      if (!template || typeof template !== 'object') return template;
+      const nameEn = typeof template.nameEn === 'string' ? template.nameEn.trim() : '';
+      return nameEn ? { ...template, name: nameEn } : template;
+    })
+  };
+}
+
+function forceConfirmedSafetyParameters(commandName, params = {}) {
+  const capabilities = getCommandSafetyCapabilities(commandName);
+  const normalized = normalizeCommandSafetyParameters(commandName, params);
+
+  // Template replay already has an explicit UI preview/confirm stage. Mutation
+  // steps must not fall back to the Add-On's dryRun=true default.
+  if (capabilities.dryRun) {
+    normalized.dryRun = false;
+  }
+  if (capabilities.confirmRequired) {
+    normalized.confirmRequired = true;
+  }
+
+  return normalized;
+}
+
+function getAddOnCommandName(commandJson) {
+  return commandJson?.parameters?.addOnCommandId?.commandName;
+}
+
+function normalizeUserStepSafety(step) {
+  if (!step || typeof step !== 'object') {
+    return step;
+  }
+
+  const nextStep = { ...step };
+  const actionName = typeof step.action === 'string' ? step.action : step.commandName;
+
+  if (actionName) {
+    nextStep.params = forceConfirmedSafetyParameters(actionName, step.params || {});
+  }
+
+  if (step.commandJson && typeof step.commandJson === 'object') {
+    const commandJson = { ...step.commandJson };
+    const parameters = { ...(commandJson.parameters || {}) };
+    const addOnCommandName = getAddOnCommandName({ parameters });
+
+    if (addOnCommandName) {
+      parameters.addOnCommandParameters = forceConfirmedSafetyParameters(
+        addOnCommandName,
+        parameters.addOnCommandParameters || {}
+      );
+      commandJson.parameters = parameters;
+      nextStep.commandJson = commandJson;
+    }
+  }
+
+  return nextStep;
+}
+
+function normalizeUserTemplateSafety(template) {
+  if (!template || typeof template !== 'object' || !template.plan || !Array.isArray(template.plan.steps)) {
+    return template;
+  }
+
+  return {
+    ...template,
+    plan: {
+      ...template.plan,
+      steps: template.plan.steps.map(normalizeUserStepSafety)
+    }
+  };
+}
+
+function normalizeUserCommandSafety(command) {
+  if (!command || typeof command !== 'object' || !command.singleStep) {
+    return command;
+  }
+
+  return {
+    ...command,
+    singleStep: {
+      ...command.singleStep,
+      params: forceConfirmedSafetyParameters(
+        command.singleStep.action,
+        command.singleStep.params || {}
+      )
+    }
+  };
+}
+
+function normalizeUserAssetsSafety(assets) {
+  if (!assets || typeof assets !== 'object') {
+    return assets;
+  }
+
+  return {
+    ...assets,
+    templates: Array.isArray(assets.templates)
+      ? assets.templates.map(normalizeUserTemplateSafety)
+      : [],
+    commands: Array.isArray(assets.commands)
+      ? assets.commands.map(normalizeUserCommandSafety)
+      : []
+  };
 }
 
 // 确保 user-data/ 和 backups/ 目录存在（新用户首次启动自动创建）
@@ -199,7 +316,7 @@ function loadAssets() {
     if (!data.schemaVersion) {
       data.schemaVersion = 'user-asset-1';
     }
-    return data;
+    return normalizeUserAssetsSafety(data);
   } catch (error) {
     console.error('[UserAssets] Load error:', error);
     return emptyAssets();
@@ -208,7 +325,7 @@ function loadAssets() {
 
 // 保存资产文件
 function saveAssets(data) {
-  fs.writeFileSync(ASSETS_FILE, JSON.stringify(data, null, 2));
+  fs.writeFileSync(ASSETS_FILE, JSON.stringify(normalizeUserAssetsSafety(data), null, 2));
 }
 
 function writeAssetsBackup(assets, reason = 'manual') {
@@ -246,7 +363,10 @@ router.get('/load', (req, res) => {
       ...storedAssets,
       templates: visibleTemplates(storedAssets.templates)
     };
-    const assets = localizeStarterAssets(storedVisibleAssets, locale);
+    const assets = localizeTemplateDisplayNames(
+      localizeStarterAssets(storedVisibleAssets, locale),
+      locale
+    );
     const tier = getCurrentTier();
     res.json({
       success: true,
@@ -273,12 +393,12 @@ router.post('/save', (req, res) => {
   try {
     const { templates, commands } = req.body;
 
-    const assets = {
+    const assets = normalizeUserAssetsSafety({
       schemaVersion: 'user-asset-1',
       templates: Array.isArray(templates) ? templates : [],
       commands: Array.isArray(commands) ? commands : [],
       updatedAt: new Date().toISOString()
-    };
+    });
 
     saveAssets(assets);
     res.json({ success: true, message: 'User assets saved' });
@@ -329,14 +449,15 @@ router.post('/templates', (req, res) => {
       });
     }
 
+    const normalizedTemplate = normalizeUserTemplateSafety(template);
     const assets = loadAssets();
-    const idx = assets.templates.findIndex(t => t.id === template.id);
+    const idx = assets.templates.findIndex(t => t.id === normalizedTemplate.id);
     const now = new Date().toISOString();
 
     if (idx >= 0) {
       // 更新
-      template.updatedAt = now;
-      assets.templates[idx] = template;
+      normalizedTemplate.updatedAt = now;
+      assets.templates[idx] = normalizedTemplate;
     } else {
       // 新增 — 检查数量限制
       const limitCheck = checkLimit('templates', assets.templates.length);
@@ -346,13 +467,13 @@ router.post('/templates', (req, res) => {
           error: `模板数量已达上限 (${limitCheck.limit} 个)，请删除旧模板或升级版本`
         });
       }
-      template.createdAt = now;
-      template.updatedAt = now;
-      assets.templates.push(template);
+      normalizedTemplate.createdAt = now;
+      normalizedTemplate.updatedAt = now;
+      assets.templates.push(normalizedTemplate);
     }
 
     saveAssets(assets);
-    res.json({ success: true, template, message: idx >= 0 ? 'Template updated' : 'Template created' });
+    res.json({ success: true, template: normalizedTemplate, message: idx >= 0 ? 'Template updated' : 'Template created' });
   } catch (error) {
     console.error('[UserAssets] POST /templates error:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -421,12 +542,13 @@ router.post('/commands', (req, res) => {
       }
     }
 
+    const normalizedCommand = normalizeUserCommandSafety(command);
     const assets = loadAssets();
-    const idx = assets.commands.findIndex(c => c.id === command.id);
+    const idx = assets.commands.findIndex(c => c.id === normalizedCommand.id);
     const now = new Date().toISOString();
 
     if (idx >= 0) {
-      assets.commands[idx] = command;
+      assets.commands[idx] = normalizedCommand;
     } else {
       // 新增 — 检查数量限制
       const limitCheck = checkLimit('commands', assets.commands.length);
@@ -436,12 +558,12 @@ router.post('/commands', (req, res) => {
           error: `自定义命令数量已达上限 (${limitCheck.limit} 个)，请删除旧命令或升级版本`
         });
       }
-      command.createdAt = now;
-      assets.commands.push(command);
+      normalizedCommand.createdAt = now;
+      assets.commands.push(normalizedCommand);
     }
 
     saveAssets(assets);
-    res.json({ success: true, command, message: idx >= 0 ? 'Command updated' : 'Command created' });
+    res.json({ success: true, command: normalizedCommand, message: idx >= 0 ? 'Command updated' : 'Command created' });
   } catch (error) {
     console.error('[UserAssets] POST /commands error:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -514,7 +636,7 @@ router.post('/import', (req, res) => {
             }
           }
           if (valid) {
-            assets.templates.push(template);
+            assets.templates.push(normalizeUserTemplateSafety(template));
             templatesAdded++;
           }
         }
@@ -538,7 +660,7 @@ router.post('/import', (req, res) => {
             }
           }
           if (valid) {
-            assets.commands.push(command);
+            assets.commands.push(normalizeUserCommandSafety(command));
             commandsAdded++;
           }
         }
@@ -672,5 +794,8 @@ module.exports = router;
 module.exports._test = {
   getStarterAssetsFile,
   localizeStarterAssets,
+  normalizeUserAssetsSafety,
+  normalizeUserCommandSafety,
+  normalizeUserTemplateSafety,
   normalizeUiLocale,
 };

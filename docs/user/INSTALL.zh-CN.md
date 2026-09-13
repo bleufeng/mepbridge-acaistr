@@ -1,8 +1,8 @@
-# MEPbridge ACAIstr v0.1.4 安装说明
+# MEPbridge ACAIstr v0.1.5 安装说明
 
 本说明适用于 Archicad 28 和 Archicad 29 的 Windows 发布包。
 
-中文优先界面请下载 `MEPbridge-ACAIstr-v0.1.4-win64-zh-CN.zip`，英文优先界面请下载 `MEPbridge-ACAIstr-v0.1.4-win64-en-US.zip`。首次安装不要使用独立 APX 更新文件，也不要使用 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`。
+中文优先界面请下载 `MEPbridge-ACAIstr-v<版本号>-win64-zh-CN.zip`，英文优先界面请下载 `MEPbridge-ACAIstr-v<版本号>-win64-en-US.zip`（`<版本号>` 以 Releases 页最新发布为准）。首次安装不要使用独立 APX 更新文件，也不要使用 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`。
 
 ## 环境要求
 
@@ -36,8 +36,8 @@ Archicad-29\MEPBridge.apx
 
 只能安装与 Archicad 主版本一致的 APX。
 
-`MEPbridge-ACAIstr-v0.1.4-AC28-win64.apx` 和
-`MEPbridge-ACAIstr-v0.1.4-AC29-win64.apx` 只更新原生 Add-On，不包含
+`MEPbridge-ACAIstr-v<版本号>-AC28-win64.apx` 和
+`MEPbridge-ACAIstr-v<版本号>-AC29-win64.apx` 只更新原生 Add-On，不包含
 Server、UI、MCP Server、生产依赖和安装脚本，仅适用于已经完成完整安装的用户。
 
 ## 如何判断该只换 APX 还是重装完整包
@@ -61,16 +61,18 @@ Server、UI、MCP Server、生产依赖和安装脚本，仅适用于已经完�
 4. 确认该目录内只有一个有效的 `.apx` 文件。
 5. 启动 Archicad 并执行 Ping：回报的版本必须等于新版本号，命令数与 descriptor 数必须与发布说明一致。若版本仍显示旧值，说明 Archicad 加载了旧副本或复制时文件被锁定 —— 从第 1 步重做。
 
-**v0.1.4 必须重装完整包。** 它同时更新 Add-On、Server、MCP Server 和 descriptor 注册表。
+> 本版本的升级类型以 GitHub Release 发布说明的标注为准；只要涉及 Add-On 之外的部分（Server / MCP Server / descriptor 注册表 / 命令数变化），就必须重装完整包。
 
 ## 自动安装
 
-1. 将完整 ZIP 解压到普通目录。
+1. 将完整 ZIP 解压到普通目录（Windows 会创建与 ZIP 同名的文件夹，属预期行为）。
 2. 保存工作并关闭 Archicad。
-3. 双击 `Install-MEPBridge.cmd`。
+3. 进入解压出的文件夹，双击其中的 `Install-MEPBridge.cmd`（安装按该文件所在目录定位，文件夹名不影响安装）。
 4. 允许 Windows 管理员权限。
 5. 出现选择提示时，选择需要安装的 Archicad。
 6. 重新启动 Archicad。
+
+> 注意：解压出的文件夹是 Workbench Server/UI 的永久运行目录，装完不要删除或移动；升级时请解压到全新目录，不要混入旧版本文件。
 
 安装程序会将对应 APX 复制到：
 
@@ -162,7 +164,7 @@ Archicad-29\MEPBridge.apx   → 用于 Archicad 29
 
 1. 启动过程中没有 Add-On 加载错误弹窗。
 2. 菜单栏出现 **MEPbridge ACAIstr** 菜单，展开后有三个菜单项：「打开 MEPbridge ACAIstr」「使用指南」「版本信息」。
-3. 点击「版本信息」，对话框中显示 `Version: 0.1.2`。
+3. 点击「版本信息」，对话框中显示的版本号与你所安装的版本一致。
 
 前三项通过即说明原生 Add-On 安装成功，Archicad JSON 命令已可用。
 
@@ -230,6 +232,34 @@ node <发布包根目录>\tools\mepbridge-mcp-server.js
   }
 }
 ```
+
+### 把路径换成自己的解压目录
+
+示例中的 `D:\MEPbridge-ACAIstr\` 仅是占位写法。请替换为你自己的解压目录，例如
+`D:\\MEPbridge-ACAIstr-v<版本号>-win64-zh-CN\\tools\\mepbridge-mcp-server.js`（文件夹名以实际解压结果为准）。注意：JSON 里的
+Windows 反斜杠必须写成 `\\`。
+
+### 常见 MCP 客户端的配置位置
+
+| 客户端 | 配置方式 |
+| --- | --- |
+| 豆包（桌面版） | 在豆包桌面版的「MCP / 扩展」设置中添加自定义 MCP 服务器：粘贴上方 JSON，或按表单填写命令 `node`、参数为脚本完整路径、环境变量 `MEPBRIDGE_ENDPOINT` |
+| Cursor | 将 JSON 写入 `%USERPROFILE%\.cursor\mcp.json`（项目级为 `<项目>\.cursor\mcp.json`），重启 Cursor |
+| Claude Desktop | 将 JSON 合并进 `%APPDATA%\Claude\claude_desktop_config.json`，重启 Claude Desktop |
+| CodeBuddy | 将 JSON 写入项目 `.codebuddy\.mcp.json` 或用户级 `~\.codebuddy\.mcp.json`，重启 IDE |
+| Codex CLI | 在 `%USERPROFILE%\.codex\config.toml` 追加（TOML 格式）：`[mcp_servers.mepbridge]`、`command = "node"`、`args = ["<解压目录>/tools/mepbridge-mcp-server.js"]`、`env = { MEPBRIDGE_ENDPOINT = "http://127.0.0.1:19780" }` |
+
+### 其它 MCP 宿主端（表中没有的）
+
+任何支持 **stdio 传输 MCP** 的宿主端都可接入，在它的 MCP 设置里提供同样三要素即可：
+
+1. 命令：`node`
+2. 参数：`<你的解压目录>\tools\mepbridge-mcp-server.js`
+3. 环境变量：`MEPBRIDGE_ENDPOINT=http://127.0.0.1:19780`
+
+该脚本使用 stdio JSON-RPC 2.0，仅依赖 Node.js 内置模块，无需额外安装依赖。若某个客户端
+不支持配置自定义 stdio 命令（例如纯网页版客户端），则无法接入；是否支持以该客户端自身的
+MCP 能力为准。
 
 ## 用户数据
 
@@ -299,7 +329,7 @@ node <发布包根目录>\tools\mepbridge-mcp-server.js
 - Archicad 加载 Add-On 时没有错误。
 - MEPbridge ACAIstr 菜单显示三个独立菜单项。
 - Workbench 可以打开 `http://127.0.0.1:19780/`。
-- `/health` 显示版本 `0.1.4`。
-- 对已发布的 v0.1.4 安装包，Ping 显示 79 个注册 C++ 命令和 78 个 Add-On descriptor/MCP 工具；Workbench Server 另有 4 个 server 工具。
+- `/health` 显示的版本与你所安装的版本一致。
+- Ping 显示的注册 C++ 命令数与 Add-On descriptor/MCP 工具数，与该版本发布说明标注的数量一致。
 
 执行写入、删除、批量或几何修改前，应使用测试或已备份的 PLN。

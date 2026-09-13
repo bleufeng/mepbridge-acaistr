@@ -919,9 +919,9 @@
     {
       "name": "mepbridge.set_active_story",
       "title": "MEPBridge set active story",
-      "description": "Preview or switch Archicad's active story by existing story index. DEFAULTS TO PREVIEW (dryRun:true): the story is NOT switched unless the caller passes confirmRequired:true (and dryRun:false or omitting dryRun is not enough — confirmRequired is mandatory). On an actual switch the response carries readbackVerified:true plus previousStoryIndex for explicit restoration after the task.",
+      "description": "Preview or switch Archicad's active story by existing story index. DEFAULTS TO PREVIEW (dryRun:true): the story is NOT switched unless the caller passes confirmRequired:true (and dryRun:false or omitting dryRun is not enough — confirmRequired is mandatory). On an actual switch the response carries readbackVerified:true plus previousStoryIndex for explicit restoration after the task. Runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates.",
       "featureArea": "Workspace",
-      "status": "code-complete-pending-runtime",
+      "status": "runtime-validated",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "SwitchStory",
@@ -1056,6 +1056,79 @@
       ]
     },
     {
+      "name": "mepbridge.delete_story",
+      "title": "MEPBridge delete story",
+      "description": "Preview or delete one native Archicad story. The story is identified by an exact storyIndex plus expectedStoryName pair, actual deletion is confirmation-gated, and the command verifies the remaining sequence, collapsed story levels, virtual upper story, and active story. Archicad story deletion is non-undoable; after a mutation, readback mismatches are reported without pretending rollback is possible. Runtime-validated on the 2026-09-09 AC28 and AC29 v0.1.5 candidates, including AC28 forced story database refresh.",
+      "featureArea": "Project",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "DeleteStory",
+      "riskLevel": "high-mutation",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "none-story-deletion-is-non-undoable",
+      "nlTriggers": {
+        "zh": [
+          "删除楼层",
+          "移除楼层",
+          "删掉测试楼层",
+          "清理楼层"
+        ],
+        "en": [
+          "delete story",
+          "remove story",
+          "delete floor",
+          "remove floor"
+        ]
+      },
+      "paramExtractors": {
+        "storyIndex": {
+          "type": "integer",
+          "required": true,
+          "description": "Existing target story index from get_stories."
+        },
+        "expectedStoryName": {
+          "type": "string",
+          "required": true,
+          "description": "Exact current story name at storyIndex; rejects any index/name mismatch."
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "true (default) = preview only; false performs the confirmation-gated deletion."
+        },
+        "confirmRequired": {
+          "type": "boolean",
+          "description": "MUST be true when dryRun is false."
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "DeleteStory"
+          },
+          "addOnCommandParameters": {
+            "storyIndex": 0,
+            "expectedStoryName": "Story To Delete",
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      },
+      "postChecks": [
+        "native-story-count-decrement",
+        "remaining-story-sequence-and-collapsed-level-match",
+        "target-story-name-absent",
+        "native-active-story-restored"
+      ]
+    },
+    {
       "name": "mepbridge.set_stories",
       "title": "MEPBridge batch rename stories",
       "description": "Batch rename existing Archicad stories by index. Prevalidates the full request, supports dry-run and confirmation, and restores earlier names if a later rename fails.",
@@ -1112,6 +1185,84 @@
           }
         }
       }
+    },
+    {
+      "name": "mepbridge.change_story_settings",
+      "title": "MEPBridge change story elevation or height",
+      "description": "Preview or change one existing Archicad story's absolute elevation or its height to the immediate upper story. Provide exactly one of elevation or height. elevation is the project absolute level; height is the interval to the next higher actual story, or to Archicad's virtual upper story level for the top actual story. The virtual story is used only for height calculation and is never exposed as a real story. Teamwork projects are rejected. Story structure mutations are non-undoable project-setting changes; actual execution requires dryRun=false and confirmRequired=true, then performs a complete native story readback. A readback mismatch triggers best-effort restoration and is not equivalent to Archicad Undo.",
+      "featureArea": "Project",
+      "status": "code-complete-pending-runtime",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "ChangeStorySettings",
+      "riskLevel": "high-mutation",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "best-effort-story-snapshot-restore",
+      "nlTriggers": {
+        "zh": [
+          "修改楼层标高",
+          "修改楼层层高",
+          "调整楼层高度",
+          "修改楼层高度",
+          "调整楼层标高"
+        ],
+        "en": [
+          "change story elevation",
+          "change story height",
+          "change floor elevation",
+          "change floor height"
+        ]
+      },
+      "paramExtractors": {
+        "storyIndex": {
+          "type": "integer",
+          "required": true,
+          "description": "Existing story index from GetStories."
+        },
+        "elevation": {
+          "type": "number",
+          "description": "New project absolute story elevation in meters; mutually exclusive with height."
+        },
+        "height": {
+          "type": "number",
+          "description": "New height from this story to the immediate upper actual story in meters; for the top actual story, Archicad's virtual upper story level is used; mutually exclusive with elevation."
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "true (default) previews the complete story snapshot without mutation."
+        },
+        "confirmRequired": {
+          "type": "boolean",
+          "description": "MUST be true for an actual mutation."
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "ChangeStorySettings"
+          },
+          "addOnCommandParameters": {
+            "storyIndex": 1,
+            "elevation": 3.5,
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      },
+      "postChecks": [
+        "native-story-count-unchanged",
+        "native-story-identities-unchanged",
+        "native-target-elevation-or-height-readback",
+        "native-top-story-virtual-upper-level-readback",
+        "best-effort-story-snapshot-restore-on-mismatch"
+      ]
     },
     {
       "name": "mepbridge.get_libraries",
@@ -2618,9 +2769,9 @@
     {
       "name": "mepbridge.create_roof",
       "title": "MEPBridge create roof (architectural)",
-      "description": "Create a roof from a polygon outline using native Archicad API (API_RoofID) with pitch angle support. Requires at least 3 vertices. V2 H1.1 channel A.",
+      "description": "Create a roof from a polygon outline using native Archicad API (API_RoofID) with pitch angle support. Requires at least 3 vertices. Contour input and readback use model coordinates; PlaneRoof contours are converted back from pivot-local coordinates. Runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates.",
       "featureArea": "Architecture",
-      "status": "v2-h1",
+      "status": "runtime-validated",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "CreateRoof",
@@ -2714,9 +2865,9 @@
     {
       "name": "mepbridge.create_stair",
       "title": "MEPBridge create stair (architectural)",
-      "description": "Create a native Archicad stair from a two-point straight baseline, explicit totalHeight, and optional step/flight/tread parameters. Strictly asserted: baseline / totalHeight / stepNum / flightWidth / relative baseLevel / floorIndex (all verifiably preserved). When stepNum is supplied, solver rules pin the riser height and going to totalHeight/stepNum and baselineLength/stepNum, and readback fails closed with cleanup if Archicad changes the semantics. The response exposes baseLevel (relative to home story), absoluteBaseLevel, homeStoryLevel, and resolvedGoing (baselineLength / stepNum). treadDepth is accepted but not directly asserted; the response reports treadDepthApplied:false. Creation is read back and cleaned up on semantic mismatch. AC29 evidence updated 2026-09-02.",
+      "description": "Create a native Archicad stair from a two-point straight baseline, explicit totalHeight, and optional step/flight/tread parameters. Strictly asserted: baseline / totalHeight / stepNum / flightWidth / relative baseLevel / floorIndex (all verifiably preserved). When stepNum is supplied, solver rules pin the riser height and going to totalHeight/stepNum and baselineLength/stepNum; riser, going, and 2R+G rule checks use a 1 mm tolerance. Readback fails closed with cleanup if Archicad changes the semantics. The response exposes baseLevel (relative to home story), absoluteBaseLevel, homeStoryLevel, and resolvedGoing (baselineLength / stepNum). treadDepth is accepted but not directly asserted; the response reports treadDepthApplied:false. Runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates.",
       "featureArea": "Architecture",
-      "status": "code-complete-pending-runtime",
+      "status": "runtime-validated",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "CreateStair",
@@ -2818,7 +2969,7 @@
       "title": "MEPBridge create object (architectural)",
       "description": "Create a placeable GSM Object at a position. Supports exact project-library resolution by stable main GUID/name and Object Favorites; ambiguous or stale selectors fail explicitly. Source and offline contract complete; AC28/AC29 APX rebuild and runtime readback pending.",
       "featureArea": "Architecture",
-      "status": "code-complete-pending-compile",
+      "status": "code-complete-pending-runtime",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "CreateObject",
@@ -2973,9 +3124,9 @@
     {
       "name": "mepbridge.create_mesh",
       "title": "MEPBridge create mesh (terrain)",
-      "description": "Create a terrain mesh from a structured polygon outline with optional per-vertex heights. Source and offline contract complete; AC28/AC29 APX rebuild and runtime readback pending.",
+      "description": "Create a terrain mesh from a structured polygon outline with optional per-vertex heights. Runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates.",
       "featureArea": "Architecture",
-      "status": "code-complete-pending-compile",
+      "status": "runtime-validated",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "CreateMesh",
@@ -3164,7 +3315,7 @@
       "title": "MEPBridge viewport capture (visual feedback)",
       "description": "Capture the current or a uniquely named Navigator View Map view as a structured visual snapshot and optional PNG. When targetViewName is supplied, the original window/database/view settings are restored on every completion path. AC28/AC29 APX rebuild and runtime verification pending.",
       "featureArea": "Architecture",
-      "status": "code-complete-pending-compile",
+      "status": "code-complete-pending-runtime",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "ViewportCapture",
@@ -3234,9 +3385,9 @@
     {
       "name": "mepbridge.get_element_mesh",
       "title": "MEPBridge get element 3D mesh",
-      "description": "Read structured 3D geometry by GUID. Mesh elements include polygon vertices, relativeZ, absolute z, level, and elevation range; Morph elements include model-space Body vertices, edges, polygon edge indices, and normals. Read-only; AC28/AC29 APX rebuild and runtime readback pending.",
+      "description": "Read structured 3D geometry by GUID. Mesh elements include polygon vertices, relativeZ, absolute z, level, and elevation range; Morph elements include model-space Body vertices, edges, polygon edge indices, and normals. Read-only; runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates.",
       "featureArea": "Architecture",
-      "status": "code-complete-pending-compile",
+      "status": "runtime-validated",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "GetElementMesh",
@@ -5023,6 +5174,288 @@
       }
     },
     {
+      "name": "mepbridge.get_attributes",
+      "title": "MEPBridge get project attributes",
+      "description": "ATTR-R1: enumerate common project attribute families (Building Materials, Composites, Surfaces, Fills, Pens, Line Types, Complex Profiles, Layer Combinations, Zone Categories). Read-only identity inventory; attribute editing is intentionally outside v0.1.5. Runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates.",
+      "featureArea": "Architecture",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetAttributes",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "建筑材料",
+          "复合材料",
+          "表面",
+          "填充",
+          "笔号",
+          "线型",
+          "属性列表",
+          "图层组合",
+          "区域类别"
+        ],
+        "en": [
+          "building materials",
+          "composites",
+          "surfaces",
+          "fills",
+          "pens",
+          "line types",
+          "layer combinations",
+          "zone categories",
+          "attributes"
+        ]
+      },
+      "paramExtractors": {
+        "attributeType": {
+          "type": "string",
+          "description": "All/BuildingMaterial/Composite/Surface/Fill/Pen/LineType/Profile/LayerCombination/ZoneCategory"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetAttributes"
+          },
+          "addOnCommandParameters": {
+            "attributeType": "All"
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_text",
+      "title": "MEPBridge create text",
+      "description": "DOC-W2: create a minimal native single-line Archicad Text element. Supports content, anchor position, optional size/pen/floorIndex; fixed left-top anchor and left justification. Actual creation requires dryRun=false and confirmRequired=true; readback mismatch triggers cleanup. Runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates.",
+      "featureArea": "Architecture",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateText",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "auto-run"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "创建文本",
+          "新建文本",
+          "添加文字",
+          "创建标注文字",
+          "单行文本"
+        ],
+        "en": [
+          "create text",
+          "new text",
+          "add text",
+          "create annotation text",
+          "single-line text"
+        ]
+      },
+      "paramExtractors": {
+        "text": {
+          "type": "string",
+          "description": "Single-line text content; newline characters are rejected"
+        },
+        "position": {
+          "type": "point2d",
+          "description": "Text anchor position {x,y} in meters"
+        },
+        "size": {
+          "type": "number",
+          "description": "Optional text size in meters"
+        },
+        "pen": {
+          "type": "integer",
+          "description": "Optional Archicad pen index"
+        },
+        "floorIndex": {
+          "type": "integer",
+          "description": "Story index; defaults to current story"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateText"
+          },
+          "addOnCommandParameters": {
+            "text": "MEPBridge annotation",
+            "position": {
+              "x": 0,
+              "y": 0
+            },
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_dimension",
+      "title": "MEPBridge create dimension",
+      "description": "DOC-W3: create a minimal native static linear Archicad Dimension. Supports exactly two measured points, optional dimension-line location, and floorIndex. Angle, radius, level, chain, associated dimensions, custom style and custom dimension text are unsupported; associatedElementGuid is rejected with ASSOCIATED_DIMENSION_NOT_SUPPORTED. Actual creation requires dryRun=false and confirmRequired=true; native readback mismatch triggers created-GUID cleanup.",
+      "featureArea": "Architecture",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateDimension",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "创建尺寸标注",
+          "创建线性标注",
+          "新建尺寸",
+          "添加距离标注"
+        ],
+        "en": [
+          "create dimension",
+          "create linear dimension",
+          "new dimension",
+          "add distance annotation"
+        ]
+      },
+      "paramExtractors": {
+        "points": {
+          "type": "array",
+          "description": "Exactly two measured points; each point is {x,y} in meters"
+        },
+        "dimensionLineLocation": {
+          "type": "point2d",
+          "description": "Optional point on the dimension line in meters"
+        },
+        "associatedElementGuid": {
+          "type": "string",
+          "description": "Rejected in v0.1.5 with ASSOCIATED_DIMENSION_NOT_SUPPORTED"
+        },
+        "floorIndex": {
+          "type": "integer",
+          "description": "Story index; defaults to current story"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateDimension"
+          },
+          "addOnCommandParameters": {
+            "points": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 3,
+                "y": 0
+              }
+            ],
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_label",
+      "title": "MEPBridge create label",
+      "description": "DOC-W4: create a minimal native single-line text Archicad Label. Supports text, anchor position, optional leader mid/end points, one parent element GUID, and floorIndex. Symbol labels, GDL label parts, rich paragraphs, multiple parents and custom label templates are unsupported. Actual creation requires dryRun=false and confirmRequired=true; native readback mismatch triggers created-GUID cleanup.",
+      "featureArea": "Architecture",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateLabel",
+      "riskLevel": "create-element",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "created-guid-cleanup",
+      "nlTriggers": {
+        "zh": [
+          "创建标签",
+          "创建文字标注",
+          "新建标签",
+          "添加标签"
+        ],
+        "en": [
+          "create label",
+          "create text label",
+          "new label",
+          "add label"
+        ]
+      },
+      "paramExtractors": {
+        "text": {
+          "type": "string",
+          "description": "Single-line label text; newline characters are rejected"
+        },
+        "position": {
+          "type": "point2d",
+          "description": "Label anchor or leader beginning position {x,y} in meters"
+        },
+        "parentGuid": {
+          "type": "string",
+          "description": "Optional GUID of one existing parent element"
+        },
+        "midPoint": {
+          "type": "point2d",
+          "description": "Optional leader line middle point in meters"
+        },
+        "endPoint": {
+          "type": "point2d",
+          "description": "Optional leader line end point in meters"
+        },
+        "floorIndex": {
+          "type": "integer",
+          "description": "Story index; defaults to current story"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateLabel"
+          },
+          "addOnCommandParameters": {
+            "text": "MEPBridge label",
+            "position": {
+              "x": 0,
+              "y": 0
+            },
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
       "name": "mepbridge.get_view_map",
       "title": "MEPBridge get view map",
       "description": "Enumerate Navigator View Map (视图列表, read-only). Returns guid/name/viewName/itemType/databaseTypeID per view. Stage-1 semantic enhancement.",
@@ -5122,6 +5555,59 @@
           "addOnCommandParameters": {
             "elementType": "All",
             "includeGeometry": true
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.get_documentation_elements",
+      "title": "MEPBridge get documentation elements",
+      "description": "DOC-R1: enumerate documentation elements (Dimension, Text, Label, Detail, Worksheet, Section, Elevation) with guid/type/floor/layer. Read-only basic inventory; Section/Elevation marker geometry remains in GetSectionMarkers. Runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates.",
+      "featureArea": "Architecture",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "GetDocumentationElements",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "标注",
+          "文本",
+          "标签",
+          "详图",
+          "工作图",
+          "文档元素"
+        ],
+        "en": [
+          "dimensions",
+          "texts",
+          "labels",
+          "details",
+          "worksheets",
+          "documentation elements"
+        ]
+      },
+      "paramExtractors": {
+        "elementType": {
+          "type": "string",
+          "description": "All/Dimension/Text/Label/Detail/Worksheet/Section/Elevation"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "GetDocumentationElements"
+          },
+          "addOnCommandParameters": {
+            "elementType": "All"
           }
         }
       }
@@ -5718,9 +6204,9 @@
     {
       "name": "mepbridge.create_morph",
       "title": "MEPBridge create extruded morph",
-      "description": "Create a simple solid Morph by vertically extruding a structured 2D polygon. Source and offline contract complete; AC28/AC29 APX rebuild and runtime readback pending.",
+      "description": "Create a simple solid Morph by vertically extruding a structured 2D polygon. Runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates.",
       "featureArea": "Architecture",
-      "status": "code-complete-pending-compile",
+      "status": "runtime-validated",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "CreateMorph",
@@ -5860,9 +6346,9 @@
     {
       "name": "mepbridge.move_building_elements",
       "title": "MEPBridge move building elements by GUID",
-      "description": "ELEM-1: translate building elements by GUID list via native APIEdit_Drag. Supported: Wall/Column/Beam/Slab/Object/Lamp/Window/Door/Zone/Morph/Mesh. Windows/doors keep their host wall (native drag semantics). Unsupported types (e.g. Stair) fail the whole batch with ELEMENT_TYPE_UNSUPPORTED (fail-closed, no partial move). MEP routing keeps using move_elements.",
+      "description": "ELEM-1: translate building elements by GUID list via native APIEdit_Drag. Supported: Wall/Column/Beam/Slab/Object/Lamp/Window/Door/Zone/Morph/Mesh. Windows/doors keep their host wall (native drag semantics). Unsupported types (e.g. Stair) fail the whole batch with ELEMENT_TYPE_UNSUPPORTED (fail-closed, no partial move). MEP routing keeps using move_elements. Runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates.",
       "featureArea": "Architecture",
-      "status": "code-complete-pending-runtime",
+      "status": "runtime-validated",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "MoveBuildingElements",
@@ -5926,9 +6412,9 @@
     {
       "name": "mepbridge.edit_building_element",
       "title": "MEPBridge edit building element fields",
-      "description": "ELEM-2: post-create field edit for building elements with a precise ACAPI_Element_Change mask (STAIR-0② discipline; readback echo of actual values). Supported: Wall (height — top-link disabled automatically, thickness — switches to basic structure, begC+endC centerline) and Window/Door (width, height, sillHeight → API lower with WINDOW_EXCEEDS_WALL_HEIGHT host check). Any other type fails with ELEMENT_TYPE_UNSUPPORTED.",
+      "description": "ELEM-2: post-create field edit for building elements with a precise ACAPI_Element_Change mask (STAIR-0② discipline; readback echo of actual values). Supported: Wall (height — top-link disabled automatically, thickness — switches to basic structure, begC+endC centerline), Column (height, position), Beam (begC+endC), Slab (thickness — switches to basic structure, level), and Window/Door (width, height, sillHeight → API lower with WINDOW_EXCEEDS_WALL_HEIGHT host check). Any other type fails with ELEMENT_TYPE_UNSUPPORTED. Runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates.",
       "featureArea": "Architecture",
-      "status": "code-complete-pending-runtime",
+      "status": "runtime-validated",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "EditBuildingElement",
@@ -5945,6 +6431,9 @@
           "改墙厚",
           "修改窗台",
           "改门宽",
+          "改柱高",
+          "改梁端点",
+          "改板厚",
           "编辑构件"
         ],
         "en": [
@@ -5952,7 +6441,10 @@
           "change wall height",
           "change wall thickness",
           "change sill height",
-          "resize opening"
+          "resize opening",
+          "change column height",
+          "change beam endpoints",
+          "change slab thickness"
         ]
       },
       "paramExtractors": {
@@ -5963,11 +6455,11 @@
         },
         "height": {
           "type": "number",
-          "description": "Wall: height in meters. Window/Door: opening height"
+          "description": "Wall/Window/Door/Column: height in meters"
         },
         "thickness": {
           "type": "number",
-          "description": "Wall only: thickness in meters"
+          "description": "Wall/Slab: thickness in meters"
         },
         "width": {
           "type": "number",
@@ -5976,6 +6468,22 @@
         "sillHeight": {
           "type": "number",
           "description": "Window/Door only: sill (parapet) height in meters"
+        },
+        "position": {
+          "type": "point2d",
+          "description": "Column only: new column origin"
+        },
+        "begC": {
+          "type": "point2d",
+          "description": "Wall/Beam: new baseline or beam start"
+        },
+        "endC": {
+          "type": "point2d",
+          "description": "Wall/Beam: new baseline or beam end"
+        },
+        "level": {
+          "type": "number",
+          "description": "Slab only: reference level relative to its floor"
         }
       },
       "commandJson": {
@@ -5988,6 +6496,226 @@
           "addOnCommandParameters": {
             "elementGuid": "{element-guid-placeholder}",
             "height": 4,
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.multiply_elements",
+      "title": "MEPBridge multiply building elements",
+      "description": "EDIT-W0: controlled vector or two-direction array multiplication for Wall/Column/Beam/Slab/Roof/Mesh/Morph by explicit GUID. The DevKit has no APIEdit_Multiply primitive, so this uses the proven create-copy + native APIEdit_Drag pattern inside one undoable transaction. Dry-run and confirmRequired are required; failures clean up created copies and report the cleanup result. Runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates.",
+      "featureArea": "Architecture",
+      "status": "runtime-validated",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "MultiplyElements",
+      "riskLevel": "medium-mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "undoable-command",
+      "nlTriggers": {
+        "zh": [
+          "阵列构件",
+          "复制阵列",
+          "向量复制",
+          "批量复制构件"
+        ],
+        "en": [
+          "multiply elements",
+          "array elements",
+          "vector copy",
+          "batch copy elements"
+        ]
+      },
+      "paramExtractors": {
+        "sourceGuids": {
+          "type": "guidList",
+          "required": true,
+          "description": "Source element GUIDs (Wall/Column/Beam/Slab/Roof/Mesh/Morph)"
+        },
+        "offsetMm": {
+          "type": "delta3d",
+          "required": true,
+          "description": "Primary step vector in millimeters"
+        },
+        "count": {
+          "type": "integer",
+          "required": true,
+          "description": "Copies along the primary vector (1-100)"
+        },
+        "mode": {
+          "type": "string",
+          "description": "vector or array"
+        },
+        "secondaryOffsetMm": {
+          "type": "delta3d",
+          "description": "Second step vector in millimeters (array mode only)"
+        },
+        "secondaryCount": {
+          "type": "integer",
+          "description": "Copies along the second vector (array mode only, 1-100)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "MultiplyElements"
+          },
+          "addOnCommandParameters": {
+            "sourceGuids": [
+              "{element-guid-placeholder}"
+            ],
+            "offsetMm": {
+              "x": 1000,
+              "y": 0,
+              "z": 0
+            },
+            "count": 3,
+            "mode": "vector",
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.trim_elements",
+      "title": "MEPBridge trim a wall with a roof",
+      "description": "EDIT-ADV0: native one-to-one trim relation for an explicit Wall target and Roof trimming element, with KeepInside or KeepOutside only. Actual runs require dryRun=false and confirmRequired=true; readback checks both trim lists and the trim type, and failed readback attempts verified relation cleanup. Code-complete pending centralized AC28/AC29 APX runtime validation.",
+      "featureArea": "Architecture",
+      "status": "code-complete-pending-runtime",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "TrimElements",
+      "riskLevel": "medium-mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "undoable-command",
+      "nlTriggers": {
+        "zh": [
+          "修剪墙体",
+          "墙体屋顶裁剪",
+          "用屋顶修剪墙"
+        ],
+        "en": [
+          "trim wall",
+          "trim wall with roof",
+          "wall roof trim"
+        ]
+      },
+      "paramExtractors": {
+        "targetGuid": {
+          "type": "guid",
+          "required": true,
+          "description": "Target Wall GUID"
+        },
+        "trimmingGuid": {
+          "type": "guid",
+          "required": true,
+          "description": "Trimming Roof GUID"
+        },
+        "trimType": {
+          "type": "string",
+          "required": true,
+          "description": "KeepInside or KeepOutside"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Preview without mutation; defaults to true"
+        },
+        "confirmRequired": {
+          "type": "boolean",
+          "description": "Must be true for dryRun=false"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "TrimElements"
+          },
+          "addOnCommandParameters": {
+            "targetGuid": "{element-guid-placeholder}",
+            "trimmingGuid": "{element-guid-placeholder}",
+            "trimType": "KeepInside",
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_solid_operation",
+      "title": "MEPBridge create a Morph solid operation",
+      "description": "EDIT-ADV1: native one-shot Subtract or Add operation for two different Morph elements using ACAPI_Element_SolidOperation_Create. The command preserves returned result GUIDs, independently reads back each result Morph geometry summary, reports original GUID persistence, and cleans up only returned result GUIDs on failed readback. Code-complete pending centralized AC28/AC29 APX runtime validation.",
+      "featureArea": "Architecture",
+      "status": "code-complete-pending-runtime",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateSolidOperation",
+      "riskLevel": "medium-mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "undoable-command",
+      "nlTriggers": {
+        "zh": [
+          "布尔运算",
+          "Morph加减",
+          "体量 subtract"
+        ],
+        "en": [
+          "solid operation",
+          "subtract morph",
+          "add morph"
+        ]
+      },
+      "paramExtractors": {
+        "targetGuid": {
+          "type": "guid",
+          "required": true,
+          "description": "Target Morph GUID"
+        },
+        "operatorGuid": {
+          "type": "guid",
+          "required": true,
+          "description": "Operator Morph GUID"
+        },
+        "operation": {
+          "type": "string",
+          "required": true,
+          "description": "Subtract or Add"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Preview without mutation; defaults to true"
+        },
+        "confirmRequired": {
+          "type": "boolean",
+          "description": "Must be true for dryRun=false"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateSolidOperation"
+          },
+          "addOnCommandParameters": {
+            "targetGuid": "{element-guid-placeholder}",
+            "operatorGuid": "{element-guid-placeholder}",
+            "operation": "Subtract",
             "dryRun": true,
             "confirmRequired": false
           }

@@ -21,6 +21,8 @@ interface ElementInfo {
 
 interface EditParams {
   thickness?: number; height?: number; width?: number; length?: number;
+  begC?: { x: number; y: number }; endC?: { x: number; y: number };
+  position?: { x: number; y: number };
   level?: number; floorIndex?: number; layerName?: string;
   sectionWidth?: number; sectionDepth?: number;
   pitchAngle?: number; baseLevel?: number;
@@ -38,10 +40,10 @@ interface Props {
 }
 
 const ELEMENT_CONFIG: Record<ElementType, { icon: React.ReactNode; zhName: string; enName: string; commandName: string }> = {
-  Wall:    { icon: <Layers className="w-4 h-4" />,     zhName: '墙',   enName: 'Wall',    commandName: 'ChangeElementGeometry' },
-  Column:  { icon: <Box className="w-4 h-4" />,       zhName: '柱',   enName: 'Column',  commandName: 'ChangeElementGeometry' },
-  Beam:    { icon: <Minus className="w-4 h-4" />,     zhName: '梁',   enName: 'Beam',    commandName: 'ChangeElementGeometry' },
-  Slab:    { icon: <Square className="w-4 h-4" />,    zhName: '板',   enName: 'Slab',    commandName: 'ChangeElementGeometry' },
+  Wall:    { icon: <Layers className="w-4 h-4" />,     zhName: '墙',   enName: 'Wall',    commandName: 'EditBuildingElement' },
+  Column:  { icon: <Box className="w-4 h-4" />,       zhName: '柱',   enName: 'Column',  commandName: 'EditBuildingElement' },
+  Beam:    { icon: <Minus className="w-4 h-4" />,     zhName: '梁',   enName: 'Beam',    commandName: 'EditBuildingElement' },
+  Slab:    { icon: <Square className="w-4 h-4" />,    zhName: '板',   enName: 'Slab',    commandName: 'EditBuildingElement' },
   Door:    { icon: <DoorOpen className="w-4 h-4" />,  zhName: '门',   enName: 'Door',    commandName: 'ChangeOpeningGeometry' },
   Window:  { icon: <AppWindow className="w-4 h-4" />, zhName: '窗',   enName: 'Window',  commandName: 'ChangeOpeningGeometry' },
   Roof:    { icon: <Triangle className="w-4 h-4" />,  zhName: '屋顶', enName: 'Roof',    commandName: 'ChangeElementGeometry' },
@@ -82,6 +84,9 @@ const NumInput: React.FC<{ label: string; value: number | undefined; onChange: (
   </div>
 );
 
+const hasCompletePoint = (point?: { x?: number; y?: number }): boolean =>
+  point?.x !== undefined && point?.y !== undefined;
+
 const TxtInput: React.FC<{ label: string; value: string | undefined; onChange: (v: string | undefined) => void; placeholder?: string }> = ({ label, value, onChange, placeholder }) => (
   <div className="flex flex-col gap-1">
     <label className="text-[10px] text-zinc-500 font-mono uppercase">{label}</label>
@@ -101,6 +106,11 @@ export const EditBuildingElementPanel: React.FC<Props> = ({ onExecute, lang, mep
   const [showSel, setShowSel] = useState(true);  // 默认展开选择面板
 
   const config = ELEMENT_CONFIG[selType];
+  const incompletePoint = Boolean(
+    (editParams.begC && !hasCompletePoint(editParams.begC)) ||
+    (editParams.endC && !hasCompletePoint(editParams.endC)) ||
+    (editParams.position && !hasCompletePoint(editParams.position))
+  );
 
   const loadByType = useCallback(async (type: ElementType) => {
     setLoading(true);
@@ -150,7 +160,16 @@ export const EditBuildingElementPanel: React.FC<Props> = ({ onExecute, lang, mep
 
   const buildParams = (guid: string, dryRun: boolean): any => {
     const cmd = config.commandName;
-    if (cmd === 'ChangeElementGeometry') {
+    if (cmd === 'EditBuildingElement') {
+      const p: any = { elementGuid: guid, dryRun, confirmRequired: !dryRun };
+      if (editParams.thickness !== undefined) p.thickness = editParams.thickness;
+      if (editParams.height !== undefined) p.height = editParams.height;
+      if (editParams.level !== undefined) p.level = editParams.level;
+      if (hasCompletePoint(editParams.begC)) p.begC = editParams.begC;
+      if (hasCompletePoint(editParams.endC)) p.endC = editParams.endC;
+      if (hasCompletePoint(editParams.position)) p.position = editParams.position;
+      return p;
+    } else if (cmd === 'ChangeElementGeometry') {
       const p: any = { elementGuid: guid, dryRun, confirmRequired: !dryRun };
       if (editParams.thickness !== undefined) p.thickness = editParams.thickness;
       if (editParams.height !== undefined) p.height = editParams.height;
@@ -263,11 +282,12 @@ export const EditBuildingElementPanel: React.FC<Props> = ({ onExecute, lang, mep
         <div className="flex flex-col gap-2">
           <div className="text-[10px] text-zinc-500 font-mono uppercase border-b border-zinc-700 pb-1">✏️ {selGuids.size === 1 ? (zh ? '单个编辑' : 'Single Edit') : (zh ? `批量编辑 (${selGuids.size})` : `Batch (${selGuids.size})`)}</div>
           <div className="text-[10px] text-zinc-600">{zh ? '留空 = 不修改' : 'Empty = keep'}</div>
-          <div className="grid grid-cols-2 gap-2">
-            {selType === 'Wall' && <><NumInput label={zh ? '厚度(m)' : 'Thick(m)'} value={editParams.thickness} onChange={v => setEditParams({...editParams, thickness: v})} placeholder="0.24" /><NumInput label={zh ? '高度(m)' : 'Height(m)'} value={editParams.height} onChange={v => setEditParams({...editParams, height: v})} placeholder="3.0" /><NumInput label={zh ? '长度(m)' : 'Length(m)'} value={editParams.length} onChange={v => setEditParams({...editParams, length: v})} placeholder="5.0" /><TxtInput label={zh ? '图层' : 'Layer'} value={editParams.layerName} onChange={v => setEditParams({...editParams, layerName: v})} placeholder="外墙" /></>}
-            {selType === 'Column' && <><NumInput label={zh ? '截面宽(m)' : 'SecW(m)'} value={editParams.sectionWidth} onChange={v => setEditParams({...editParams, sectionWidth: v})} placeholder="0.4" /><NumInput label={zh ? '截面深(m)' : 'SecD(m)'} value={editParams.sectionDepth} onChange={v => setEditParams({...editParams, sectionDepth: v})} placeholder="0.4" /><NumInput label={zh ? '高度(m)' : 'Height(m)'} value={editParams.height} onChange={v => setEditParams({...editParams, height: v})} placeholder="3.0" /><TxtInput label={zh ? '图层' : 'Layer'} value={editParams.layerName} onChange={v => setEditParams({...editParams, layerName: v})} placeholder="柱" /></>}
-            {selType === 'Beam' && <><NumInput label={zh ? '截面高(m)' : 'SecH(m)'} value={editParams.sectionDepth} onChange={v => setEditParams({...editParams, sectionDepth: v})} placeholder="0.5" /><NumInput label={zh ? '截面宽(m)' : 'SecW(m)'} value={editParams.sectionWidth} onChange={v => setEditParams({...editParams, sectionWidth: v})} placeholder="0.25" /><NumInput label={zh ? '长度(m)' : 'Length(m)'} value={editParams.length} onChange={v => setEditParams({...editParams, length: v})} placeholder="4.0" /><TxtInput label={zh ? '图层' : 'Layer'} value={editParams.layerName} onChange={v => setEditParams({...editParams, layerName: v})} placeholder="主梁" /></>}
-            {selType === 'Slab' && <><NumInput label={zh ? '厚度(m)' : 'Thick(m)'} value={editParams.thickness} onChange={v => setEditParams({...editParams, thickness: v})} placeholder="0.12" /><NumInput label={zh ? '标高(m)' : 'Level(m)'} value={editParams.level} onChange={v => setEditParams({...editParams, level: v})} placeholder="0" /><TxtInput label={zh ? '图层' : 'Layer'} value={editParams.layerName} onChange={v => setEditParams({...editParams, layerName: v})} placeholder="楼板" /></>}
+          {incompletePoint && <div className="text-[10px] text-amber-400">{zh ? '坐标 X/Y 需成对填写；未成对时该点不提交' : 'Point X/Y must be paired; incomplete points are not submitted'}</div>}
+          <div className="grid grid-cols-2 gap-2" data-testid="building-edit-fields">
+            {selType === 'Wall' && <><NumInput label={zh ? '厚度(m)' : 'Thick(m)'} value={editParams.thickness} onChange={v => setEditParams({...editParams, thickness: v})} placeholder="0.24" /><NumInput label={zh ? '高度(m)' : 'Height(m)'} value={editParams.height} onChange={v => setEditParams({...editParams, height: v})} placeholder="3.0" /><NumInput label={zh ? '起点X(m)' : 'Beg X(m)'} value={editParams.begC?.x} onChange={v => setEditParams({...editParams, begC: {...editParams.begC, x: v}})} placeholder="0" /><NumInput label={zh ? '起点Y(m)' : 'Beg Y(m)'} value={editParams.begC?.y} onChange={v => setEditParams({...editParams, begC: {...editParams.begC, y: v}})} placeholder="0" /><NumInput label={zh ? '终点X(m)' : 'End X(m)'} value={editParams.endC?.x} onChange={v => setEditParams({...editParams, endC: {...editParams.endC, x: v}})} placeholder="5" /><NumInput label={zh ? '终点Y(m)' : 'End Y(m)'} value={editParams.endC?.y} onChange={v => setEditParams({...editParams, endC: {...editParams.endC, y: v}})} placeholder="0" /></>}
+            {selType === 'Column' && <><NumInput label={zh ? '高度(m)' : 'Height(m)'} value={editParams.height} onChange={v => setEditParams({...editParams, height: v})} placeholder="3.0" /><NumInput label={zh ? '原点X(m)' : 'Origin X(m)'} value={editParams.position?.x} onChange={v => setEditParams({...editParams, position: {...editParams.position, x: v}})} placeholder="0" /><NumInput label={zh ? '原点Y(m)' : 'Origin Y(m)'} value={editParams.position?.y} onChange={v => setEditParams({...editParams, position: {...editParams.position, y: v}})} placeholder="0" /></>}
+            {selType === 'Beam' && <><NumInput label={zh ? '起点X(m)' : 'Beg X(m)'} value={editParams.begC?.x} onChange={v => setEditParams({...editParams, begC: {...editParams.begC, x: v}})} placeholder="0" /><NumInput label={zh ? '起点Y(m)' : 'Beg Y(m)'} value={editParams.begC?.y} onChange={v => setEditParams({...editParams, begC: {...editParams.begC, y: v}})} placeholder="0" /><NumInput label={zh ? '终点X(m)' : 'End X(m)'} value={editParams.endC?.x} onChange={v => setEditParams({...editParams, endC: {...editParams.endC, x: v}})} placeholder="4" /><NumInput label={zh ? '终点Y(m)' : 'End Y(m)'} value={editParams.endC?.y} onChange={v => setEditParams({...editParams, endC: {...editParams.endC, y: v}})} placeholder="0" /></>}
+            {selType === 'Slab' && <><NumInput label={zh ? '厚度(m)' : 'Thick(m)'} value={editParams.thickness} onChange={v => setEditParams({...editParams, thickness: v})} placeholder="0.12" /><NumInput label={zh ? '标高(m)' : 'Level(m)'} value={editParams.level} onChange={v => setEditParams({...editParams, level: v})} placeholder="0" /></>}
             {selType === 'Roof' && <><NumInput label={zh ? '厚度(m)' : 'Thick(m)'} value={editParams.thickness} onChange={v => setEditParams({...editParams, thickness: v})} placeholder="0.15" /><NumInput label={zh ? '坡角(°)' : 'Pitch(°)'} value={editParams.pitchAngle} onChange={v => setEditParams({...editParams, pitchAngle: v})} placeholder="30" /><NumInput label={zh ? '基标高(m)' : 'BaseL(m)'} value={editParams.baseLevel} onChange={v => setEditParams({...editParams, baseLevel: v})} placeholder="3.0" /><TxtInput label={zh ? '图层' : 'Layer'} value={editParams.layerName} onChange={v => setEditParams({...editParams, layerName: v})} placeholder="屋面" /></>}
             {(selType === 'Door' || selType === 'Window') && <><NumInput label={zh ? '宽度(m)' : 'Width(m)'} value={editParams.width} onChange={v => setEditParams({...editParams, width: v})} placeholder="0.9" /><NumInput label={zh ? '高度(m)' : 'Height(m)'} value={editParams.height} onChange={v => setEditParams({...editParams, height: v})} placeholder="2.1" /><NumInput label={zh ? '参考位(m)' : 'RefPos(m)'} value={editParams.refPos} onChange={v => setEditParams({...editParams, refPos: v})} placeholder="0" /><TxtInput label={zh ? '图层' : 'Layer'} value={editParams.layerName} onChange={v => setEditParams({...editParams, layerName: v})} placeholder="门窗" /></>}
             {selType === 'Stair' && <><NumInput label={zh ? '总高(m)' : 'TotalH(m)'} value={editParams.totalHeight} onChange={v => setEditParams({...editParams, totalHeight: v})} placeholder="3.0" /><NumInput label={zh ? '步数' : 'Steps'} value={editParams.stepNum} onChange={v => setEditParams({...editParams, stepNum: v})} step={1} placeholder="16" /><NumInput label={zh ? '梯段宽(m)' : 'FlightW(m)'} value={editParams.flightWidth} onChange={v => setEditParams({...editParams, flightWidth: v})} placeholder="1.2" /><NumInput label={zh ? '踏步深(m)' : 'TreadD(m)'} value={editParams.treadDepth} onChange={v => setEditParams({...editParams, treadDepth: v})} placeholder="0.26" /></>}

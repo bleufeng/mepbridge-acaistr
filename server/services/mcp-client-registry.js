@@ -31,6 +31,11 @@ const CLIENT_NAME_ALIASES = new Map([
   ['chatgpt', 'Codex'],
   ['cursor', 'Cursor'],
   ['cursor-ide', 'Cursor'],
+  // 豆包桌面版：其 MCP 客户端在 initialize 握手时自报 clientInfo.name = "Copilot"
+  // （2026-09-10 实测：Doubao.exe spawn 的 node 子进程连接后上报 "Copilot"）。
+  ['copilot', 'Doubao'],
+  ['doubao', 'Doubao'],
+  ['豆包', 'Doubao'],
 ]);
 
 function normalizeClientName(rawName) {

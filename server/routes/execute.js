@@ -16,37 +16,22 @@ const {
 const { getArchicadEndpoint, endpointForPort } = require('../services/archicad-endpoint');
 const { resolveTargetInstance } = require('../services/instance-targeting');
 const { normalizeCommandSafetyParameters } = require('../services/command-capabilities');
+const {
+  getOfficialApiCapabilities,
+  getDirectOfficialApiCommands,
+  createOfficialApiPreview,
+  getOfficialApiPreview,
+  consumeOfficialApiPreview,
+  validateAuthorizedOfficialApiExecute,
+  extractPropertyWriteTargets,
+  comparePropertyReadback,
+} = require('../services/official-api-capabilities');
 
 // Archicad JSON API 端点：动态解析（global.archicadPort > 环境变量 > 默认 19723）
 // 不能再硬编码 19723 —— AC29 实测会用 19724，导致 ping 在线但执行报 ARCHICAD_OFFLINE
 function ARCHICAD_ENDPOINT() {
   return getArchicadEndpoint();
 }
-
-// V2 H1.4: 官方 API 命令透传白名单（B 通道安全控制）
-// 仅允许只读和低风险官方命令透传，mutation 类官方命令需通过 MEPBridge C++ 包装
-const OFFICIAL_API_WHITELIST = [
-  // 只读查询
-  'API.GetSelectedElements',
-  'API.GetAllElements',
-  'API.GetElementsByType',
-  'API.GetElementPropertyObjects',
-  'API.GetPropertyValuesOfElements',
-  'API.SetPropertyValuesOfElements',
-  'API.GetStoryInfo',
-  'API.GetProjectInfo',
-  'API.GetHotspots',
-  'API.GetClassificationsOfItem',
-  'API.GetLibraries',
-  'API.GetHotlinks',
-  // 低风险
-  'API.ChangeSelection',
-  'API.SetStoryInfo',
-  'API.ApplyClassification',
-  'API.SetHotspots',
-  'API.SetLibrary',
-  'API.SetHotlinks'
-];
 
 /**
  * POST /api/execute
@@ -123,19 +108,31 @@ router.post('/', async (req, res) => {
     const dynamicResolution = await resolveDynamicCommandParameters(archicadCommand, endpoint);
 
     console.log(`[Execute] ${archicadCommand.command} -> Archicad @ ${endpoint}`);
+    let guardedOfficialContext = null;
 
     // V2 H1.4: 官方 API 命令透传安全包装（B 通道）
     // 官方命令（API.* 非 ExecuteAddOnCommand）走白名单 + 审计日志
     if (archicadCommand.command.startsWith('API.') && archicadCommand.command !== 'API.ExecuteAddOnCommand') {
-      if (!OFFICIAL_API_WHITELIST.includes(archicadCommand.command)) {
+      const capability = getOfficialApiCapabilities(archicadCommand.command);
+      const whitelist = getDirectOfficialApiCommands();
+      if (!capability?.directAllowed || !whitelist.includes(archicadCommand.command)) {
         return res.status(403).json({
           ok: false,
-          error: `Official API command '${archicadCommand.command}' is not in the H1.4 whitelist.`,
+          error: `Official API command '${archicadCommand.command}' is not in the direct whitelist.`,
           errorType: 'OFFICIAL_COMMAND_NOT_WHITELISTED',
-          whitelist: OFFICIAL_API_WHITELIST
+          whitelist,
+          capability: capability || null,
         });
       }
-      console.log(`[Execute] [H1.4 Official] ${archicadCommand.command} whitelisted, parameters:`, Object.keys(archicadCommand.parameters || {}));
+      const officialResult = await handleOfficialApiCapability({
+        body,
+        command: archicadCommand,
+        capability,
+        endpoint,
+      });
+      if (officialResult.handled) return res.status(officialResult.statusCode || 200).json(officialResult.body);
+      guardedOfficialContext = officialResult.context || null;
+      console.log(`[Execute] [B Official] ${archicadCommand.command} (${capability.layer}), parameters:`, Object.keys(archicadCommand.parameters || {}));
     }
 
     // 透传到 Archicad JSON API
@@ -151,13 +148,18 @@ router.post('/', async (req, res) => {
 
     // 返回 UI 期望的格式 {ok, response}
     if (archicadResult.succeeded && addOnStatus !== 'error' && addOnSuccess !== false) {
-      res.json({
+      let responseBody = {
         ok: true,
         response: archicadResult,
         command: archicadCommand,
         ...(targeting.requested ? { target: { port: targeting.port, mode: targeting.mode } } : {}),
         ...(dynamicResolution ? { dynamicResolution } : {})
-      });
+      };
+      // Guarded property writes return readback status in the same response.
+      if (guardedOfficialContext) {
+        responseBody = await completeOfficialApiResponse(responseBody, guardedOfficialContext, endpoint);
+      }
+      res.json(responseBody);
     } else {
       // Archicad 返回 succeeded:false
       res.json({
@@ -206,6 +208,111 @@ router.post('/', async (req, res) => {
     });
   }
 });
+
+// SetPropertyValuesOfElements is the one currently allowed official mutation
+// that needs an explicit preview/authorization/execute/readback binding.
+// This is a request-level handshake; it does not insert a human wait between
+// already-authorized AI steps.
+async function handleOfficialApiCapability({ body, command, capability, endpoint }) {
+  if (!capability.requiresAuthorization) return { handled: false };
+
+  if (!capability.supportsPreview || capability.command !== 'API.SetPropertyValuesOfElements') {
+    return { handled: true, statusCode: 403, body: { ok: false, error: 'Official mutation is not enabled for direct execution', errorType: 'OFFICIAL_MUTATION_NOT_ENABLED' } };
+  }
+
+  const protocol = body.officialApi;
+  if (!protocol || typeof protocol !== 'object') {
+    return { handled: true, statusCode: 403, body: { ok: false, error: '属性写入必须先 preview，并携带 officialApi 授权上下文', errorType: 'OFFICIAL_AUTHORIZATION_REQUIRED' } };
+  }
+  const phase = protocol.phase;
+  const readback = protocol.readback;
+  const authorization = protocol.authorization;
+  if (!authorization || typeof authorization.scope !== 'object' || Array.isArray(authorization.scope) || Object.keys(authorization.scope).length === 0) {
+    return { handled: true, statusCode: 400, body: { ok: false, error: 'officialApi.authorization.scope 必须是非空对象', errorType: 'OFFICIAL_SCOPE_REQUIRED' } };
+  }
+  if (!readback || readback.command !== capability.readbackCommand || !readback.parameters || typeof readback.parameters !== 'object' || Array.isArray(readback.parameters)) {
+    return { handled: true, statusCode: 400, body: { ok: false, error: `必须提供 ${capability.readbackCommand} readback 请求`, errorType: 'OFFICIAL_READBACK_REQUIRED' } };
+  }
+
+  if (phase === 'preview') {
+    const targets = extractPropertyWriteTargets(command.parameters);
+    if (!targets.ok) {
+      return { handled: true, statusCode: 400, body: { ok: false, error: targets.message, errorType: targets.errorType } };
+    }
+    const preview = createOfficialApiPreview({
+      command: command.command,
+      parameters: command.parameters,
+      authorization,
+      readback,
+      endpoint,
+    });
+    return {
+      handled: true,
+      body: { ok: true, preview: true, capability, officialApi: preview, command },
+    };
+  }
+
+  if (phase !== 'execute') {
+    return { handled: true, statusCode: 400, body: { ok: false, error: 'officialApi.phase 只能是 preview 或 execute', errorType: 'OFFICIAL_PHASE_INVALID' } };
+  }
+  if (protocol.authorization.granted !== true) {
+    return { handled: true, statusCode: 403, body: { ok: false, error: '真实属性写入必须携带 authorization.granted=true', errorType: 'OFFICIAL_AUTHORIZATION_REQUIRED' } };
+  }
+  const entry = getOfficialApiPreview(protocol.previewId);
+  const validation = validateAuthorizedOfficialApiExecute({
+    request: protocol,
+    entry,
+    command: command.command,
+    parameters: command.parameters,
+    endpoint,
+  });
+  if (!validation.ok) {
+    return { handled: true, statusCode: validation.errorType === 'OFFICIAL_PREVIEW_NOT_FOUND' ? 404 : 409, body: { ok: false, error: validation.message, errorType: validation.errorType } };
+  }
+  // Consume before forwarding to make a preview single-use even if the client retries.
+  consumeOfficialApiPreview(protocol.previewId);
+  return {
+    handled: false,
+    context: { readback, capability, previewId: protocol.previewId, parameters: command.parameters },
+  };
+}
+
+async function completeOfficialApiResponse(responseBody, context, endpoint) {
+  try {
+    const readbackResponse = await axios.post(endpoint, context.readback, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 30000,
+    });
+    const readbackData = readbackResponse.data;
+    const comparison = comparePropertyReadback(context.parameters, readbackData);
+    const verified = comparison.verified;
+    return {
+      ...responseBody,
+      officialApi: {
+        phase: 'execute',
+        previewId: context.previewId,
+        readback: readbackData,
+        readbackVerified: verified,
+        comparison,
+      },
+      ok: responseBody.ok && verified,
+      ...(verified ? {} : { error: '属性写入后 readback 未通过', errorType: comparison.errorType || 'OFFICIAL_READBACK_FAILED' }),
+    };
+  } catch (error) {
+    return {
+      ...responseBody,
+      ok: false,
+      error: '属性写入后 readback 请求失败',
+      errorType: 'OFFICIAL_READBACK_FAILED',
+      officialApi: {
+        phase: 'execute',
+        previewId: context.previewId,
+        readbackVerified: false,
+        readbackError: error.message,
+      },
+    };
+  }
+}
 
 function normalizeArchicadCommand(commandJson) {
   const command = {

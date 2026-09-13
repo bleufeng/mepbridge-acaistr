@@ -70,6 +70,36 @@ const REPLAY_STRATEGIES = {
       polygon: { points: normalizePolygon(g.polygon && !Array.isArray(g.polygon) ? g.polygon.points : g.polygon) },
       height: g.height
     })
+  },
+  Roof: {
+    createCommand: 'CreateRoof',
+    // 平面屋顶近似：GetElementGeometry 不回读 pitch，重建为轮廓 baseLevel 处的 PlaneRoof
+    mapGeometry: (g) => ({
+      vertices: normalizePolygon(g.polygon),
+      thickness: g.thickness,
+      baseLevel: g.baseLevel,
+      pitchAngle: 0
+    })
+  },
+  Mesh: {
+    createCommand: 'CreateMesh',
+    // CreateMesh polygon: {points, heights(相对 level，可选)}；C++ 自动闭环
+    mapGeometry: (g) => {
+      const level = typeof g.level === 'number' ? g.level : 0;
+      const verts = (g.vertices || []).map((v) => ({
+        x: v.x,
+        y: v.y,
+        z: typeof v.z === 'number' ? v.z : level + (typeof v.relativeZ === 'number' ? v.relativeZ : 0)
+      }));
+      const open = dedupeRing(verts);
+      return {
+        polygon: {
+          points: open.map((p) => ({ x: p.x, y: p.y })),
+          heights: open.map((p) => p.z - level)
+        },
+        level
+      };
+    }
   }
 };
 
@@ -128,6 +158,17 @@ function normalizePolygon (polygon) {
   if (Array.isArray(polygon)) return polygon.map(pickPoint);
   if (polygon && Array.isArray(polygon.points)) return polygon.points.map(pickPoint);
   return undefined;
+}
+
+// 去除环的闭合点（首尾重合时丢弃最后一个），用于输入侧要求开环的命令（CreateMesh）
+function dedupeRing (points) {
+  if (!Array.isArray(points) || points.length <= 3) return points;
+  const a = points[0];
+  const b = points[points.length - 1];
+  if (a && b && Math.abs(Number(a.x) - Number(b.x)) < 1e-9 && Math.abs(Number(a.y) - Number(b.y)) < 1e-9) {
+    return points.slice(0, -1);
+  }
+  return points;
 }
 
 function numbersClose (a, b, tolerance = DISTANCE_TOLERANCE_M) {
@@ -890,7 +931,7 @@ function createSnapshotReplayService (deps = {}) {
 
   function extractCreatedGuid (payload) {
     const containers = [payload, payload && payload.data];
-    const guidKeys = ['elementGuid', 'guid', 'wallGuid', 'columnGuid', 'beamGuid', 'slabGuid', 'zoneGuid', 'meshGuid', 'morphGuid', 'stairGuid', 'objectGuid'];
+    const guidKeys = ['elementGuid', 'guid', 'wallGuid', 'columnGuid', 'beamGuid', 'slabGuid', 'zoneGuid', 'meshGuid', 'morphGuid', 'stairGuid', 'objectGuid', 'roofGuid'];
     for (const container of containers) {
       if (!container || typeof container !== 'object') continue;
       for (const key of guidKeys) {
@@ -902,7 +943,9 @@ function createSnapshotReplayService (deps = {}) {
 
   async function executeCleanup (targetEndpoint, createdStack) {
     if (createdStack.length === 0) {
-      return { status: 'not-needed', deletedTargetGuids: [], verifiedAbsentTargetGuids: [] };
+      // 没有任何成功创建的元素：无可清理对象，视为 vacuous 完成（空列表满足
+      // failed-cleaned 要求 cleanup.status=deleted-and-verified 的契约形状）
+      return { status: 'deleted-and-verified', deletedTargetGuids: [], verifiedAbsentTargetGuids: [] };
     }
     // 逆创建序删除本次创建且有证据的 target GUID
     const reverse = [...createdStack].reverse();
@@ -995,7 +1038,8 @@ function createSnapshotReplayService (deps = {}) {
       Column: [['point', 'position'], ['number', 'height']],
       Beam: [['point', 'start'], ['point', 'end']],
       Slab: [['polygon', 'polygon'], ['number', 'thickness'], ['number', 'level']],
-      Zone: [['polygon', 'polygon'], ['number', 'height']]
+      Zone: [['polygon', 'polygon'], ['number', 'height']],
+      Roof: [['polygon', 'polygon'], ['number', 'thickness'], ['number', 'baseLevel']]
     }[type] || [];
 
     for (const [kind, field] of geometryChecks) {
@@ -1019,6 +1063,29 @@ function createSnapshotReplayService (deps = {}) {
             actual: { vertexCount: Array.isArray(act) ? act.length : null }
           });
         }
+      }
+    }
+
+    // Mesh：轮廓 + level + 逐顶点高度（readback vertices 带 z/relativeZ，可能含闭合点）
+    if (type === 'Mesh') {
+      if (!numbersClose(requested.level, actual.level)) {
+        mismatches.push({ field: 'level', requested: requested.level, actual: actual.level });
+      }
+      const reqVerts = dedupeRing((requested.vertices || []).map((v) => ({
+        x: v.x, y: v.y,
+        z: typeof v.z === 'number' ? v.z : Number(requested.level) + (typeof v.relativeZ === 'number' ? v.relativeZ : 0)
+      })));
+      const actVerts = dedupeRing((actual.vertices || []).map((v) => ({
+        x: v.x, y: v.y,
+        z: typeof v.z === 'number' ? v.z : Number(actual.level) + (typeof v.relativeZ === 'number' ? v.relativeZ : 0)
+      })));
+      if (!Array.isArray(actVerts) || reqVerts.length !== actVerts.length
+        || reqVerts.some((p, i) => !pointsClose(p, actVerts[i], 0.001))) {
+        mismatches.push({
+          field: 'meshVertices',
+          requested: { vertexCount: reqVerts.length },
+          actual: { vertexCount: Array.isArray(actVerts) ? actVerts.length : null }
+        });
       }
     }
 

@@ -1,8 +1,8 @@
 {
   "_comment": "Single source of truth for the command boundary. The private release gate and the public repository validator both read this file so the two cannot drift apart. cppInstallCommands can only be verified where Sources/ is present (private repo); the descriptor counts are verifiable everywhere.",
   "_countSemantics": "descriptors counts ONLY descriptors whose executionKind is mepbridge-addon-command, i.e. tools backed by a real C++ command. serverTools counts descriptors served by the local Node server (executionKind server-endpoint), which never enter the APX. The tool-descriptors.json array length must equal descriptors + serverTools. Keeping the two apart is what lets server-side tools ship without recompiling the Add-On: CMake bakes descriptors into the APX and PingCommand echoes it, so a combined count would force an AC28/AC29 rebuild for every server-only tool.",
-  "cppInstallCommands": 79,
-  "descriptors": 78,
+  "cppInstallCommands": 89,
+  "descriptors": 88,
   "serverTools": 4,
   "directOnlyCppCommands": [
     "ChangeStairGeometry"
