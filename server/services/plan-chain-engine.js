@@ -131,6 +131,7 @@ const {
   getRegistryError,
 } = require('./command-registry');
 const { getCommandSafetyCapabilities } = require('./command-capabilities');
+const { getOfficialApiCapabilities } = require('./official-api-capabilities');
 
 // ─── PlanChain 核心 ───
 
@@ -726,12 +727,8 @@ class PlanChain {
       // 非 MEPBridge 命令额外检查白名单
       const cmd = step.commandJson.command;
       if (cmd.startsWith('API.') && cmd !== 'API.ExecuteAddOnCommand') {
-        const whitelisted = [
-          'API.GetSelectedElements', 'API.GetAllElements', 'API.GetElementsByType',
-          'API.GetElementPropertyObjects', 'API.GetStoryInfo', 'API.GetProjectInfo',
-          'API.ChangeSelection', 'API.SetStoryInfo', 'API.ApplyClassification'
-        ].includes(cmd);
-        if (!whitelisted) {
+        const capability = getOfficialApiCapabilities(cmd);
+        if (!capability?.planChainAllowed) {
           return { pass: false, reason: `命令 ${cmd} 不在安全白名单内` };
         }
       }

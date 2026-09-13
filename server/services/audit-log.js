@@ -290,4 +290,4 @@ class AuditLogger {
 }
 
 module.exports = new AuditLogger();
-module.exports._test = { isSafeChainId, CHAIN_ID_PATTERN };
+module.exports._test = { isSafeChainId, CHAIN_ID_PATTERN, AUDIT_LOG_DIR };

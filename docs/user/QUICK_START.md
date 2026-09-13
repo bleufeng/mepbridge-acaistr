@@ -1,11 +1,11 @@
-# MEPbridge ACAIstr Quick Start
+# MEPbridge ACAIstr v0.1.5 Quick Start
 
 ## 1. Install
 
 Download the English `win64-en-US.zip` or Chinese `win64-zh-CN.zip` full package. APX-only assets are updates for existing installations; GitHub's generated source archives are not installation packages.
 
-1. Extract the complete v0.1.4 release ZIP.
-2. Close Archicad and run `Install-MEPBridge.cmd`.
+1. Download the latest release from the Releases page and extract the complete release ZIP (Windows creates a folder named after the ZIP — this is expected).
+2. Close Archicad, open the extracted folder and run `Install-MEPBridge.cmd` inside it (this folder is the Workbench runtime home — do not delete it after installation).
 3. Restart Archicad.
 4. Open **MEPbridge ACAIstr -> Open MEPbridge ACAIstr**.
 
@@ -16,7 +16,7 @@ See [INSTALL.md](INSTALL.md) for manual installation and MCP configuration.
 1. Open a test or backed-up PLN.
 2. Confirm that the Workbench shows Archicad and MEPBridge as online.
 3. Run Ping or read the current project information.
-4. For the released v0.1.4 package, confirm version `0.1.4`, 79 registered C++ commands, 78 Add-On descriptor/MCP tools, and 4 Workbench Server tools.
+4. Confirm that the reported version and the Ping command / descriptor counts match the release notes of the installed version.
 
 ## 3. Manual Mode
 

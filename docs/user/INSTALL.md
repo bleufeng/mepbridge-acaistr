@@ -1,8 +1,8 @@
-# MEPbridge ACAIstr v0.1.4 Installation
+# MEPbridge ACAIstr v0.1.5 Installation
 
 This guide applies to the Windows release packages for Archicad 28 and Archicad 29.
 
-Download `MEPbridge-ACAIstr-v0.1.4-win64-en-US.zip` for an English-first installation or `MEPbridge-ACAIstr-v0.1.4-win64-zh-CN.zip` for a Chinese-first installation. Do not use an APX-only update or GitHub's automatically generated `Source code.zip` / `Source code.tar.gz` for first-time installation.
+Download `MEPbridge-ACAIstr-v<version>-win64-en-US.zip` for an English-first installation or `MEPbridge-ACAIstr-v<version>-win64-zh-CN.zip` for a Chinese-first installation (`<version>` = the latest release listed on the Releases page). Do not use an APX-only update or GitHub's automatically generated `Source code.zip` / `Source code.tar.gz` for first-time installation.
 
 ## Requirements
 
@@ -36,8 +36,8 @@ Archicad-29\MEPBridge.apx
 
 Use only the APX matching the installed Archicad major version.
 
-The standalone `MEPbridge-ACAIstr-v0.1.4-AC28-win64.apx` and
-`MEPbridge-ACAIstr-v0.1.4-AC29-win64.apx` assets update only the native Add-On.
+The standalone `MEPbridge-ACAIstr-v<version>-AC28-win64.apx` and
+`MEPbridge-ACAIstr-v<version>-AC29-win64.apx` assets update only the native Add-On.
 They do not include the Server, UI, MCP Server, production dependencies, or
 installer and are intended only for an existing complete installation.
 
@@ -80,17 +80,20 @@ Two rules apply to both types:
    If the version still shows the old value, Archicad loaded a cached copy or the
    file was locked during the copy — repeat from step 1.
 
-**v0.1.4 requires a full package update.** It changes the Add-On, Server, MCP Server
-and the descriptor registry in addition to the Add-On.
+> The upgrade type of each release is stated in its GitHub Release notes; whenever anything
+> beyond the Add-On changes (Server / MCP Server / descriptor registry / command-count change),
+> a full package update is required.
 
 ## Automatic Installation
 
-1. Extract the complete ZIP to a normal directory.
+1. Extract the complete ZIP to a normal directory (Windows creates a folder named after the ZIP — this is expected).
 2. Save your work and close Archicad.
-3. Double-click `Install-MEPBridge.cmd`.
+3. Open the extracted folder and double-click `Install-MEPBridge.cmd` inside it (the installer locates everything relative to this file; the folder name does not matter).
 4. Approve the Windows administrator prompt.
 5. Select the Archicad installation when prompted.
 6. Restart Archicad.
+
+> Note: the extracted folder is the permanent runtime home of the Workbench Server/UI — do not delete or move it after installation. When upgrading, extract into a fresh directory instead of mixing files with an older version.
 
 The installer copies the matching APX to:
 
@@ -182,7 +185,7 @@ Check in order:
 
 1. No Add-On load error appears during startup.
 2. The menu bar shows the **MEPbridge ACAIstr** menu with three items: "Open MEPbridge ACAIstr", "Usage Guide", and "Version Info".
-3. Click "Version Info" and confirm the dialog reports `Version: 0.1.2`.
+3. Click "Version Info" and confirm the dialog reports the same version you installed.
 
 Passing these three means the native Add-On is installed and Archicad JSON commands are available.
 
@@ -250,6 +253,38 @@ Example:
   }
 }
 ```
+
+### Point the path to your own extraction folder
+
+`D:\MEPbridge-ACAIstr\` in the example is a placeholder. Replace it with your own extraction
+directory, for example
+`D:\\MEPbridge-ACAIstr-v<version>-win64-en-US\\tools\\mepbridge-mcp-server.js` (use the actual
+extracted folder name). Note that Windows
+backslashes inside JSON must be escaped as `\\`.
+
+### Where common MCP clients keep their configuration
+
+| Client | How to configure |
+| --- | --- |
+| Doubao (desktop) | In Doubao desktop's MCP / extensions settings, add a custom MCP server: paste the JSON above, or fill the form with command `node`, the full script path as argument, and the `MEPBRIDGE_ENDPOINT` environment variable |
+| Cursor | Write the JSON into `%USERPROFILE%\.cursor\mcp.json` (project scope: `<project>\.cursor\mcp.json`), then restart Cursor |
+| Claude Desktop | Merge the JSON into `%APPDATA%\Claude\claude_desktop_config.json`, then restart Claude Desktop |
+| CodeBuddy | Write the JSON into the project `.codebuddy\.mcp.json` or the user-level `~\.codebuddy\.mcp.json`, then restart the IDE |
+| Codex CLI | Append to `%USERPROFILE%\.codex\config.toml` (TOML format): `[mcp_servers.mepbridge]`, `command = "node"`, `args = ["<extraction-dir>/tools/mepbridge-mcp-server.js"]`, `env = { MEPBRIDGE_ENDPOINT = "http://127.0.0.1:19780" }` |
+
+### Other MCP hosts (not listed above)
+
+Any host that supports **stdio-transport MCP** can be connected. Provide the same three
+elements in its MCP settings:
+
+1. Command: `node`
+2. Argument: `<your-extraction-dir>\tools\mepbridge-mcp-server.js`
+3. Environment variable: `MEPBRIDGE_ENDPOINT=http://127.0.0.1:19780`
+
+The script speaks stdio JSON-RPC 2.0 and depends only on Node.js built-in modules — no extra
+installation steps. If a client cannot configure custom stdio commands (for example a pure
+web-based client), it cannot be connected; support depends on that client's own MCP
+capabilities.
 
 ## Runtime Data
 
@@ -319,7 +354,8 @@ User data is generally compatible across versions; if a data format incompatibil
 - Archicad loads the Add-On without an error.
 - The MEPbridge ACAIstr menu shows three independent menu items.
 - The Workbench opens at `http://127.0.0.1:19780/`.
-- `/health` reports version `0.1.4`.
-- For the released v0.1.4 package, Ping reports 79 registered C++ commands and 78 Add-On descriptor/MCP tools; the Workbench Server additionally provides 4 server tools.
+- `/health` reports the same version you installed.
+- Ping reports registered C++ command and Add-On descriptor/MCP tool counts that match the
+  release notes of the installed version.
 
 Use a test or backed-up PLN before running write, delete, batch, or geometry-changing commands.

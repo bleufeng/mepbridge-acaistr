@@ -184,6 +184,15 @@ router.get('/status', (req, res) => {
         path.join(home, 'AppData', 'Roaming', 'Claude', 'claude_desktop_config.json')
       ],
       processMatchers: ['claude desktop']
+    },
+    {
+      // 豆包桌面版：MCP 配置写入 Electron 用户数据 Preferences（含 mepbridge 才算已配置）。
+      // 连接判定仍以 initialize 握手自报为准（自报名 "Copilot"，由注册表别名映射为 Doubao）。
+      name: 'Doubao',
+      configPaths: [
+        path.join(home, 'AppData', 'Local', 'Doubao', 'User Data', 'Default', 'Preferences')
+      ],
+      processMatchers: ['doubao.exe']
     }
   ];
   const probed = candidates

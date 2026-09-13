@@ -5,7 +5,7 @@
 > 探索方向：依托 MCP 双向数据交互，逐步形成“任务规划 → 执行建模 → 读取模型反馈 → 修正迭代”的 AI Loop。当前初始版本重点是建立可靠的模型读写、风险确认与结果回读基础；图纸解析、合规校验和建筑设计全流程、全专业智能化期望持续扩展方向。
 
 [![Archicad](https://img.shields.io/badge/Archicad-28%20%7C%2029-blue.svg)]()
-[![Version](https://img.shields.io/badge/version-0.1.4-orange.svg)]()
+[![Version](https://img.shields.io/badge/version-0.1.5-orange.svg)]()
 [![OPENBIM](https://img.shields.io/badge/OPENBIM-Workflow-0F766E.svg)]()
 [![Archicad JSON API](https://img.shields.io/badge/ARCHICAD-JSON%20API-2563EB.svg)]()
 [![C++ Add-On](https://img.shields.io/badge/C%2B%2B-Add--On-00599C.svg)]()
@@ -25,9 +25,9 @@
 
 ## 发布范围
 
-- 版本：`v0.1.4`
-- 79 个注册 C++ 命令
-- 78 个 Add-On descriptor/MCP 工具
+- 版本：`v0.1.5`
+- 89 个注册 C++ 命令
+- 88 个 Add-On descriptor/MCP 工具
 - 4 个本地 Workbench Server 工具
 - 仅直接调用的 C++ 命令：`ChangeStairGeometry`
 - 支持 Archicad 28 和 Archicad 29 Windows 版本
@@ -38,8 +38,8 @@
 
 请从 GitHub Releases 按界面语言下载完整安装包：
 
-- `MEPbridge-ACAIstr-v0.1.4-win64-zh-CN.zip`：中文完整安装包。
-- `MEPbridge-ACAIstr-v0.1.4-win64-en-US.zip`：英文完整安装包。
+- `MEPbridge-ACAIstr-v0.1.5-win64-zh-CN.zip`：中文完整安装包。
+- `MEPbridge-ACAIstr-v0.1.5-win64-en-US.zip`：英文完整安装包。
 
 不要下载 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`，它们不是安装包，不包含完整 APX 和运行依赖。每个完整 ZIP 均包含 AC28/AC29 APX、Workbench Server、编译后的 UI、MCP Server、生产依赖、法律文件、发布清单和 SHA256 校验和。单独的 AC28/AC29 APX 仅供已安装完整运行环境的用户更新插件。
 
@@ -72,8 +72,8 @@
 
 - 通用建筑构件：墙、柱、梁、板、屋顶、门窗、楼梯、对象、灯具、地形、区域和轴网
 - MEP 专业：管道、风管、桥架、柔性段、支管连接、系统、尺寸和路由操作
-- 模型编辑：移动、旋转、镜像、复制、几何修改、批量创建、选择和删除
-- 项目查询：项目信息、楼层、图库、热链接、属性、几何、网格和视口截图
+- 模型编辑：移动、旋转、镜像、复制、阵列复制、几何修改、批量创建、选择和删除
+- 项目查询：项目信息、楼层、图库、热链接、属性、几何、属性盘点、文档元素、网格和视口截图
 - `CollabAI 智能` 与 `Manual 手动` 双入口、风险分级、确认闸门和执行结果回读
 - 根据 `ai-adapter/tool-descriptors.json` 动态生成 MCP 工具
 - 本地用户模板、自定义命令、知识库、学习记忆和审计日志
@@ -121,8 +121,8 @@ UI 和 MCP 的模型操作统一通过 `/api/execute`。用户模板、学习记
 ## 安装
 
 1. 从 Releases 下载完整的 `win64-zh-CN.zip` 或 `win64-en-US.zip`，不要把独立 APX 更新文件或自动生成的 `Source code.zip` / `Source code.tar.gz` 当作完整安装包。
-2. 解压到普通可写目录。
-3. 关闭 Archicad，双击 `Install-MEPBridge.cmd`。
+2. 解压到普通可写目录（Windows 会创建同名文件夹，属预期行为）。
+3. 关闭 Archicad，进入解压出的文件夹，双击其中的 `Install-MEPBridge.cmd`（该文件夹是 Workbench 运行目录，装完勿删）。
 4. 重新启动 Archicad。
 5. 从 MEPbridge ACAIstr 插件菜单打开 Workbench。
 

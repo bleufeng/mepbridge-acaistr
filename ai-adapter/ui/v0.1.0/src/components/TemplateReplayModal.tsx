@@ -111,8 +111,8 @@ export const TemplateReplayModal: React.FC<TemplateReplayModalProps> = ({
               <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
               <div className="text-xs text-amber-400/80">
                 {lang === "zh-CN"
-                  ? "此模板包含修改操作，将按左区自动模式设置执行：自动模式直接执行，监督/手动模式需确认。"
-                  : "This template contains mutations and follows the left-panel mode: auto executes directly; supervised/manual modes require confirmation."}
+                  ? "此模板包含修改操作。请先检查步骤预览，确认后将真实执行并回读结果。"
+                  : "This template contains mutations. Review the step preview first; confirming will execute and read back results."}
               </div>
             </div>
           )}
@@ -195,7 +195,7 @@ export const TemplateReplayModal: React.FC<TemplateReplayModalProps> = ({
             className="px-4 py-2 text-xs font-semibold text-white bg-pink-600 hover:bg-pink-500 rounded flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] transition-all"
           >
             <Play className="w-3.5 h-3.5" />
-            {lang === "zh-CN" ? "按当前模式继续" : "Continue by Mode"}
+            {lang === "zh-CN" ? "确认并执行" : "Confirm and Execute"}
           </button>
         </div>
       </div>

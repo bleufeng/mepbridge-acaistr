@@ -572,6 +572,7 @@ export default function App() {
   // Connection settings
   const [archicadConnected, setArchicadConnected] = useState<boolean>(true);
   const [mepbridgeConnected, setMepbridgeConnected] = useState<boolean>(true);
+  const [activeArchicadPort, setActiveArchicadPort] = useState<number | null>(null);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   // Flow & Gate logic config
@@ -837,12 +838,17 @@ export default function App() {
         if (!isCancelled) {
           setArchicadConnected(data.archicad === true);
           setMepbridgeConnected(data.mepbridge === true);
+          const hasResolvedTarget = data.archicad === true
+            && data.mepbridge === true
+            && Number.isInteger(data.port);
+          setActiveArchicadPort(hasResolvedTarget ? data.port : null);
         }
       } catch (err) {
         if (!isCancelled) {
           console.warn("[Connection Poll] Failed:", err);
           setArchicadConnected(false);
           setMepbridgeConnected(false);
+          setActiveArchicadPort(null);
         }
       } finally {
         // 调度下一次检查（无论成功失败）
@@ -1881,6 +1887,14 @@ export default function App() {
   // Actual execution logic (extracted for reuse)
   const executeOperationPlan = async (plan: OperationPlan, executionMode: "base" | "copilot" = workbenchMode) => {
     setSystemError(null);
+    const targetPort = activeArchicadPort;
+    if (targetPort === null) {
+      setSystemError(lang === "zh-CN"
+        ? "未获取到已验证的 Archicad 目标实例端口，已停止执行。"
+        : "No verified Archicad target port is available; execution stopped.");
+      return;
+    }
+
     setIsExecutingPlan(true);
     setExecutionCompleted(false);
     setActivePlanMode(executionMode);
@@ -1914,7 +1928,7 @@ export default function App() {
       });
 
       try {
-        const command = buildExecutePayload(step);
+        const command = buildExecutePayload(step, targetPort);
 
         // SYNC-5 防御：空 action 的 step 跳过执行（不再误发 Ping）
         // 正常情况下 copilot-message.js 已过滤 unsupported plan，此为兜底保护
@@ -1942,6 +1956,12 @@ export default function App() {
         }
 
         const result = await res.json();
+
+        if (result?.target?.port !== targetPort) {
+          throw new Error(lang === "zh-CN"
+            ? `目标实例校验失败：期望端口 ${targetPort}，实际 ${result?.target?.port ?? "未回显"}`
+            : `Target instance mismatch: expected port ${targetPort}, got ${result?.target?.port ?? "no echo"}`);
+        }
 
         // Check result
         if (result.ok || result.validation?.ok) {
@@ -2002,7 +2022,7 @@ export default function App() {
     updateVerificationTable(stepResults, plan);
 
     // Perform readback verification if any GUIDs were created
-    await performReadback(stepResults, executionMode);
+    await performReadback(stepResults, executionMode, targetPort);
 
     pushExecutionMessage({
         id: `success_${Date.now()}`,
@@ -2036,32 +2056,16 @@ export default function App() {
       return;
     }
 
-    const hasPlaceholders = Array.isArray(latestTemplate.placeholders) && latestTemplate.placeholders.length > 0;
-    if (autonomyMode === "copilot-auto" && !hasPlaceholders) {
-      const filledPlan = latestTemplate.plan;
-      setActivePlan(filledPlan);
-      setExecutionResultData(filledPlan.parameters || []);
-      setShowPlanCard(true);
-      setWorkbenchMode("copilot");
-      setExecutionCompleted(false);
-      setCurrentExecutingStepIndex(-1);
-
-      if (!archicadConnected || !mepbridgeConnected) {
-        setSystemError(currentT.errConnDesc);
-        triggerToast(currentT.errConnTitle);
-        return;
-      }
-
-      triggerToast(lang === "zh-CN" ? "AI 自动模式：用户模板将直接执行" : "AI auto mode: executing user template directly");
-      await executeOperationPlan(filledPlan, "copilot");
-      return;
-    }
-
+    // V15-GOV-04: template replay always has an explicit preview/confirm stage.
     setReplayTemplate(latestTemplate);
   };
 
   // Helper: Perform readback verification
-  const performReadback = async (results: any[], executionMode: "base" | "copilot" = workbenchMode) => {
+  const performReadback = async (
+    results: any[],
+    executionMode: "base" | "copilot" = workbenchMode,
+    targetPort: number
+  ) => {
     const pushReadbackMessage = (msg: ChatMessage) => {
       setMessages((prev) => [...prev, { ...msg, mode: msg.mode || executionMode }]);
     };
@@ -2126,6 +2130,7 @@ export default function App() {
               }
             }
           },
+          targetPort,
           source: "ui-readback",
           intent: "Verify active selection after execution"
         })
@@ -2136,6 +2141,10 @@ export default function App() {
       }
 
       const result = await res.json();
+
+      if (result?.target?.port !== targetPort) {
+        throw new Error(`Target instance mismatch: expected port ${targetPort}, got ${result?.target?.port ?? "no echo"}`);
+      }
 
       const payload = getCommandPayload(result);
 
@@ -2235,10 +2244,11 @@ export default function App() {
     setExecutionResultData(newParams);
   };
 
-  const buildExecutePayload = (step: PlanStep) => {
+  const buildExecutePayload = (step: PlanStep, targetPort: number) => {
     if (step.commandJson?.command) {
       return {
         command: step.commandJson,
+        targetPort,
         source: "ui-copilot",
         intent: step.description
       };
@@ -2248,6 +2258,7 @@ export default function App() {
       commandName: mapStepToCommand(step),
       commandNamespace: step.commandNamespace || undefined,
       parameters: step.params || {},
+      targetPort,
       source: "ui-copilot",
       intent: step.description,
       target: { scope: "selection" }
@@ -6754,17 +6765,12 @@ export default function App() {
             setExecutionCompleted(false);
             setCurrentExecutingStepIndex(-1);
 
-            const shouldAutoExecuteTemplate = autonomyMode === "copilot-auto";
-            if (shouldAutoExecuteTemplate) {
-              if (!archicadConnected || !mepbridgeConnected) {
-                setSystemError(currentT.errConnDesc);
-                triggerToast(currentT.errConnTitle);
-              } else {
-                triggerToast(lang === "zh-CN" ? "AI 自动模式：用户模板将直接执行" : "AI auto mode: executing user template directly");
-                await executeOperationPlan(filledPlan, "copilot");
-              }
+            if (!archicadConnected || !mepbridgeConnected) {
+              setSystemError(currentT.errConnDesc);
+              triggerToast(currentT.errConnTitle);
             } else {
-              triggerToast(lang === "zh-CN" ? "用户模板已加载，请按当前模式确认执行" : "User template loaded; confirm according to current mode");
+              triggerToast(lang === "zh-CN" ? "用户模板已确认，开始执行" : "User template confirmed; starting execution");
+              await executeOperationPlan(filledPlan, "copilot");
             }
           }
           setReplayTemplate(null);

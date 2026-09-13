@@ -5,7 +5,7 @@
 > The exploration path uses two-way MCP data exchange to progressively form an AI Loop of task planning, model execution, model-feedback readback, and corrective iteration. Design instructions connect with AI algorithms through data, driving Archicad execution via the local Workbench / MCP layer and reading back structured results to close the loop. The initial version focuses on reliable model read/write access, risk confirmation, and result readback. Drawing interpretation, compliance checking, and multidisciplinary end-to-end design automation are expected to continue expanding.
 
 [![Archicad](https://img.shields.io/badge/Archicad-28%20%7C%2029-blue.svg)]()
-[![Version](https://img.shields.io/badge/version-0.1.4-orange.svg)]()
+[![Version](https://img.shields.io/badge/version-0.1.5-orange.svg)]()
 [![OPENBIM](https://img.shields.io/badge/OPENBIM-Workflow-0F766E.svg)]()
 [![Archicad JSON API](https://img.shields.io/badge/ARCHICAD-JSON%20API-2563EB.svg)]()
 [![C++ Add-On](https://img.shields.io/badge/C%2B%2B-Add--On-00599C.svg)]()
@@ -46,9 +46,9 @@ Natural-language tasks and extensible user templates pass through planning and r
 
 ## Release Scope
 
-- Version: `v0.1.4`
-- 79 registered C++ commands
-- 78 Add-On descriptor/MCP tools
+- Version: `v0.1.5`
+- 89 registered C++ commands
+- 88 Add-On descriptor/MCP tools
 - 4 local Workbench Server tools
 - Direct-only C++ command: `ChangeStairGeometry`
 - Archicad 28 and Archicad 29 Windows builds
@@ -59,8 +59,8 @@ Public update history: [CHANGELOG.md](CHANGELOG.md).
 
 Download the full package for your language from GitHub Releases:
 
-- `MEPbridge-ACAIstr-v0.1.4-win64-en-US.zip`: English full package.
-- `MEPbridge-ACAIstr-v0.1.4-win64-zh-CN.zip`: Chinese full package.
+- `MEPbridge-ACAIstr-v0.1.5-win64-en-US.zip`: English full package.
+- `MEPbridge-ACAIstr-v0.1.5-win64-zh-CN.zip`: Chinese full package.
 
 Do not use GitHub's automatically generated `Source code.zip` or `Source code.tar.gz`; they are not installation packages and do not contain the complete APX and runtime dependencies. Each full ZIP contains both AC28 and AC29 APXs, the Workbench Server, compiled UI, MCP Server, production dependencies, legal files, manifest, and checksums. The standalone AC28/AC29 APX assets are update-only files for users who already have a complete package installed.
 
@@ -72,8 +72,8 @@ The repository focuses on Workbench development and extension rather than indepe
 
 - General building elements: walls, columns, beams, slabs, roofs, doors, windows, stairs, objects, lamps, meshes, zones, and grids
 - MEP domains: pipe, duct, cable carrier, flexible segment, take-off, systems, sizes, and route operations
-- Model editing: move, rotate, mirror, copy, geometry changes, batch creation, selection, and deletion
-- Project queries: project information, stories, libraries, hotlinks, properties, geometry, mesh, and viewport capture
+- Model editing: move, rotate, mirror, copy, multiply, geometry changes, batch creation, selection, and deletion
+- Project queries: project information, stories, libraries, hotlinks, properties, geometry, attributes, documentation elements, mesh, and viewport capture
 - `CollabAI Smart` and `Manual` operation modes with risk classification, confirmation gates, and result readback
 - MCP tools generated dynamically from `ai-adapter/tool-descriptors.json`
 - Local user templates, custom commands, knowledge base, learning memory, and audit logs
@@ -121,8 +121,8 @@ UI and MCP model operations pass through `/api/execute`. Runtime data such as us
 ## Install
 
 1. Download the complete `win64-en-US.zip` or `win64-zh-CN.zip` package from Releases, not an APX-only update or the automatically generated `Source code.zip` / `Source code.tar.gz`.
-2. Extract it to a normal writable directory.
-3. Close Archicad and run `Install-MEPBridge.cmd`.
+2. Extract it to a normal writable directory (Windows creates a folder named after the ZIP — this is expected).
+3. Close Archicad, open the extracted folder and run `Install-MEPBridge.cmd` inside it (this folder is the Workbench runtime home — do not delete it after installation).
 4. Restart Archicad.
 5. Use the MEPbridge ACAIstr menu to open the Workbench.
 

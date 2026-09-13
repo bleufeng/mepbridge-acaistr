@@ -8,7 +8,8 @@ review, and test the C2 Workbench layer:
 - React Workbench source
 - Node.js Server source
 - MCP Server
-- 73 core tool descriptors (including the source-level `CreateMorph` contract pending native APX rebuild and runtime verification)
+- 88 Add-On-backed tool descriptors matching the `v0.1.5` released APX boundary
+- 4 server-side tools that run in the Node.js Server and never require an APX rebuild
 - reviewed module registry, schema, modules, and module tests
 - the narrowly scoped public command-safety regression test at `tests/test-command-capabilities.js`
 - public examples and user documentation
@@ -27,6 +28,22 @@ The public repository does not contain:
 - user data, templates created by users, logs, API keys, or local LLM settings
 
 The public repository is not a reproducible APX build source.
+
+## Capability Boundary
+
+The public repository declares the same command boundary as the reviewed
+`v0.1.5` release binaries:
+
+- 89 registered C++ commands
+- 88 Add-On descriptors
+- 4 server tools
+- 92 descriptor entries in total
+
+Development commands that exist in the engineering source but are not part of
+the reviewed binary release are filtered out during the public export. The
+`CreateComplexElement` command is therefore intentionally absent from this
+repository until its native implementation is compiled and live-validated in a
+later release.
 
 ## Contribution Boundary
 
