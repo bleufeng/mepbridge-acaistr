@@ -1,4 +1,4 @@
-# MEPbridge ACAIstr v0.1.5 安装说明
+# MEPbridge ACAIstr v0.1.6 安装说明
 
 本说明适用于 Archicad 28 和 Archicad 29 的 Windows 发布包。
 

@@ -14,6 +14,7 @@ const CJK_PATTERN = /[\u3400-\u9fff]/;
 // localization contract under test is "no CJK in the en-US payload", not a
 // particular template count.
 const starterEnUs = require('../../examples/user-assets/mepbridge-starter-user-assets.en-US.json');
+const userTemplateCodes = require('../services/user-template-codes');
 const STARTER_TEMPLATE_COUNT = starterEnUs.templates.length;
 const STARTER_COMMAND_COUNT = starterEnUs.commands.length;
 
@@ -102,7 +103,15 @@ async function main() {
 
     const assets = await requestJson(`${baseUrl}/api/user-assets/load?locale=en-US`);
     assert.strictEqual(assets.locale, 'en-US');
-    assert.strictEqual(assets.templates.length, STARTER_TEMPLATE_COUNT);
+    // 2026-09-18: /load 只返回"面板模板"——去除几何模板，以及已被出厂模板（SYS-0NN）承载的示例
+    //（示例数据仍完整保存在 assets.json 中，只是不在面板里重复展示）。
+    const expectedPanelCount = starterEnUs.templates.filter((template) => template.geometryTemplate === undefined
+      && !userTemplateCodes.builtinCodeForTemplateId(template.id)).length;
+    assert.strictEqual(
+      assets.templates.length,
+      expectedPanelCount,
+      'load must return panel templates only (geometry templates and factory-superseded samples excluded)'
+    );
     assert.strictEqual(assets.commands.length, STARTER_COMMAND_COUNT);
     assertNoCjk('English user asset response', {
       templates: assets.templates,

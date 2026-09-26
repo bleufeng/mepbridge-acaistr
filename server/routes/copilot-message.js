@@ -10,7 +10,24 @@ const router = express.Router();
 const aiAdapter = require('../services/ai-adapter');
 const archicadClient = require('../services/archicad-client');
 const taskTemplates = require('../services/task-templates');   // V2 H5.5 任务模板库
+const userAssets = require('./user-assets');                   // 用户模板（含 TPL-0NN 编号）
 const { normalizeUiLocale, isEnglishUiLocale } = require('../services/ui-locale');
+
+/**
+ * 「编号直达」：用户直接输入模板编号时，不经过 LLM 直接回放。
+ *   - TPL-0NN = 用户模板（assets.json 里采集时固化的步骤，面板唯一列表展示）
+ *   - SYS-0NN = 出厂模板（内置任务模板 TPL-001..020，代码生成；仅聊天通道，面板不展示）
+ * TPL 编号只解析用户模板——未命中直接回"未找到"，绝不回落内置（2026-09-18 晚间裁定）。
+ * SYS 编号只解析出厂模板（聊天隐藏通道）。
+ */
+function resolveUserTemplateCode(message, locale) {
+  const templates = userAssets.templateCodes.loadVisibleTemplates(locale);
+  const parsed = userAssets.templateCodes.parseTemplateCodeRequest(message);
+  const resolved = parsed.kind === 'user'
+    ? userAssets.templateCodes.resolveTemplateCodeRequest(message, templates)
+    : { plan: null, code: null, found: false };
+  return { ...resolved, ...parsed, templates };
+}
 
 /**
  * 获取当前选择集摘要（FO-3）
@@ -161,10 +178,38 @@ router.post('/', async (req, res) => {
       console.log(`[Copilot][H3.2] Project context: ${projectContext.summary}`);
     }
 
-    // V2 H5.5: 先尝试任务模板匹配（<200ms 精确匹配，避免不必要的 LLM 调用）
-    const templatePlan = taskTemplates.tryGenerate(message, context);
+    // 编号直达（优先于关键词匹配）：
+    //   ① 用户模板编号 TPL-0NN（assets.json，步骤为采集时固化）——未命中 = 未找到，不回落内置
+    //   ② 出厂模板编号 SYS-0NN（内置任务模板 TPL-001..020，代码生成；聊天专用通道）
+    const codeRequest = resolveUserTemplateCode(message, locale);
+    let templatePlan = codeRequest.plan;
+    let matchedBy = templatePlan ? `code ${codeRequest.code}` : 'keywords';
+    if (!templatePlan && codeRequest.builtinId) {
+      templatePlan = taskTemplates.generateById(codeRequest.builtinId, message, context);
+      if (templatePlan) matchedBy = `factory code ${codeRequest.code}`;
+    }
+    const unknownCode = !templatePlan && Boolean(codeRequest.builtinId || (codeRequest.code && !codeRequest.found));
+    if (unknownCode) {
+      const available = userAssets.templateCodes.listTemplateCodes(codeRequest.templates)
+        .slice(0, 12)
+        .map((item) => `${item.code} ${item.name}`)
+        .join('；');
+      console.log(`[Copilot][TPL-code] Code ${codeRequest.code || codeRequest.builtinId} not found`);
+      return res.json({
+        message: english
+          ? `No template with code ${codeRequest.code || codeRequest.builtinId}. Available: ${available || 'none'}`
+          : `未找到模板编号 ${codeRequest.code || codeRequest.builtinId}。可用编号：${available || '（暂无）'}`,
+        isMepAction: false,
+        action: null
+      });
+    }
+
+    // V2 H5.5: 再尝试关键词匹配（<200ms 精确匹配，避免不必要的 LLM 调用）
+    if (!templatePlan) {
+      templatePlan = taskTemplates.tryGenerate(message, context);
+    }
     if (templatePlan) {
-      console.log(`[Copilot][H5.5] Template matched: ${templatePlan.userIntent}, ${templatePlan.steps.length} steps`);
+      console.log(`[Copilot][H5.5] Template matched (${matchedBy}): ${templatePlan.userIntent}, ${templatePlan.steps.length} steps`);
 
       // 缺必需参数时在此拦住，不把注定失败的请求送去 Archicad。
       //

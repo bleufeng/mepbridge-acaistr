@@ -20,6 +20,9 @@ export type RiskLevel = "read" | "low-mutation";
 
 export interface TaskTemplate {
   id: string;                          // uuid，本地生成
+  // TPL-0NN 编号：由服务端分配并持久化（内置任务模板占用 TPL-001..020，用户模板从 021 起）。
+  // 面板展示该编号，且在聊天框直接输入编号即可复现对应模板。
+  code?: string;
   name: string;                        // 用户起名，如"标准水管上移200"
   category: TemplateCategory;          // 对齐 C.1.6 模块切换器的 6 模块 + "自定义"
   icon?: string;                       // emoji，沿用现有按钮风格（如 "↕️"）

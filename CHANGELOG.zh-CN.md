@@ -2,6 +2,34 @@
 
 面向用户的公开变更。版本号遵循语义化版本规范。
 
+## [0.1.6] - 2026-09-25
+
+### 新增
+
+- `CreateWall`、`CreateColumn`、`CreateBeam`、`CreateSlab`、`CreateRoof`、`CreateMorph` 支持可选 `properties[]`，几何与语义（如「结构功能=承重元素」用于 IFC／结构分析）一次调用完成；任一属性失败将整体原子回滚，不留半配置构件。
+- `CreateBeam` 新增 `topOffset` 与 `absoluteZ`，创建后回读校验，适用于降板、设备夹层与找坡梁。
+- `EditBuildingElement` 支持写墙体 `relativeTopStory`、`topOffset`、`bottomOffset`（有无顶部关联均可）。
+- `CreateWall` 新增 `refLinePosition`（center／outside／inside）与 `refLineOffset`，墙体不再只能按中心线放置。
+- 屋顶现已支持 `MoveBuildingElements` 移动（此前报 `ELEMENT_TYPE_UNSUPPORTED`）。
+- `MoveBuildingElements` 的 `vector` 改为 `{dx,dy,dz}` 米（新增 `delta3dMeters` descriptor 类型）；此前 `{x,y,z}`+毫米的形态有误导性。
+- 快照回放现已恢复项目 A 采集的墙体 `bottomOffset`。
+- `CopyElements` 垂直复制未指定 `targetStoryIndex` 时回报 `floorAssignmentNote`，不再静默指派楼层。
+- 新增官方 PowerShell 调用示例（`examples/powershell-call/`），展示在 Windows PowerShell 5.1 下调用 `/api/execute` 而无需内联 JSON 转义。
+- 命令指南新增单位、语义、GUID 字段与环境约定附录。
+
+### 修复
+
+- 移动构件不再静默变成复制。`MoveBuildingElements` 现在真移动、保持原 GUID，并按世界坐标 AABB（1 mm 容差）与元素计数校验；校验失败返回 `status:error`，不再假报 `verified` 成功。
+- 屋顶轮廓与枢轴线现在以模型坐标创建并按模型坐标回读，屋顶可以精确放置，跨文件几何可正常往返。
+- 批量创建柱/梁恢复正常：`BatchCreateElements` 逐条重取元素默认值，柱/梁批量不再整体失败。
+- `DeleteElements` 删除后按 GUID 读回校验；被模态对话框阻塞时回报 `notDeletedGuids` 与 `DELETE_READBACK_INCOMPLETE`，不再误报成功。
+- `CreatePipe` 精确匹配请求管径，失败时列出可选直径，不再静默取近似值。
+- `GetElementsByType` 的楼梯 AABB 现包含踏步全高（`aabbZSource:stair-geometry`），不再返回零高盒。
+- `CreateDuct` 与 `CreateCableCarrier` 的结果补 `mode: "created"`。
+- `GetAvailableSystems` 重新输出 `domain` 字段（0.1.5 包中缺失）。
+- 顶层标高超过虚拟上层时前置拒绝并给出 `STORY_ELEVATION_EXCEEDS_VIRTUAL_UPPER` 与建议顺序（先抬 `height` 再设 `elevation`），不再静默回滚。
+- `GetElementGeometry` 柱分支补 `rotationAngle`、`bottomOffset`、`baseZ`、`homeStoryLevel`，带旋转柱可被回读校验。
+
 ## [0.1.5] - 2026-09-04
 
 ### 新增

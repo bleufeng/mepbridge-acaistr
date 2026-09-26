@@ -232,7 +232,10 @@ export function ExtensionPanel({
   const filteredTemplates = sortedTemplates.filter(t => {
     if (templateSearch) {
       const q = templateSearch.toLowerCase();
-      return t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q);
+      // 支持按编号搜索（如 TPL-006 / tpl6）
+      return t.name.toLowerCase().includes(q)
+        || t.description.toLowerCase().includes(q)
+        || (t.code || "").toLowerCase().includes(q);
     }
     return true;
   });
@@ -330,28 +333,38 @@ export function ExtensionPanel({
         {activeTab === "templates" && (
           <div className="flex flex-col h-full bg-zinc-950 text-zinc-200">
             {/* 搜索栏（移除分类下拉框，远期再设分类） */}
-            <div className="flex-shrink-0 px-4 py-2.5 border-b border-zinc-800 flex items-center gap-2">
-              <input
-                type="text"
-                value={templateSearch}
-                onChange={e => setTemplateSearch(e.target.value)}
-                placeholder={zh ? "搜索模板（按热度排序）..." : "Search (sorted by usage)..."}
-                className="flex-1 text-xs bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-zinc-300 placeholder:text-zinc-600"
-              />
-              <span className="text-[10px] font-mono text-zinc-500">
-                {userTemplates.length}{zh ? "个" : ""}
-              </span>
-              <button
-                onClick={() => setTemplateManageMode(prev => !prev)}
-                className={`px-2.5 py-1 text-[11px] rounded font-semibold transition-colors flex items-center gap-1 ${templateManageMode ? "bg-red-600/25 hover:bg-red-600/40 text-red-200" : "bg-pink-600/30 hover:bg-pink-600/50 text-pink-200"}`}
-              >
-                <Bookmark className="w-3 h-3" />
-                {templateManageMode ? (zh ? "完成" : "Done") : (zh ? "管理模板" : "Manage")}
-              </button>
+            <div className="flex-shrink-0 px-4 py-2.5 border-b border-zinc-800 flex flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={templateSearch}
+                  onChange={e => setTemplateSearch(e.target.value)}
+                  placeholder={zh ? "搜索模板（名称或编号，如 TPL-026）..." : "Search (name or code, e.g. TPL-026)..."}
+                  className="flex-1 text-xs bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-zinc-300 placeholder:text-zinc-600"
+                />
+                <span className="text-[10px] font-mono text-zinc-500">
+                  {userTemplates.length}{zh ? "个" : ""}
+                </span>
+                <button
+                  onClick={() => setTemplateManageMode(prev => !prev)}
+                  className={`px-2.5 py-1 text-[11px] rounded font-semibold transition-colors flex items-center gap-1 ${templateManageMode ? "bg-red-600/25 hover:bg-red-600/40 text-red-200" : "bg-pink-600/30 hover:bg-pink-600/50 text-pink-200"}`}
+                >
+                  <Bookmark className="w-3 h-3" />
+                  {templateManageMode ? (zh ? "完成" : "Done") : (zh ? "管理模板" : "Manage")}
+                </button>
+              </div>
+              <div className="text-[10px] text-zinc-600">
+                {zh
+                  ? "在聊天框直接输入编号即可复现模板（如 TPL-001）；官方配方可在聊天中用 SYS-0NN（如 SYS-014）或自然语言触发"
+                  : "Type a code in the chat to replay a template (e.g. TPL-001); factory recipes stay chat-only: SYS-0NN (e.g. SYS-014) or natural language"}
+              </div>
             </div>
 
             {/* 模板列表 */}
             <div className="flex-1 overflow-y-auto px-4 py-3 custom-scrollbar">
+              <div className="text-[10px] font-semibold text-pink-300 mb-1.5">
+                {zh ? "我的模板（TPL-0NN · 可编辑）" : "My templates (TPL-0NN · editable)"}
+              </div>
               {userTemplates.length === 0 ? (
                 <div className="text-center py-8 flex flex-col items-center gap-2">
                   <Bookmark className="w-8 h-8 text-zinc-700" />
@@ -374,7 +387,15 @@ export function ExtensionPanel({
                       className={`rounded-lg border p-2.5 transition-colors ${templateManageMode ? "border-red-500/25 bg-red-500/5" : "border-pink-500/20 bg-pink-500/5 hover:bg-pink-500/10"}`}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {tpl.code && (
+                            <span
+                              className="text-[9px] font-mono px-1 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-pink-200 whitespace-nowrap"
+                              title={zh ? "在聊天框输入该编号即可复现" : "Type this code in the chat to replay"}
+                            >
+                              {tpl.code}
+                            </span>
+                          )}
                           <span className="text-xs font-semibold text-zinc-200 truncate">{tpl.name}</span>
                         </div>
                         <div className="flex items-center gap-1">
@@ -400,7 +421,7 @@ export function ExtensionPanel({
                           )}
                         </div>
                       </div>
-                      <div className="text-[10px] text-zinc-500 truncate">{tpl.description}</div>
+                      <div className="text-[10px] text-zinc-500 truncate" title={tpl.description}>{tpl.description}</div>
                       {templateManageMode && (
                         <div className="text-[9px] text-zinc-600 font-mono truncate mt-1">ID: {tpl.id}</div>
                       )}
@@ -418,6 +439,7 @@ export function ExtensionPanel({
                   })}
                 </div>
               )}
+
             </div>
           </div>
         )}

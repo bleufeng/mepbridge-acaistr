@@ -5,7 +5,7 @@
     {
       "name": "mepbridge.get_selected_element_details",
       "title": "MEPBridge get selected element details",
-      "description": "Read details for the current Archicad selection through MEPBridge, including type, recognition metadata and AABB geometry, with official selection readback available for comparison.",
+      "description": "Read the current Archicad selection as a list — one entry per selected element with its type, recognition metadata and AABB geometry (official selection readback available for comparison). Note (FB-G4, 2026-09-24): this returns the selection *set* (backed by GetSelectedElements), not a single element's full detail; for one element's precise geometry use get_element_geometry, for its properties use get_element_properties.",
       "featureArea": "Architecture",
       "status": "offline-validated",
       "executionKind": "mepbridge-addon-command",
@@ -575,6 +575,10 @@
         ]
       },
       "paramExtractors": {
+        "sourceGuids": {
+          "type": "guidList",
+          "description": "Element GUIDs to copy (max 500). If omitted, the current Archicad selection is resolved server-side (see dynamicParameters)."
+        },
         "offsetMm": {
           "type": "delta3d",
           "description": "Extract x/y/z offset from text"
@@ -1250,7 +1254,6 @@
           },
           "addOnCommandParameters": {
             "storyIndex": 1,
-            "elevation": 3.5,
             "dryRun": true,
             "confirmRequired": false
           }
@@ -1506,12 +1509,10 @@
       "paramExtractors": {
         "domain": {
           "type": "enum",
-          "description": "MEP domain, defaults to Piping",
+          "description": "MEP domain. Only Piping is supported in the current version; the Add-On returns UNSUPPORTED_DOMAIN for anything else.",
           "default": "Piping",
           "allowed": [
-            "Piping",
-            "Ventilation",
-            "CableCarrier"
+            "Piping"
           ]
         }
       },
@@ -1824,11 +1825,11 @@
         },
         "referenceId": {
           "type": "string",
-          "description": "Pipe diameter reference ID from GetAvailableSizes"
+          "description": "PREFERRED. Pipe cross-section reference ID from GetAvailableSizes; resolves to an exact preference-table row. Use this rather than diameterMm."
         },
         "diameterMm": {
           "type": "number",
-          "description": "Pipe diameter in millimeters, extracted from '100mm水管' / 'DN20' / '直径100mm' etc. Falls back to 22.0mm if not specified."
+          "description": "Pipe diameter in millimeters. Matched EXACTLY against the Piping preference table (no nearest-size rounding); a value with no exact row is rejected with DIAMETER_NOT_FOUND listing the available diameters. Prefer referenceId from GetAvailableSizes. Falls back to 22.0mm only when neither referenceId nor diameterMm is given."
         }
       },
       "commandJson": {
@@ -1894,13 +1895,13 @@
         ]
       },
       "paramExtractors": {
-        "waypoints": {
-          "type": "point3dList",
-          "description": "Main route waypoints [{x,y,z}] in meters"
+        "mainRoute": {
+          "type": "raw",
+          "description": "Main route object { waypoints:[{x,y,z}] in meters, optional diameterMm/referenceId/mepSystemName }. The C++ command reads waypoints under mainRoute, not at the top level."
         },
         "branches": {
           "type": "raw",
-          "description": "Branch array with tapPoint/endPoint/diameterMm"
+          "description": "Branch array; each branch has waypoints:[{x,y,z}] or tapPoint/endPoint, plus optional diameterMm"
         }
       },
       "commandJson": {
@@ -2201,6 +2202,10 @@
         "floorIndex": {
           "type": "integer",
           "description": "Story index (0-based), defaults to current story"
+        },
+        "bottomOffset": {
+          "type": "number",
+          "description": "Optional wall baseline offset from the home story level in meters. Negative values are allowed; omitted keeps the existing default behavior. Compile-validated by V16-BUILD-01 and pending runtime validation."
         },
         "profileGuid": {
           "type": "string",
@@ -2769,9 +2774,9 @@
     {
       "name": "mepbridge.create_roof",
       "title": "MEPBridge create roof (architectural)",
-      "description": "Create a roof from a polygon outline using native Archicad API (API_RoofID) with pitch angle support. Requires at least 3 vertices. Contour input and readback use model coordinates; PlaneRoof contours are converted back from pivot-local coordinates. Runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates.",
+      "description": "Create a roof from a polygon outline using native Archicad API (API_RoofID) with pitch angle support. Requires at least 3 vertices. Contour input and readback, the pivot line, and posSign use model coordinates. The v0.1.6 frame/readback-cleanup revision is code-complete pending V16-BUILD-01 compile and AC28/AC29 runtime validation; the 2026-09-05 v0.1.5 runtime evidence applies only to the historical implementation.",
       "featureArea": "Architecture",
-      "status": "runtime-validated",
+      "status": "code-complete-pending-runtime",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "CreateRoof",
@@ -2814,6 +2819,18 @@
         "pitchAngle": {
           "type": "number",
           "description": "Roof pitch angle in degrees (0=flat, default=30)"
+        },
+        "baseLineStart": {
+          "type": "point2d",
+          "description": "Optional pivot line start in model coordinates; must be supplied with baseLineEnd"
+        },
+        "baseLineEnd": {
+          "type": "point2d",
+          "description": "Optional pivot line end in model coordinates; must be supplied with baseLineStart"
+        },
+        "posSign": {
+          "type": "boolean",
+          "description": "Optional PlaneRoof raise-side flag"
         },
         "thickness": {
           "type": "number",
@@ -3017,6 +3034,10 @@
         "floorIndex": {
           "type": "integer",
           "description": "Story index"
+        },
+        "body": {
+          "type": "object",
+          "description": "Optional explicit Solid body topology {bodyType:'Solid', vertices, edges, polygons}. Mutually exclusive with polygon + extrudeHeight. Compile-validated by V16-BUILD-01 and pending runtime validation."
         },
         "objectRef": {
           "type": "object-reference",
@@ -4470,7 +4491,7 @@
     {
       "name": "mepbridge.get_elements_by_type",
       "title": "MEPBridge get elements by type",
-      "description": "Query all elements of a specific type from the Archicad model. Returns guid/type/floorIndex/layerIndex per element, with optional AABB. NOTE: no server-side floor filtering — results always span all stories; filter client-side by each element's floorIndex. Supports Wall/Column/Beam/Slab/Roof/Door/Window/Object/Stair/Mesh/Morph/MEPRoute. Native element discovery query. P4-2.",
+      "description": "Query all elements of a specific type from the Archicad model. Returns guid/type/floorIndex/layerIndex per element, with optional AABB. NOTE: no server-side floor filtering — results always span all stories; filter client-side by each element's floorIndex. Supports Wall/Column/Beam/Slab/Roof/Door/Window/Object/Stair/Zone/Mesh/Morph/MEPRoute. Zone discovery is compile-validated for V16-BUILD-01 and pending AC28/AC29 runtime validation. Native element discovery query. P4-2.",
       "featureArea": "Architecture",
       "status": "runtime-schema-smoke",
       "executionKind": "mepbridge-addon-command",
@@ -4547,6 +4568,7 @@
             "Window",
             "Object",
             "Stair",
+            "Zone",
             "Mesh",
             "Morph",
             "MEPRoute"
@@ -4575,7 +4597,7 @@
     {
       "name": "mepbridge.set_selected_elements",
       "title": "MEPBridge set selection (low-mutation, AI location assist)",
-      "description": "Change the current Archicad selection to the specified element GUIDs. Supports replace/add/remove modes. Helps AI locate problem elements for user confirmation. Does not modify the model. P4-3.",
+      "description": "Change the current Archicad selection to the specified element GUIDs. Supports replace/add/remove modes. Helps AI locate problem elements for user confirmation. Does not modify the model. Defaults to dryRun=true (preview only); pass dryRun=false with confirmRequired=true to actually change the selection. P4-3.",
       "featureArea": "Architecture",
       "status": "runtime-schema-smoke",
       "executionKind": "mepbridge-addon-command",
@@ -4647,7 +4669,7 @@
     {
       "name": "mepbridge.get_element_geometry",
       "title": "MEPBridge get element precise geometry (read)",
-      "description": "Get precise geometry of a single element by GUID. Returns type-specific fields: Wall→start/end/thickness/height/length, Column→position/height, Beam→start/end/length, Slab→polygon/thickness/level, Roof→polygon/thickness/baseLevel, Door/Window→width/height/owner, Mesh→vertices/elevation statistics, Morph→vertices/edges/polygons/poly-edges/normals. Stair also returns baseLevel relative to its home story plus absoluteBaseLevel and homeStoryLevel. P4-5.",
+      "description": "Get precise geometry of a single element by GUID. Returns type-specific fields: Wall→start/end/thickness/height/bottomOffset/baseZ/length, Column→position/height/rotationAngle(radians)/bottomOffset/baseZ, Beam→start/end/length, Slab→polygon/thickness/level, Roof→polygon/thickness/baseLevel/roofClass and PlaneRoof pitchAngle, Door/Window→width/height/owner, Mesh→vertices/elevation statistics, Morph→vertices/edges/polygons/poly-edges/normals. Stair also returns baseLevel relative to its home story plus absoluteBaseLevel and homeStoryLevel. P4-5. The v0.1.6 Wall/Roof/Column fields are code-complete pending V16-BUILD-01 recompile and runtime validation.",
       "featureArea": "Architecture",
       "status": "runtime-schema-smoke",
       "executionKind": "mepbridge-addon-command",
@@ -6203,10 +6225,22 @@
     },
     {
       "name": "mepbridge.create_morph",
-      "title": "MEPBridge create extruded morph",
-      "description": "Create a simple solid Morph by vertically extruding a structured 2D polygon. Runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates.",
+      "title": "MEPBridge create extruded or freeform morph",
+      "description": "Create a Morph. The polygon + extrudeHeight mode is runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates. The explicit freeform Solid body mode (vertices/edges/polygons) is compile-validated by the 2026-09-15 V16-BUILD-01 AC28/AC29 build and remains pending runtime validation.",
       "featureArea": "Architecture",
       "status": "runtime-validated",
+      "validationScopes": [
+        {
+          "mode": "polygon + extrudeHeight",
+          "status": "runtime-validated",
+          "evidence": "2026-09-05 v0.1.5 AC28/AC29 APX candidates"
+        },
+        {
+          "mode": "explicit Solid body",
+          "status": "compile-validated-pending-runtime",
+          "evidence": "2026-09-15 V16-BUILD-01 AC28/AC29 build"
+        }
+      ],
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "CreateMorph",
@@ -6251,6 +6285,10 @@
         "floorIndex": {
           "type": "integer",
           "description": "Story index"
+        },
+        "body": {
+          "type": "object",
+          "description": "Explicit freeform Solid body (bodyType, vertices, edges, polygons). Mutually exclusive with polygon + extrudeHeight; compile-validated by V16-BUILD-01 and pending runtime validation."
         }
       },
       "commandJson": {
@@ -6291,9 +6329,9 @@
     {
       "name": "mepbridge.get_gsm_object_catalog",
       "title": "MEPBridge get project GSM object catalog",
-      "description": "Read-only catalog of placeable GSM Object library parts currently registered in the project. Supports optional case-insensitive substring filtering. The main GUID is the stable identity; libraryPartIndex is session diagnostics only. Source and offline contract complete; AC28/AC29 APX rebuild and runtime readback pending.",
+      "description": "Read-only catalog of placeable GSM Object library parts currently registered in the project. Supports optional case-insensitive substring filtering. The main GUID is the stable identity; libraryPartIndex is session diagnostics only. Registered and usable since v0.1.5 (git tag v0.1.5 includes InstallCommand<GetGsmObjectCatalogCommand>; live dryRun returns real library-part GUID/name/index — FB-G2M metadata correction 2026-09-24).",
       "featureArea": "Project",
-      "status": "code-complete-pending-compile",
+      "status": "runtime-validated",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "GetGsmObjectCatalog",
@@ -6346,9 +6384,9 @@
     {
       "name": "mepbridge.move_building_elements",
       "title": "MEPBridge move building elements by GUID",
-      "description": "ELEM-1: translate building elements by GUID list via native APIEdit_Drag. Supported: Wall/Column/Beam/Slab/Object/Lamp/Window/Door/Zone/Morph/Mesh. Windows/doors keep their host wall (native drag semantics). Unsupported types (e.g. Stair) fail the whole batch with ELEMENT_TYPE_UNSUPPORTED (fail-closed, no partial move). MEP routing keeps using move_elements. Runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates.",
+      "description": "ELEM-1: translate building elements by GUID list via native APIEdit_Drag using move semantics (withDelete=true, begC/endC displacement). Supported: Wall/Column/Beam/Slab/Roof/Object/Lamp/Window/Door/Zone/Morph/Mesh. Windows/doors keep their host wall (native drag semantics). Unsupported types (e.g. Stair) fail the whole batch with ELEMENT_TYPE_UNSUPPORTED (fail-closed, no partial move). v0.1.6 P0 fix adds original-GUID identity checks, world-AABB displacement verification within 1 mm, and element-count preservation; failed verification returns status:error instead of verified:true. MEP routing keeps using move_elements.",
       "featureArea": "Architecture",
-      "status": "runtime-validated",
+      "status": "code-complete-pending-compile",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "MoveBuildingElements",
@@ -6379,12 +6417,12 @@
         "elementGuids": {
           "type": "guidList",
           "required": true,
-          "description": "GUIDs of elements to move (Wall/Column/Beam/Slab/Object/Lamp/Window/Door/Zone/Morph/Mesh)"
+          "description": "GUIDs of elements to move (Wall/Column/Beam/Slab/Roof/Object/Lamp/Window/Door/Zone/Morph/Mesh)"
         },
         "vector": {
-          "type": "delta3d",
+          "type": "delta3dMeters",
           "required": true,
-          "description": "{dx, dy, dz} translation delta in meters (dz optional)"
+          "description": "{dx, dy, dz} translation delta in meters (dz optional). Keys are dx/dy/dz (not x/y/z) to match the MoveBuildingElements C++ command."
         }
       },
       "commandJson": {
@@ -6412,9 +6450,21 @@
     {
       "name": "mepbridge.edit_building_element",
       "title": "MEPBridge edit building element fields",
-      "description": "ELEM-2: post-create field edit for building elements with a precise ACAPI_Element_Change mask (STAIR-0② discipline; readback echo of actual values). Supported: Wall (height — top-link disabled automatically, thickness — switches to basic structure, begC+endC centerline), Column (height, position), Beam (begC+endC), Slab (thickness — switches to basic structure, level), and Window/Door (width, height, sillHeight → API lower with WINDOW_EXCEEDS_WALL_HEIGHT host check). Any other type fails with ELEMENT_TYPE_UNSUPPORTED. Runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates.",
+      "description": "ELEM-2: post-create field edit for building elements with a precise ACAPI_Element_Change mask and readback. Wall supports fixed height (which disables top-link), relativeTopStory (0 disables top-link), topOffset (requires an effective top-link), bottomOffset, thickness, and begC+endC. height is mutually exclusive with a non-zero relativeTopStory or topOffset. Column, Beam, Slab, Window and Door keep their existing field sets. Legacy fields were runtime-validated on the 2026-09-05 v0.1.5 AC28/AC29 APX candidates; the v0.1.6 wall-constraint fields are code-complete and pending APX compile/runtime validation.",
       "featureArea": "Architecture",
-      "status": "runtime-validated",
+      "status": "code-complete-pending-compile",
+      "validationScopes": [
+        {
+          "mode": "legacy EditBuildingElement fields",
+          "status": "runtime-validated",
+          "evidence": "2026-09-05 v0.1.5 AC28/AC29 APX candidates"
+        },
+        {
+          "mode": "Wall relativeTopStory/topOffset/bottomOffset",
+          "status": "code-complete-pending-compile",
+          "evidence": "2026-09-20 V16-WALL-CONSTRAINT-01 offline contracts"
+        }
+      ],
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "EditBuildingElement",
@@ -6429,6 +6479,8 @@
           "修改构件",
           "改墙高",
           "改墙厚",
+          "设置墙顶部关联",
+          "修改墙上下偏移",
           "修改窗台",
           "改门宽",
           "改柱高",
@@ -6440,6 +6492,8 @@
           "edit element",
           "change wall height",
           "change wall thickness",
+          "set wall top link",
+          "change wall offsets",
           "change sill height",
           "resize opening",
           "change column height",
@@ -6455,7 +6509,19 @@
         },
         "height": {
           "type": "number",
-          "description": "Wall/Window/Door/Column: height in meters"
+          "description": "Wall/Window/Door/Column: height in meters; Wall height disables top-link and conflicts with non-zero relativeTopStory or topOffset"
+        },
+        "relativeTopStory": {
+          "type": "integer",
+          "description": "Wall only: non-negative top-linked story relative to the home story; 0 disables top-link"
+        },
+        "topOffset": {
+          "type": "number",
+          "description": "Wall only: finite offset from the top-linked story; requires an effective non-zero relativeTopStory"
+        },
+        "bottomOffset": {
+          "type": "number",
+          "description": "Wall only: finite base offset from the home story"
         },
         "thickness": {
           "type": "number",
@@ -6495,7 +6561,6 @@
           },
           "addOnCommandParameters": {
             "elementGuid": "{element-guid-placeholder}",
-            "height": 4,
             "dryRun": true,
             "confirmRequired": false
           }

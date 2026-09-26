@@ -16,6 +16,7 @@ const router = express.Router();
 const { PlanChain, APPROVAL_PRESETS } = require('../services/plan-chain-engine');
 const aiAdapter = require('../services/ai-adapter');
 const taskTemplates = require('../services/task-templates');   // V2 H5.5 任务模板库
+const userAssets = require('./user-assets');                   // 用户模板（含 TPL-0NN 编号）
 const auditLogger = require('../services/audit-log');         // V2 H6.2 审计日志
 const knowledgeBase = require('../services/knowledge-base');  // V2 H8.6 知识库校验钩子
 const learningMemory = require('../services/learning-memory'); // V2 H9.4 错误避免
@@ -94,8 +95,36 @@ router.post('/execute', async (req, res) => {
       context.modelSnapshot = modelSnapshot.summary;
     }
 
+    // 编号直达（优先于关键词匹配）：① 用户模板 TPL-0NN ② 出厂模板 SYS-0NN（内置 TPL-001..020）
+    const userTemplates = userAssets.templateCodes.loadVisibleTemplates(locale);
+    const parsedCode = userAssets.templateCodes.parseTemplateCodeRequest(message);
+    const codeRequest = parsedCode.kind === 'user'
+      ? userAssets.templateCodes.resolveTemplateCodeRequest(message, userTemplates)
+      : { plan: null, code: null, found: false };
+    let plan = codeRequest.plan;
+    if (!plan && parsedCode.kind === 'builtin' && parsedCode.builtinId) {
+      plan = taskTemplates.generateById(parsedCode.builtinId, message, context);
+    }
+    if (!plan && (parsedCode.kind === 'builtin' || (parsedCode.kind === 'user' && !codeRequest.found))) {
+      const available = userAssets.templateCodes.listTemplateCodes(userTemplates)
+        .slice(0, 12)
+        .map((item) => `${item.code} ${item.name}`)
+        .join('；');
+      return res.json({
+        ok: true,
+        status: 'unsupported',
+        message: english
+          ? `No template with code ${parsedCode.code}. Available: ${available || 'none'}`
+          : `未找到模板编号 ${parsedCode.code}。可用编号：${available || '（暂无）'}`,
+        chainId: null,
+        steps: []
+      });
+    }
+
     // V2 H5.5: 任务模板库快速匹配（优先于 LLM，降低延迟）
-    let plan = taskTemplates.tryGenerate(message, context);
+    if (!plan) {
+      plan = taskTemplates.tryGenerate(message, context);
+    }
 
     if (!plan) {
       // 模板未命中 → 走 LLM 生成
@@ -225,7 +254,31 @@ router.post('/create', async (req, res) => {
       language: locale,
       locale,
     };
-    let plan = taskTemplates.tryGenerate(message, context);
+    // 编号直达（与 /execute 同规则）：① 用户模板 TPL-0NN ② 出厂模板 SYS-0NN
+    const codeTemplates = userAssets.templateCodes.loadVisibleTemplates(locale);
+    const parsedCode = userAssets.templateCodes.parseTemplateCodeRequest(message);
+    const codePlan = parsedCode.kind === 'user'
+      ? userAssets.templateCodes.resolveTemplateCodeRequest(message, codeTemplates)
+      : { plan: null, code: null, found: false };
+    let plan = codePlan.plan;
+    if (!plan && parsedCode.kind === 'builtin' && parsedCode.builtinId) {
+      plan = taskTemplates.generateById(parsedCode.builtinId, message, context);
+    }
+    if (!plan && (parsedCode.kind === 'builtin' || (parsedCode.kind === 'user' && !codePlan.found))) {
+      const availableCodes = userAssets.templateCodes.listTemplateCodes(codeTemplates)
+        .slice(0, 12)
+        .map((item) => `${item.code} ${item.name}`)
+        .join('；');
+      return res.json({
+        ok: true,
+        status: 'unsupported',
+        message: `未找到模板编号 ${parsedCode.code}。可用编号：${availableCodes || '（暂无）'}`,
+        chain: null
+      });
+    }
+    if (!plan) {
+      plan = taskTemplates.tryGenerate(message, context);
+    }
     if (!plan) {
       plan = await aiAdapter.generatePlan(message, context);
     }

@@ -82,6 +82,12 @@ import { ExtensionPanel } from "./components/ExtensionPanel";
 import { SimpleInputDialog } from "./components/SimpleInputDialog";
 import type { TaskTemplate, CustomNLCommand } from "./userAssets";
 import { matchCustomCommand, fillPlaceholders } from "./userAssets";
+import {
+  buildPostReplayParams,
+  collectCreatedElements,
+  describePostReplayStep,
+  resolvePostReplaySteps
+} from "./postReplay";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ModelObstacle,
@@ -558,6 +564,7 @@ export default function App() {
   };
   // E.4: 用户模板列表和重放状态
   const [userTemplates, setUserTemplates] = useState<TaskTemplate[]>([]);
+  // 出厂（内置）任务模板：只读、代码定义；面板「出厂模板」分组展示，编号 SYS-0NN
   const [isLoadingTemplates, setIsLoadingTemplates] = useState<boolean>(false);
   const [replayTemplate, setReplayTemplate] = useState<TaskTemplate | null>(null);
   // P3: 模板搜索和分类过滤状态
@@ -1282,7 +1289,7 @@ export default function App() {
     };
   }, []);
 
-  // E.4 补充: 启动时也加载模板列表（供 Copilot 模式模板快捷栏使用）
+  // E.4 补充: 启动时也加载模板列表（供 Copilot 模板快捷栏使用）
   useEffect(() => {
     loadUserTemplates();
   }, [lang]);
@@ -2021,6 +2028,10 @@ export default function App() {
     // Update verification parameters with actual results
     updateVerificationTable(stepResults, plan);
 
+    // 回放后步骤（post-replay steps）：普通步骤全部成功后执行，把本次新建构件的统一属性套上
+    // （典型：模板要求「结构功能 = 承重元素」）。GUID 由运行时解析，模板步骤里不出现。
+    await applyPostReplaySteps(plan, stepResults, targetPort, executionMode, pushExecutionMessage);
+
     // Perform readback verification if any GUIDs were created
     await performReadback(stepResults, executionMode, targetPort);
 
@@ -2056,7 +2067,29 @@ export default function App() {
       return;
     }
 
-    // V15-GOV-04: template replay always has an explicit preview/confirm stage.
+    // 2026-09-20 修订：copilot-auto（智能模式）且无占位符的用户模板直接执行，对齐内置任务与
+    // 「AI 自动执行治理原则」（已授权且范围未变化的 AI 任务自动完成 preview/执行/readback）。
+    // 有占位符（需用户输入）或监督/手动模式 → 仍打开预览/确认弹窗（V15-GOV-04 保留分支）。
+    if (autonomyMode === "copilot-auto" && !(latestTemplate.placeholders && latestTemplate.placeholders.length > 0)) {
+      const autoPlan = fillPlaceholders(latestTemplate.plan, {});
+      setActivePlan(autoPlan);
+      setExecutionResultData(autoPlan.parameters || []);
+      setShowPlanCard(true);
+      setWorkbenchMode("copilot");
+      setExecutionCompleted(false);
+      setCurrentExecutingStepIndex(-1);
+
+      if (!archicadConnected || !mepbridgeConnected) {
+        setSystemError(currentT.errConnDesc);
+        triggerToast(currentT.errConnTitle);
+      } else {
+        triggerToast(lang === "zh-CN" ? "智能模式：用户模板直接执行" : "Auto mode: user template executing directly");
+        await executeOperationPlan(autoPlan, "copilot");
+      }
+      return;
+    }
+
+    // V15-GOV-04（保留分支）：需要输入或监督/手动模式时，模板重放必须经过显式预览/确认。
     setReplayTemplate(latestTemplate);
   };
 
@@ -2193,6 +2226,128 @@ export default function App() {
           text: `❌ READBACK: Verification failed - ${err.message}`,
           timestamp: new Date().toLocaleTimeString()
       });
+    }
+  };
+
+  // Helper: 执行"回放后步骤"（post-replay steps）
+  //
+  // 为什么单独一层：创建类步骤的产物 GUID 只有回放时才存在，写不进模板步骤；
+  // 用 ${...}/{{...}} 占位符表达又会被 plan-chain Gate1 明确拒绝（防未解析占位符发给 Archicad）。
+  // 因此模板把这类收尾动作登记为 plan.postReplaySteps（或旧模板的 unifiedStructuralProperty），
+  // 目标元素在运行时从"本次新建的构件"里解析（见 src/postReplay.ts）。
+  const applyPostReplaySteps = async (
+    plan: OperationPlan,
+    stepResults: any[],
+    targetPort: number,
+    executionMode: "base" | "copilot",
+    pushExecutionMessage: (msg: ChatMessage) => void
+  ) => {
+    const postSteps = resolvePostReplaySteps(plan);
+    if (postSteps.length === 0) return;
+
+    // 本次回放新建的构件（按来源步骤 action / 元素类型分组）
+    const created = collectCreatedElements(
+      stepResults.map((result, index) => ({
+        action: plan.steps[index]?.action || "",
+        payload: getCommandPayload(result)
+      }))
+    );
+
+    const rows: VerificationParameter[] = [];
+
+    for (const post of postSteps) {
+      const title = describePostReplayStep(post);
+      const params = buildPostReplayParams(post, created);
+
+      if (!params) {
+        // 没有目标构件：显式跳过（不静默、不当作成功）
+        pushExecutionMessage({
+            id: `post_skip_${Date.now()}`,
+            sender: "system",
+            text: `⊘ SKIP: [${title}] 本次回放没有新建构件，已跳过。`,
+            timestamp: new Date().toLocaleTimeString()
+        });
+        rows.push({
+          item: title,
+          expected: "已套用到新建构件",
+          actual: "无目标构件（跳过）",
+          status: "warning"
+        });
+        continue;
+      }
+
+      const targetGuids = params.elementGuids as string[];
+      pushExecutionMessage({
+          id: `post_start_${Date.now()}`,
+          sender: "system",
+          text: `⏳ POST: [${title}] 对 ${targetGuids.length} 个新建构件执行 ${post.action}…`,
+          timestamp: new Date().toLocaleTimeString()
+      });
+
+      try {
+        const res = await fetch("/api/execute", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            commandName: post.action,
+            parameters: params,
+            targetPort,
+            source: "ui-post-replay",
+            intent: title
+          })
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const result = await res.json();
+
+        if (result?.target?.port !== targetPort) {
+          throw new Error(lang === "zh-CN"
+            ? `目标实例校验失败：期望端口 ${targetPort}，实际 ${result?.target?.port ?? "未回显"}`
+            : `Target instance mismatch: expected port ${targetPort}, got ${result?.target?.port ?? "no echo"}`);
+        }
+
+        if (!(result.ok || result.validation?.ok)) {
+          throw new Error(result.validation?.errors?.join(", ") || result.error || "Unknown error");
+        }
+
+        const payload = getCommandPayload(result);
+        const applied = typeof payload?.setPropertyCount === "number"
+          ? payload.setPropertyCount
+          : targetGuids.length;
+
+        pushExecutionMessage({
+            id: `post_done_${Date.now()}`,
+            sender: "system",
+            text: `✅ POST: [${title}] 已套用到 ${applied}/${targetGuids.length} 个构件。`,
+            timestamp: new Date().toLocaleTimeString()
+        });
+        rows.push({
+          item: title,
+          expected: `${targetGuids.length} 个新建构件`,
+          actual: `已套用 ${applied} 个`,
+          status: applied >= targetGuids.length ? "ok" : "warning"
+        });
+      } catch (err: any) {
+        pushExecutionMessage({
+            id: `post_error_${Date.now()}`,
+            sender: "system",
+            text: `❌ POST: [${title}] 失败：${err.message}`,
+            timestamp: new Date().toLocaleTimeString()
+        });
+        rows.push({
+          item: title,
+          expected: "已套用到新建构件",
+          actual: `失败：${err.message}`,
+          status: "error"
+        });
+      }
+    }
+
+    if (rows.length > 0) {
+      setExecutionResultData((prev) => [...prev, ...rows]);
     }
   };
 
@@ -5818,12 +5973,12 @@ export default function App() {
                     🏠 {lang === "zh-CN" ? "示例首层房间墙体（15.3×14.3m，19面墙）" : "Ground Floor Walls (15.3×14.3m, 19 walls)"}
                   </button>
 
-                  {/* AI Scenario 2: 示例布置首层风管 (参照文件首层真实坐标) */}
+                  {/* AI Scenario 2: 示例创建box结构机电建筑 (TPL-021 / SYS-021，120步组合) */}
                   <button
-                    onClick={() => selectQuickSuggestion(lang === "zh-CN" ? "示例布置首层风管" : "Ground floor duct layout")}
+                    onClick={() => selectQuickSuggestion(lang === "zh-CN" ? "示例创建box结构机电建筑" : "Sample box structural MEP building")}
                     className="w-full bg-zinc-800 border border-zinc-705 rounded py-1.5 px-2.5 text-[10px] text-zinc-200 outline-none hover:border-cyan-500 font-mono text-left cursor-pointer transition-colors"
                   >
-                    🚿 {lang === "zh-CN" ? "示例布置首层风管（排风+暖供+暖回，7条管段）" : "Duct Layout (Exhaust+Hydronic, 7 segments)"}
+                    🏗️ {lang === "zh-CN" ? "整体示例建筑（主体柱梁楼梯先行，逐层 墙→机电→楼板，144步）" : "Full Sample Building (structure first, then per story: walls+MEP+slabs, 144 steps)"}
                   </button>
 
                   {/* AI Scenario 3: 示例创建首层楼梯 (参照文件首层真实参数) */}
@@ -5905,7 +6060,7 @@ export default function App() {
                             title={tpl.description || tpl.name}
                           >
                             <span className="flex-1 min-w-0">
-                              <span className="block truncate text-zinc-200">{tpl.name}</span>
+                              <span className="block whitespace-normal break-words text-zinc-200">{tpl.name}</span>
                               {tpl.description && <span className="block truncate text-[8px] text-zinc-600">{tpl.description}</span>}
                             </span>
                             <span className="text-[8px] text-zinc-600 flex-shrink-0">{tpl.riskLevel}</span>

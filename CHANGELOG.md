@@ -2,6 +2,34 @@
 
 Public user-facing changes. Versions follow Semantic Versioning.
 
+## [0.1.6] - 2026-09-25
+
+### Added
+
+- `CreateWall`, `CreateColumn`, `CreateBeam`, `CreateSlab`, `CreateRoof` and `CreateMorph` accept an optional `properties[]` so geometry and semantics (for example "structural function = load-bearing" for IFC/structural analysis) are applied in one call; a failing property rolls the whole creation back atomically instead of leaving a half-configured element.
+- `CreateBeam` accepts `topOffset` and `absoluteZ` and verifies the offset by readback, for beams under slabs, service interlayers and slopes.
+- `EditBuildingElement` can now write `relativeTopStory`, `topOffset` and `bottomOffset` for walls with and without a top link.
+- `CreateWall` accepts `refLinePosition` (center/outside/inside) and `refLineOffset`, so walls no longer have to be placed by their centre line only.
+- Roofs can now be moved with `MoveBuildingElements` (previously reported `ELEMENT_TYPE_UNSUPPORTED`).
+- `MoveBuildingElements` `vector` now uses `{dx,dy,dz}` metres (new `delta3dMeters` descriptor type); the previous `{x,y,z}` millimetre shape was misleading.
+- Snapshot replay now restores the Wall `bottomOffset` captured from project A.
+- `CopyElements` reports a `floorAssignmentNote` when a vertical copy omits `targetStoryIndex`, instead of assigning a floor silently.
+- Official PowerShell call examples (`examples/powershell-call/`) show how to call `/api/execute` from Windows PowerShell 5.1 without inline-JSON escaping problems.
+- The command guide gains appendices for units, semantics, GUID fields and environment conventions.
+
+### Fixed
+
+- Moving elements no longer silently copies them. `MoveBuildingElements` now truly moves, keeps the original GUID, and verifies the world-space AABB (1 mm tolerance) and the element count; failed verification returns `status:error` instead of a false `verified` success.
+- Roof outlines and pivots are now created in model coordinates and read back in model coordinates, so a roof can be placed at an exact position and cross-file geometry round-trips.
+- Batch creation of columns and beams works again: `BatchCreateElements` re-derives element defaults per item, so column/beam batches no longer fail outright.
+- `DeleteElements` reads elements back by GUID after deletion and reports `notDeletedGuids` with `DELETE_READBACK_INCOMPLETE` when a modal dialog blocked the deletion, instead of falsely reporting success.
+- `CreatePipe` matches the requested diameter exactly and, on failure, lists the available diameters rather than silently picking the nearest one.
+- `GetElementsByType` reports the full stair height (tread to top) in the AABB with `aabbZSource:stair-geometry`, instead of a zero-height box.
+- `CreateDuct` and `CreateCableCarrier` report `mode: "created"` in their results.
+- `GetAvailableSystems` reports `domain` again (it was missing from 0.1.5 packages).
+- Setting a top story elevation beyond the virtual upper story is now rejected up front with `STORY_ELEVATION_EXCEEDS_VIRTUAL_UPPER` and a suggested order (raise `height` first), instead of a silent rollback.
+- `GetElementGeometry` on columns returns `rotationAngle`, `bottomOffset`, `baseZ` and `homeStoryLevel`, so a rotated column can be verified by readback.
+
 ## [0.1.5] - 2026-09-04
 
 ### Added

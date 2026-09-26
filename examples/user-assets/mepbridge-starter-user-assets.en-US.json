@@ -88,7 +88,8 @@
       ],
       "usageCount": 0,
       "version": "1.2",
-      "notes": "Packaged starter example. It can be imported, reset, copied, and edited from Preset Management."
+      "notes": "Packaged starter example. It can be imported, reset, copied, and edited from Preset Management.",
+      "code": "TPL-001"
     },
     {
       "id": "tpl-starter-read-selection",
@@ -154,7 +155,8 @@
       ],
       "usageCount": 0,
       "version": "1.2",
-      "notes": "Packaged starter example. It can be imported, reset, copied, and edited from Preset Management."
+      "notes": "Packaged starter example. It can be imported, reset, copied, and edited from Preset Management.",
+      "code": "TPL-002"
     },
     {
       "id": "tpl-starter-room-walls",
@@ -391,48 +393,110 @@
       ],
       "usageCount": 0,
       "version": "1.2",
-      "notes": "Uses four CreateWall steps to avoid incompatible batch-wrapper parameters."
+      "notes": "Uses four CreateWall steps to avoid incompatible batch-wrapper parameters.",
+      "code": "TPL-003"
     },
     {
       "id": "tpl-starter-scan-structure",
-      "name": "Create sample slab",
-      "category": "Building",
+      "name": "Scan wall / column / beam AABBs",
+      "category": "MEPBridge-Read",
       "icon": "SLAB",
-      "description": "Creates a 15.55m x 14.55m rectangular sample slab on story 0 at level 0.000m with a thickness of 0.30m, using the verified native source coordinates (same position as the source slab).",
+      "description": "Reads the bounding boxes (AABB) of walls, columns and beams for pre-modelling checks; read-only, nothing is written to the model.",
       "plan": {
-        "title": "Create sample slab",
-        "warning": "This template writes to the Archicad model. Auto mode executes directly; supervised and manual modes require confirmation.",
-        "isMutation": true,
-        "mepCode": "CreateSlab",
+        "title": "Scan wall / column / beam AABBs",
+        "warning": null,
+        "isMutation": false,
+        "mepCode": "ScanStructuralElements",
         "steps": [
           {
-            "id": "step-create-sample-slab",
-            "title": "Create story-0 sample slab",
-            "action": "CreateSlab",
-            "description": "Create the slab from live-read parameters using the source slab's native coordinates (no offset).",
-            "expectedResult": "Creates one Slab with floorIndex=0, level=0, and thickness=0.30m.",
+            "id": "step-scan-structure",
+            "title": "Scan wall / column / beam AABBs",
+            "action": "ScanStructuralElements",
+            "description": "Scans the AABB bounds of walls, columns and beams in the current model.",
+            "expectedResult": "Returns the structural element AABB list.",
             "params": {
-              "polygon": [
-                {
-                  "x": -6.24,
-                  "y": -11.37
+              "types": [
+                "Wall",
+                "Column",
+                "Beam"
+              ]
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "ScanStructuralElements"
                 },
-                {
-                  "x": 9.31,
-                  "y": -11.37
-                },
-                {
-                  "x": 9.31,
-                  "y": 3.18
-                },
-                {
-                  "x": -6.24,
-                  "y": 3.18
+                "addOnCommandParameters": {
+                  "types": [
+                    "Wall",
+                    "Column",
+                    "Beam"
+                  ]
                 }
-              ],
-              "thickness": 0.3,
-              "level": 0,
-              "floorIndex": 0,
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "ScanStructuralElements",
+            "descriptorName": "mepbridge.ScanStructuralElements",
+            "riskLevel": "read",
+            "status": "pending"
+          }
+        ],
+        "parameters": [
+          {
+            "item": "Structural elements",
+            "expected": "Returns Wall/Column/Beam AABBs",
+            "actual": "Pending",
+            "status": "warning"
+          }
+        ],
+        "userIntent": "Scan wall / column / beam AABBs"
+      },
+      "riskLevel": "read",
+      "createdAt": "2026-07-22T00:00:00.000+08:00",
+      "updatedAt": "2026-07-15T00:00:00.000+08:00",
+      "tags": [
+        "starter",
+        "example",
+        "release-preset",
+        "en-US"
+      ],
+      "usageCount": 0,
+      "version": "1.3",
+      "notes": "Parameters come from the current AC28 story-0 slab read/recreate regression. Coordinates use the source slab's native position (no X offset).",
+      "code": "TPL-004"
+    },
+    {
+      "id": "tpl-starter-partition-walls",
+      "name": "Create two sample partition walls",
+      "category": "Building",
+      "icon": "TRAY",
+      "description": "Creates two 3m sample partition walls near X=44m using the proven CreateWall atomic command.",
+      "plan": {
+        "title": "Create two sample partition walls",
+        "warning": "This template writes to the Archicad model; AI auto mode executes directly, supervised/manual mode requires confirmation.",
+        "isMutation": true,
+        "mepCode": "CreateWall × 2",
+        "steps": [
+          {
+            "id": "step-partition-a",
+            "title": "Create a 3m horizontal partition wall",
+            "action": "CreateWall",
+            "description": "Creates a 3m horizontal sample partition wall.",
+            "expectedResult": "Creates one Wall.",
+            "params": {
+              "start": {
+                "x": 44,
+                "y": 0
+              },
+              "end": {
+                "x": 47,
+                "y": 0
+              },
+              "thickness": 0.12,
+              "height": 3,
               "dryRun": false,
               "confirmRequired": true
             },
@@ -441,184 +505,99 @@
               "parameters": {
                 "addOnCommandId": {
                   "commandNamespace": "MEPBridge",
-                  "commandName": "CreateSlab"
+                  "commandName": "CreateWall"
                 },
                 "addOnCommandParameters": {
-                  "polygon": [
-                    {
-                      "x": -6.24,
-                      "y": -11.37
-                    },
-                    {
-                      "x": 9.31,
-                      "y": -11.37
-                    },
-                    {
-                      "x": 9.31,
-                      "y": 3.18
-                    },
-                    {
-                      "x": -6.24,
-                      "y": 3.18
-                    }
-                  ],
-                  "thickness": 0.3,
-                  "level": 0,
-                  "floorIndex": 0,
+                  "start": {
+                    "x": 44,
+                    "y": 0
+                  },
+                  "end": {
+                    "x": 47,
+                    "y": 0
+                  },
+                  "thickness": 0.12,
+                  "height": 3,
                   "dryRun": false,
                   "confirmRequired": true
                 }
               }
             },
             "commandNamespace": "MEPBridge",
-            "commandName": "CreateSlab",
-            "descriptorName": "mepbridge.CreateSlab",
+            "commandName": "CreateWall",
+            "descriptorName": "mepbridge.CreateWall",
             "riskLevel": "low-mutation",
             "status": "pending"
-          }
-        ],
-        "parameters": [
-          {
-            "item": "Slab outline",
-            "expected": "15.55m x 14.55m rectangle with four vertices",
-            "actual": "Pending execution",
-            "status": "warning"
           },
           {
-            "item": "Story and thickness",
-            "expected": "floorIndex=0, level=0.00m, thickness=0.30m",
-            "actual": "Pending execution",
-            "status": "warning"
-          }
-        ]
-      },
-      "riskLevel": "low-mutation",
-      "createdAt": "2026-07-22T00:00:00.000+08:00",
-      "updatedAt": "2026-07-24T00:00:00.000+08:00",
-      "tags": [
-        "starter",
-        "example",
-        "release-preset",
-        "en-US"
-      ],
-      "usageCount": 0,
-      "version": "1.3",
-      "notes": "Parameters come from the current AC28 story-0 slab read/recreate regression. Coordinates use the source slab's native position (no X offset)."
-    },
-    {
-      "id": "tpl-starter-partition-walls",
-      "name": "Create sample cable tray",
-      "category": "MEP",
-      "icon": "TRAY",
-      "description": "Creates a five-point, four-segment sample cable tray on story 0 at 2.50m above the home story with a 0.20m x 0.10m rectangular cross section.",
-      "plan": {
-        "title": "Create sample cable tray",
-        "warning": "This template writes to the Archicad model. Auto mode executes directly; supervised and manual modes require confirmation.",
-        "isMutation": true,
-        "mepCode": "CreateCableCarrier",
-        "steps": [
-          {
-            "id": "step-create-sample-cable-carrier",
-            "title": "Create story-0 sample cable tray",
-            "action": "CreateCableCarrier",
-            "description": "Create the five-point route from live-read parameters using the source cable tray's native coordinates (no offset).",
-            "expectedResult": "Creates one CableCarrier route using the project's default CableCarrier system and a 0.20m x 0.10m cross section.",
+            "id": "step-partition-b",
+            "title": "Create a 3m vertical partition wall",
+            "action": "CreateWall",
+            "description": "Creates a 3m vertical sample partition wall.",
+            "expectedResult": "Creates one Wall.",
             "params": {
-              "waypoints": [
-                {
-                  "x": 9.06,
-                  "y": 0.196854438,
-                  "z": 2.5
-                },
-                {
-                  "x": -1.693238115,
-                  "y": 0.196854438,
-                  "z": 2.5
-                },
-                {
-                  "x": -1.693238115,
-                  "y": -7.225874143,
-                  "z": 2.5
-                },
-                {
-                  "x": 5.001537618,
-                  "y": -7.225874143,
-                  "z": 2.5
-                },
-                {
-                  "x": 5.001537618,
-                  "y": -11.12,
-                  "z": 2.5
-                }
-              ],
-              "width": 0.2,
-              "height": 0.1
+              "start": {
+                "x": 44,
+                "y": 0
+              },
+              "end": {
+                "x": 44,
+                "y": 3
+              },
+              "thickness": 0.12,
+              "height": 3,
+              "dryRun": false,
+              "confirmRequired": true
             },
             "commandJson": {
               "command": "API.ExecuteAddOnCommand",
               "parameters": {
                 "addOnCommandId": {
                   "commandNamespace": "MEPBridge",
-                  "commandName": "CreateCableCarrier"
+                  "commandName": "CreateWall"
                 },
                 "addOnCommandParameters": {
-                  "waypoints": [
-                    {
-                      "x": 9.06,
-                      "y": 0.196854438,
-                      "z": 2.5
-                    },
-                    {
-                      "x": -1.693238115,
-                      "y": 0.196854438,
-                      "z": 2.5
-                    },
-                    {
-                      "x": -1.693238115,
-                      "y": -7.225874143,
-                      "z": 2.5
-                    },
-                    {
-                      "x": 5.001537618,
-                      "y": -7.225874143,
-                      "z": 2.5
-                    },
-                    {
-                      "x": 5.001537618,
-                      "y": -11.12,
-                      "z": 2.5
-                    }
-                  ],
-                  "width": 0.2,
-                  "height": 0.1
+                  "start": {
+                    "x": 44,
+                    "y": 0
+                  },
+                  "end": {
+                    "x": 44,
+                    "y": 3
+                  },
+                  "thickness": 0.12,
+                  "height": 3,
+                  "dryRun": false,
+                  "confirmRequired": true
                 }
               }
             },
             "commandNamespace": "MEPBridge",
-            "commandName": "CreateCableCarrier",
-            "descriptorName": "mepbridge.CreateCableCarrier",
+            "commandName": "CreateWall",
+            "descriptorName": "mepbridge.CreateWall",
             "riskLevel": "low-mutation",
             "status": "pending"
           }
         ],
         "parameters": [
           {
-            "item": "Cable tray route",
-            "expected": "Five waypoints, four rectangular segments, 2.50m above the home story",
-            "actual": "Pending execution",
+            "item": "Partition wall count",
+            "expected": "2 Walls",
+            "actual": "Pending",
             "status": "warning"
           },
           {
-            "item": "System and cross section",
-            "expected": "Uses project default CableCarrier system, width=0.20m, height=0.10m",
-            "actual": "Pending execution",
+            "item": "Size",
+            "expected": "3m long each, 3m high, 0.12m thick",
+            "actual": "Pending",
             "status": "warning"
           }
-        ]
+        ],
+        "userIntent": "Create two sample partition walls"
       },
       "riskLevel": "low-mutation",
       "createdAt": "2026-07-22T00:00:00.000+08:00",
-      "updatedAt": "2026-07-24T00:00:00.000+08:00",
+      "updatedAt": "2026-07-15T00:00:00.000+08:00",
       "tags": [
         "starter",
         "example",
@@ -627,7 +606,8 @@
       ],
       "usageCount": 0,
       "version": "1.3",
-      "notes": "Parameters come from the current AC28 story-0 CableCarrier read/recreate regression. The path uses the source cable tray's native coordinates (no X offset) while preserving the route and uniform cross section. The MEP system is not hardcoded (no index, no name); the command uses the project's default CableCarrier system, which is stable across Chinese/English projects and AC28/AC29 (both attribute index and system name are project-specific, so hardcoding either fails in some projects)."
+      "notes": "Parameters come from the current AC28 story-0 CableCarrier read/recreate regression. The path uses the source cable tray's native coordinates (no X offset) while preserving the route and uniform cross section. The MEP system is not hardcoded (no index, no name); the command uses the project's default CableCarrier system, which is stable across Chinese/English projects and AC28/AC29 (both attribute index and system name are project-specific, so hardcoding either fails in some projects).",
+      "code": "TPL-005"
     },
     {
       "id": "tpl-starter-replicate-stair",
@@ -1063,7 +1043,7 @@
                       "y": -5.02
                     },
                     {
-                    "x": 1.066209814,
+                      "x": 1.066209814,
                       "y": -5.02
                     }
                   ],
@@ -1110,14 +1090,15 @@
       ],
       "usageCount": 0,
       "version": "1.0",
-      "notes": "Replicates TPL-003 parameters to floorIndex 1,2 (floors 2 and 3); dryRun=false creates directly. Originally saved as a user-local template on 2026-07-27; now merged into the bilingual starter preset so en-US locale replaces the whole object with English text."
+      "notes": "Replicates TPL-003 parameters to floorIndex 1,2 (floors 2 and 3); dryRun=false creates directly. Originally saved as a user-local template on 2026-07-27; now merged into the bilingual starter preset so en-US locale replaces the whole object with English text.",
+      "code": "TPL-006"
     },
     {
       "id": "tpl-starter-create-shell-on-floors",
       "name": "Create outer walls and slab on floors 2 and 3",
       "category": "Building",
       "icon": "WALL",
-      "description": "Create 4 outer walls + 1 slab on each of floors 2 and 3 (10 steps total). Wall parameters come from measured geometry (thickness 0.3m, height 3m); slab is a 15.55x14.55m rectangle (level=0m, thickness=0.3m). Each step is self-contained with coordinates, no GUID dependency, works across projects. dryRun=false creates directly.",
+      "description": "Creates 8 outer walls + 12 slabs on floors 2 and 3, bottom-up (\"walls of the floor, then slabs of the floor\"). Wall data is measured from the current AC file (thickness 0.3m; floor 2 height 3.0m, floor 3 height 4.0m); slab data comes from the same source (4 slabs on floor 2, 8 on floor 3, including the 4 high/roof-level ones). Slab reference level is corrected to the top surface relative to the home story (0→0.10, 3→3.10). Every step is self-contained with coordinates, no GUID dependency, portable across projects. dryRun=false creates directly.",
       "plan": {
         "title": "Create outer walls and slab on floors 2 and 3",
         "warning": "This template writes to the Archicad model (10 steps: 8 walls + 2 slabs). Auto mode executes directly; supervised and manual modes require confirmation.",
@@ -1126,10 +1107,10 @@
         "steps": [
           {
             "id": "step-create-south-floor-1",
-            "title": "Floor 2 South wall (-5.99,-11.37)→(9.31,-11.37)",
+            "title": "Floor 2 South wall (-5.99,-11.37)→(9.31,-11.37) h=3m",
             "action": "CreateWall",
-            "description": "Create the South wall on Floor 2, thickness 0.3m, height 3m.",
-            "expectedResult": "Creates one Wall on floorIndex=1.",
+            "description": "Create the South wall on Floor 2 (data measured from the current AC file): thickness 0.3m, height 3m.",
+            "expectedResult": "Creates one Wall on floorIndex=1 (thickness 0.3m, height 3m, Z 3~6).",
             "params": {
               "start": {
                 "x": -5.99,
@@ -1172,15 +1153,15 @@
             "commandNamespace": "MEPBridge",
             "commandName": "CreateWall",
             "descriptorName": "mepbridge.CreateWall",
-            "riskLevel": "low-mutation",
+            "riskLevel": "create-element",
             "status": "pending"
           },
           {
             "id": "step-create-north-floor-1",
-            "title": "Floor 2 North wall (-5.99,2.93)→(9.31,2.93)",
+            "title": "Floor 2 North wall (-5.99,2.93)→(9.31,2.93) h=3m",
             "action": "CreateWall",
-            "description": "Create the North wall on Floor 2, thickness 0.3m, height 3m.",
-            "expectedResult": "Creates one Wall on floorIndex=1.",
+            "description": "Create the North wall on Floor 2 (data measured from the current AC file): thickness 0.3m, height 3m.",
+            "expectedResult": "Creates one Wall on floorIndex=1 (thickness 0.3m, height 3m, Z 3~6).",
             "params": {
               "start": {
                 "x": -5.99,
@@ -1223,15 +1204,15 @@
             "commandNamespace": "MEPBridge",
             "commandName": "CreateWall",
             "descriptorName": "mepbridge.CreateWall",
-            "riskLevel": "low-mutation",
+            "riskLevel": "create-element",
             "status": "pending"
           },
           {
             "id": "step-create-west-floor-1",
-            "title": "Floor 2 West wall (-5.99,-11.37)→(-5.99,2.93)",
+            "title": "Floor 2 West wall (-5.99,-11.37)→(-5.99,2.93) h=3m",
             "action": "CreateWall",
-            "description": "Create the West wall on Floor 2, thickness 0.3m, height 3m.",
-            "expectedResult": "Creates one Wall on floorIndex=1.",
+            "description": "Create the West wall on Floor 2 (data measured from the current AC file): thickness 0.3m, height 3m.",
+            "expectedResult": "Creates one Wall on floorIndex=1 (thickness 0.3m, height 3m, Z 3~6).",
             "params": {
               "start": {
                 "x": -5.99,
@@ -1274,15 +1255,15 @@
             "commandNamespace": "MEPBridge",
             "commandName": "CreateWall",
             "descriptorName": "mepbridge.CreateWall",
-            "riskLevel": "low-mutation",
+            "riskLevel": "create-element",
             "status": "pending"
           },
           {
             "id": "step-create-east-floor-1",
-            "title": "Floor 2 East wall (9.31,-11.37)→(9.31,2.93)",
+            "title": "Floor 2 East wall (9.31,-11.37)→(9.31,2.93) h=3m",
             "action": "CreateWall",
-            "description": "Create the East wall on Floor 2, thickness 0.3m, height 3m.",
-            "expectedResult": "Creates one Wall on floorIndex=1.",
+            "description": "Create the East wall on Floor 2 (data measured from the current AC file): thickness 0.3m, height 3m.",
+            "expectedResult": "Creates one Wall on floorIndex=1 (thickness 0.3m, height 3m, Z 3~6).",
             "params": {
               "start": {
                 "x": 9.31,
@@ -1325,36 +1306,36 @@
             "commandNamespace": "MEPBridge",
             "commandName": "CreateWall",
             "descriptorName": "mepbridge.CreateWall",
-            "riskLevel": "low-mutation",
+            "riskLevel": "create-element",
             "status": "pending"
           },
           {
-            "id": "step-create-slab-floor-1",
-            "title": "Floor 2 slab level=0m thickness=0.3m 15.55x14.55m",
+            "id": "step-create-slab-1-1",
+            "title": "Floor 2 slab 1/4 t=0.3m top 3.1m [-6.14,9.46]x[-11.52,-5.72]",
             "action": "CreateSlab",
-            "description": "Create the large slab on Floor 2 (level=0m, thickness=0.3m, 15.55x14.55m rectangle).",
-            "expectedResult": "Creates one Slab on floorIndex=1.",
+            "description": "Create a slab on Floor 2 (data measured from the current AC file): thickness 0.3m, absolute top level 3.1m, reference level 0.1m (top surface relative to the home story).",
+            "expectedResult": "Creates one Slab on floorIndex=1 (thickness 0.3m, top 3.1m).",
             "params": {
               "polygon": [
                 {
-                  "x": -6.24,
-                  "y": -11.37
+                  "x": -6.14,
+                  "y": -11.52
                 },
                 {
-                  "x": 9.31,
-                  "y": -11.37
+                  "x": 9.46,
+                  "y": -11.52
                 },
                 {
-                  "x": 9.31,
-                  "y": 3.18
+                  "x": 9.46,
+                  "y": -5.72
                 },
                 {
-                  "x": -6.24,
-                  "y": 3.18
+                  "x": -6.14,
+                  "y": -5.72
                 }
               ],
               "thickness": 0.3,
-              "level": 0,
+              "level": 0.1,
               "floorIndex": 1,
               "dryRun": false,
               "confirmRequired": true
@@ -1369,24 +1350,24 @@
                 "addOnCommandParameters": {
                   "polygon": [
                     {
-                      "x": -6.24,
-                      "y": -11.37
+                      "x": -6.14,
+                      "y": -11.52
                     },
                     {
-                      "x": 9.31,
-                      "y": -11.37
+                      "x": 9.46,
+                      "y": -11.52
                     },
                     {
-                      "x": 9.31,
-                      "y": 3.18
+                      "x": 9.46,
+                      "y": -5.72
                     },
                     {
-                      "x": -6.24,
-                      "y": 3.18
+                      "x": -6.14,
+                      "y": -5.72
                     }
                   ],
                   "thickness": 0.3,
-                  "level": 0,
+                  "level": 0.1,
                   "floorIndex": 1,
                   "dryRun": false,
                   "confirmRequired": true
@@ -1396,15 +1377,228 @@
             "commandNamespace": "MEPBridge",
             "commandName": "CreateSlab",
             "descriptorName": "mepbridge.CreateSlab",
-            "riskLevel": "low-mutation",
+            "riskLevel": "create-element",
+            "status": "pending"
+          },
+          {
+            "id": "step-create-slab-1-2",
+            "title": "Floor 2 slab 2/4 t=0.3m top 3.1m [-6.14,-0.5]x[-5.72,3.08]",
+            "action": "CreateSlab",
+            "description": "Create a slab on Floor 2 (data measured from the current AC file): thickness 0.3m, absolute top level 3.1m, reference level 0.1m (top surface relative to the home story).",
+            "expectedResult": "Creates one Slab on floorIndex=1 (thickness 0.3m, top 3.1m).",
+            "params": {
+              "polygon": [
+                {
+                  "x": -6.14,
+                  "y": -5.72
+                },
+                {
+                  "x": -0.5,
+                  "y": -5.72
+                },
+                {
+                  "x": -0.5,
+                  "y": 3.08
+                },
+                {
+                  "x": -6.14,
+                  "y": 3.08
+                }
+              ],
+              "thickness": 0.3,
+              "level": 0.1,
+              "floorIndex": 1,
+              "dryRun": false,
+              "confirmRequired": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateSlab"
+                },
+                "addOnCommandParameters": {
+                  "polygon": [
+                    {
+                      "x": -6.14,
+                      "y": -5.72
+                    },
+                    {
+                      "x": -0.5,
+                      "y": -5.72
+                    },
+                    {
+                      "x": -0.5,
+                      "y": 3.08
+                    },
+                    {
+                      "x": -6.14,
+                      "y": 3.08
+                    }
+                  ],
+                  "thickness": 0.3,
+                  "level": 0.1,
+                  "floorIndex": 1,
+                  "dryRun": false,
+                  "confirmRequired": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateSlab",
+            "descriptorName": "mepbridge.CreateSlab",
+            "riskLevel": "create-element",
+            "status": "pending"
+          },
+          {
+            "id": "step-create-slab-1-3",
+            "title": "Floor 2 slab 3/4 t=0.3m top 3.1m [-0.5,9.46]x[-3.02,3.08]",
+            "action": "CreateSlab",
+            "description": "Create a slab on Floor 2 (data measured from the current AC file): thickness 0.3m, absolute top level 3.1m, reference level 0.1m (top surface relative to the home story).",
+            "expectedResult": "Creates one Slab on floorIndex=1 (thickness 0.3m, top 3.1m).",
+            "params": {
+              "polygon": [
+                {
+                  "x": -0.5,
+                  "y": -3.02
+                },
+                {
+                  "x": 9.46,
+                  "y": -3.02
+                },
+                {
+                  "x": 9.46,
+                  "y": 3.08
+                },
+                {
+                  "x": -0.5,
+                  "y": 3.08
+                }
+              ],
+              "thickness": 0.3,
+              "level": 0.1,
+              "floorIndex": 1,
+              "dryRun": false,
+              "confirmRequired": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateSlab"
+                },
+                "addOnCommandParameters": {
+                  "polygon": [
+                    {
+                      "x": -0.5,
+                      "y": -3.02
+                    },
+                    {
+                      "x": 9.46,
+                      "y": -3.02
+                    },
+                    {
+                      "x": 9.46,
+                      "y": 3.08
+                    },
+                    {
+                      "x": -0.5,
+                      "y": 3.08
+                    }
+                  ],
+                  "thickness": 0.3,
+                  "level": 0.1,
+                  "floorIndex": 1,
+                  "dryRun": false,
+                  "confirmRequired": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateSlab",
+            "descriptorName": "mepbridge.CreateSlab",
+            "riskLevel": "create-element",
+            "status": "pending"
+          },
+          {
+            "id": "step-create-slab-1-4",
+            "title": "Floor 2 slab 4/4 t=0.3m top 3.1m [4.594,9.46]x[-5.72,-3.02]",
+            "action": "CreateSlab",
+            "description": "Create a slab on Floor 2 (data measured from the current AC file): thickness 0.3m, absolute top level 3.1m, reference level 0.1m (top surface relative to the home story).",
+            "expectedResult": "Creates one Slab on floorIndex=1 (thickness 0.3m, top 3.1m).",
+            "params": {
+              "polygon": [
+                {
+                  "x": 4.594,
+                  "y": -5.72
+                },
+                {
+                  "x": 9.46,
+                  "y": -5.72
+                },
+                {
+                  "x": 9.46,
+                  "y": -3.02
+                },
+                {
+                  "x": 4.594,
+                  "y": -3.02
+                }
+              ],
+              "thickness": 0.3,
+              "level": 0.1,
+              "floorIndex": 1,
+              "dryRun": false,
+              "confirmRequired": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateSlab"
+                },
+                "addOnCommandParameters": {
+                  "polygon": [
+                    {
+                      "x": 4.594,
+                      "y": -5.72
+                    },
+                    {
+                      "x": 9.46,
+                      "y": -5.72
+                    },
+                    {
+                      "x": 9.46,
+                      "y": -3.02
+                    },
+                    {
+                      "x": 4.594,
+                      "y": -3.02
+                    }
+                  ],
+                  "thickness": 0.3,
+                  "level": 0.1,
+                  "floorIndex": 1,
+                  "dryRun": false,
+                  "confirmRequired": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateSlab",
+            "descriptorName": "mepbridge.CreateSlab",
+            "riskLevel": "create-element",
             "status": "pending"
           },
           {
             "id": "step-create-south-floor-2",
-            "title": "Floor 3 South wall (-5.99,-11.37)→(9.31,-11.37)",
+            "title": "Floor 3 South wall (-5.99,-11.37)→(9.31,-11.37) h=4m",
             "action": "CreateWall",
-            "description": "Create the South wall on Floor 3, thickness 0.3m, height 3m.",
-            "expectedResult": "Creates one Wall on floorIndex=2.",
+            "description": "Create the South wall on Floor 3 (data measured from the current AC file): thickness 0.3m, height 4m.",
+            "expectedResult": "Creates one Wall on floorIndex=2 (thickness 0.3m, height 4m, Z 6~10).",
             "params": {
               "start": {
                 "x": -5.99,
@@ -1415,7 +1609,7 @@
                 "y": -11.37
               },
               "thickness": 0.3,
-              "height": 3,
+              "height": 4,
               "floorIndex": 2,
               "dryRun": false,
               "confirmRequired": true
@@ -1437,7 +1631,7 @@
                     "y": -11.37
                   },
                   "thickness": 0.3,
-                  "height": 3,
+                  "height": 4,
                   "floorIndex": 2,
                   "dryRun": false,
                   "confirmRequired": true
@@ -1447,15 +1641,15 @@
             "commandNamespace": "MEPBridge",
             "commandName": "CreateWall",
             "descriptorName": "mepbridge.CreateWall",
-            "riskLevel": "low-mutation",
+            "riskLevel": "create-element",
             "status": "pending"
           },
           {
             "id": "step-create-north-floor-2",
-            "title": "Floor 3 North wall (-5.99,2.93)→(9.31,2.93)",
+            "title": "Floor 3 North wall (-5.99,2.93)→(9.31,2.93) h=4m",
             "action": "CreateWall",
-            "description": "Create the North wall on Floor 3, thickness 0.3m, height 3m.",
-            "expectedResult": "Creates one Wall on floorIndex=2.",
+            "description": "Create the North wall on Floor 3 (data measured from the current AC file): thickness 0.3m, height 4m.",
+            "expectedResult": "Creates one Wall on floorIndex=2 (thickness 0.3m, height 4m, Z 6~10).",
             "params": {
               "start": {
                 "x": -5.99,
@@ -1466,7 +1660,7 @@
                 "y": 2.93
               },
               "thickness": 0.3,
-              "height": 3,
+              "height": 4,
               "floorIndex": 2,
               "dryRun": false,
               "confirmRequired": true
@@ -1488,7 +1682,7 @@
                     "y": 2.93
                   },
                   "thickness": 0.3,
-                  "height": 3,
+                  "height": 4,
                   "floorIndex": 2,
                   "dryRun": false,
                   "confirmRequired": true
@@ -1498,15 +1692,15 @@
             "commandNamespace": "MEPBridge",
             "commandName": "CreateWall",
             "descriptorName": "mepbridge.CreateWall",
-            "riskLevel": "low-mutation",
+            "riskLevel": "create-element",
             "status": "pending"
           },
           {
             "id": "step-create-west-floor-2",
-            "title": "Floor 3 West wall (-5.99,-11.37)→(-5.99,2.93)",
+            "title": "Floor 3 West wall (-5.99,-11.37)→(-5.99,2.93) h=4m",
             "action": "CreateWall",
-            "description": "Create the West wall on Floor 3, thickness 0.3m, height 3m.",
-            "expectedResult": "Creates one Wall on floorIndex=2.",
+            "description": "Create the West wall on Floor 3 (data measured from the current AC file): thickness 0.3m, height 4m.",
+            "expectedResult": "Creates one Wall on floorIndex=2 (thickness 0.3m, height 4m, Z 6~10).",
             "params": {
               "start": {
                 "x": -5.99,
@@ -1517,7 +1711,7 @@
                 "y": 2.93
               },
               "thickness": 0.3,
-              "height": 3,
+              "height": 4,
               "floorIndex": 2,
               "dryRun": false,
               "confirmRequired": true
@@ -1539,7 +1733,7 @@
                     "y": 2.93
                   },
                   "thickness": 0.3,
-                  "height": 3,
+                  "height": 4,
                   "floorIndex": 2,
                   "dryRun": false,
                   "confirmRequired": true
@@ -1549,15 +1743,15 @@
             "commandNamespace": "MEPBridge",
             "commandName": "CreateWall",
             "descriptorName": "mepbridge.CreateWall",
-            "riskLevel": "low-mutation",
+            "riskLevel": "create-element",
             "status": "pending"
           },
           {
             "id": "step-create-east-floor-2",
-            "title": "Floor 3 East wall (9.31,-11.37)→(9.31,2.93)",
+            "title": "Floor 3 East wall (9.31,-11.37)→(9.31,2.93) h=4m",
             "action": "CreateWall",
-            "description": "Create the East wall on Floor 3, thickness 0.3m, height 3m.",
-            "expectedResult": "Creates one Wall on floorIndex=2.",
+            "description": "Create the East wall on Floor 3 (data measured from the current AC file): thickness 0.3m, height 4m.",
+            "expectedResult": "Creates one Wall on floorIndex=2 (thickness 0.3m, height 4m, Z 6~10).",
             "params": {
               "start": {
                 "x": 9.31,
@@ -1568,7 +1762,7 @@
                 "y": 2.93
               },
               "thickness": 0.3,
-              "height": 3,
+              "height": 4,
               "floorIndex": 2,
               "dryRun": false,
               "confirmRequired": true
@@ -1590,7 +1784,7 @@
                     "y": 2.93
                   },
                   "thickness": 0.3,
-                  "height": 3,
+                  "height": 4,
                   "floorIndex": 2,
                   "dryRun": false,
                   "confirmRequired": true
@@ -1600,36 +1794,36 @@
             "commandNamespace": "MEPBridge",
             "commandName": "CreateWall",
             "descriptorName": "mepbridge.CreateWall",
-            "riskLevel": "low-mutation",
+            "riskLevel": "create-element",
             "status": "pending"
           },
           {
-            "id": "step-create-slab-floor-2",
-            "title": "Floor 3 slab level=0m thickness=0.3m 15.55x14.55m",
+            "id": "step-create-slab-2-1",
+            "title": "Floor 3 slab 1/8 t=0.3m top 6.1m [-6.14,9.46]x[-11.52,-5.72]",
             "action": "CreateSlab",
-            "description": "Create the large slab on Floor 3 (level=0m, thickness=0.3m, 15.55x14.55m rectangle).",
-            "expectedResult": "Creates one Slab on floorIndex=2.",
+            "description": "Create a slab on Floor 3 (data measured from the current AC file): thickness 0.3m, absolute top level 6.1m, reference level 0.1m (top surface relative to the home story).",
+            "expectedResult": "Creates one Slab on floorIndex=2 (thickness 0.3m, top 6.1m).",
             "params": {
               "polygon": [
                 {
-                  "x": -6.24,
-                  "y": -11.37
+                  "x": -6.14,
+                  "y": -11.52
                 },
                 {
-                  "x": 9.31,
-                  "y": -11.37
+                  "x": 9.46,
+                  "y": -11.52
                 },
                 {
-                  "x": 9.31,
-                  "y": 3.18
+                  "x": 9.46,
+                  "y": -5.72
                 },
                 {
-                  "x": -6.24,
-                  "y": 3.18
+                  "x": -6.14,
+                  "y": -5.72
                 }
               ],
               "thickness": 0.3,
-              "level": 0,
+              "level": 0.1,
               "floorIndex": 2,
               "dryRun": false,
               "confirmRequired": true
@@ -1644,24 +1838,24 @@
                 "addOnCommandParameters": {
                   "polygon": [
                     {
-                      "x": -6.24,
-                      "y": -11.37
+                      "x": -6.14,
+                      "y": -11.52
                     },
                     {
-                      "x": 9.31,
-                      "y": -11.37
+                      "x": 9.46,
+                      "y": -11.52
                     },
                     {
-                      "x": 9.31,
-                      "y": 3.18
+                      "x": 9.46,
+                      "y": -5.72
                     },
                     {
-                      "x": -6.24,
-                      "y": 3.18
+                      "x": -6.14,
+                      "y": -5.72
                     }
                   ],
                   "thickness": 0.3,
-                  "level": 0,
+                  "level": 0.1,
                   "floorIndex": 2,
                   "dryRun": false,
                   "confirmRequired": true
@@ -1671,7 +1865,504 @@
             "commandNamespace": "MEPBridge",
             "commandName": "CreateSlab",
             "descriptorName": "mepbridge.CreateSlab",
-            "riskLevel": "low-mutation",
+            "riskLevel": "create-element",
+            "status": "pending"
+          },
+          {
+            "id": "step-create-slab-2-2",
+            "title": "Floor 3 slab 2/8 t=0.3m top 6.1m [-6.14,-0.5]x[-5.72,3.08]",
+            "action": "CreateSlab",
+            "description": "Create a slab on Floor 3 (data measured from the current AC file): thickness 0.3m, absolute top level 6.1m, reference level 0.1m (top surface relative to the home story).",
+            "expectedResult": "Creates one Slab on floorIndex=2 (thickness 0.3m, top 6.1m).",
+            "params": {
+              "polygon": [
+                {
+                  "x": -6.14,
+                  "y": -5.72
+                },
+                {
+                  "x": -0.5,
+                  "y": -5.72
+                },
+                {
+                  "x": -0.5,
+                  "y": 3.08
+                },
+                {
+                  "x": -6.14,
+                  "y": 3.08
+                }
+              ],
+              "thickness": 0.3,
+              "level": 0.1,
+              "floorIndex": 2,
+              "dryRun": false,
+              "confirmRequired": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateSlab"
+                },
+                "addOnCommandParameters": {
+                  "polygon": [
+                    {
+                      "x": -6.14,
+                      "y": -5.72
+                    },
+                    {
+                      "x": -0.5,
+                      "y": -5.72
+                    },
+                    {
+                      "x": -0.5,
+                      "y": 3.08
+                    },
+                    {
+                      "x": -6.14,
+                      "y": 3.08
+                    }
+                  ],
+                  "thickness": 0.3,
+                  "level": 0.1,
+                  "floorIndex": 2,
+                  "dryRun": false,
+                  "confirmRequired": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateSlab",
+            "descriptorName": "mepbridge.CreateSlab",
+            "riskLevel": "create-element",
+            "status": "pending"
+          },
+          {
+            "id": "step-create-slab-2-3",
+            "title": "Floor 3 slab 3/8 t=0.3m top 6.1m [-0.5,9.46]x[-3.02,3.08]",
+            "action": "CreateSlab",
+            "description": "Create a slab on Floor 3 (data measured from the current AC file): thickness 0.3m, absolute top level 6.1m, reference level 0.1m (top surface relative to the home story).",
+            "expectedResult": "Creates one Slab on floorIndex=2 (thickness 0.3m, top 6.1m).",
+            "params": {
+              "polygon": [
+                {
+                  "x": -0.5,
+                  "y": -3.02
+                },
+                {
+                  "x": 9.46,
+                  "y": -3.02
+                },
+                {
+                  "x": 9.46,
+                  "y": 3.08
+                },
+                {
+                  "x": -0.5,
+                  "y": 3.08
+                }
+              ],
+              "thickness": 0.3,
+              "level": 0.1,
+              "floorIndex": 2,
+              "dryRun": false,
+              "confirmRequired": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateSlab"
+                },
+                "addOnCommandParameters": {
+                  "polygon": [
+                    {
+                      "x": -0.5,
+                      "y": -3.02
+                    },
+                    {
+                      "x": 9.46,
+                      "y": -3.02
+                    },
+                    {
+                      "x": 9.46,
+                      "y": 3.08
+                    },
+                    {
+                      "x": -0.5,
+                      "y": 3.08
+                    }
+                  ],
+                  "thickness": 0.3,
+                  "level": 0.1,
+                  "floorIndex": 2,
+                  "dryRun": false,
+                  "confirmRequired": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateSlab",
+            "descriptorName": "mepbridge.CreateSlab",
+            "riskLevel": "create-element",
+            "status": "pending"
+          },
+          {
+            "id": "step-create-slab-2-4",
+            "title": "Floor 3 slab 4/8 t=0.3m top 6.1m [4.594,9.46]x[-5.72,-3.02]",
+            "action": "CreateSlab",
+            "description": "Create a slab on Floor 3 (data measured from the current AC file): thickness 0.3m, absolute top level 6.1m, reference level 0.1m (top surface relative to the home story).",
+            "expectedResult": "Creates one Slab on floorIndex=2 (thickness 0.3m, top 6.1m).",
+            "params": {
+              "polygon": [
+                {
+                  "x": 4.594,
+                  "y": -5.72
+                },
+                {
+                  "x": 9.46,
+                  "y": -5.72
+                },
+                {
+                  "x": 9.46,
+                  "y": -3.02
+                },
+                {
+                  "x": 4.594,
+                  "y": -3.02
+                }
+              ],
+              "thickness": 0.3,
+              "level": 0.1,
+              "floorIndex": 2,
+              "dryRun": false,
+              "confirmRequired": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateSlab"
+                },
+                "addOnCommandParameters": {
+                  "polygon": [
+                    {
+                      "x": 4.594,
+                      "y": -5.72
+                    },
+                    {
+                      "x": 9.46,
+                      "y": -5.72
+                    },
+                    {
+                      "x": 9.46,
+                      "y": -3.02
+                    },
+                    {
+                      "x": 4.594,
+                      "y": -3.02
+                    }
+                  ],
+                  "thickness": 0.3,
+                  "level": 0.1,
+                  "floorIndex": 2,
+                  "dryRun": false,
+                  "confirmRequired": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateSlab",
+            "descriptorName": "mepbridge.CreateSlab",
+            "riskLevel": "create-element",
+            "status": "pending"
+          },
+          {
+            "id": "step-create-slab-2-5",
+            "title": "Floor 3 slab 5/8 t=0.3m top 9.1m [-6.14,9.46]x[-11.52,-5.72]",
+            "action": "CreateSlab",
+            "description": "Create a slab on Floor 3 (data measured from the current AC file): thickness 0.3m, absolute top level 9.1m, reference level 3.1m (top surface relative to the home story).",
+            "expectedResult": "Creates one Slab on floorIndex=2 (thickness 0.3m, top 9.1m).",
+            "params": {
+              "polygon": [
+                {
+                  "x": -6.14,
+                  "y": -11.52
+                },
+                {
+                  "x": 9.46,
+                  "y": -11.52
+                },
+                {
+                  "x": 9.46,
+                  "y": -5.72
+                },
+                {
+                  "x": -6.14,
+                  "y": -5.72
+                }
+              ],
+              "thickness": 0.3,
+              "level": 3.1,
+              "floorIndex": 2,
+              "dryRun": false,
+              "confirmRequired": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateSlab"
+                },
+                "addOnCommandParameters": {
+                  "polygon": [
+                    {
+                      "x": -6.14,
+                      "y": -11.52
+                    },
+                    {
+                      "x": 9.46,
+                      "y": -11.52
+                    },
+                    {
+                      "x": 9.46,
+                      "y": -5.72
+                    },
+                    {
+                      "x": -6.14,
+                      "y": -5.72
+                    }
+                  ],
+                  "thickness": 0.3,
+                  "level": 3.1,
+                  "floorIndex": 2,
+                  "dryRun": false,
+                  "confirmRequired": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateSlab",
+            "descriptorName": "mepbridge.CreateSlab",
+            "riskLevel": "create-element",
+            "status": "pending"
+          },
+          {
+            "id": "step-create-slab-2-6",
+            "title": "Floor 3 slab 6/8 t=0.3m top 9.1m [-6.14,-0.5]x[-5.72,3.08]",
+            "action": "CreateSlab",
+            "description": "Create a slab on Floor 3 (data measured from the current AC file): thickness 0.3m, absolute top level 9.1m, reference level 3.1m (top surface relative to the home story).",
+            "expectedResult": "Creates one Slab on floorIndex=2 (thickness 0.3m, top 9.1m).",
+            "params": {
+              "polygon": [
+                {
+                  "x": -6.14,
+                  "y": -5.72
+                },
+                {
+                  "x": -0.5,
+                  "y": -5.72
+                },
+                {
+                  "x": -0.5,
+                  "y": 3.08
+                },
+                {
+                  "x": -6.14,
+                  "y": 3.08
+                }
+              ],
+              "thickness": 0.3,
+              "level": 3.1,
+              "floorIndex": 2,
+              "dryRun": false,
+              "confirmRequired": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateSlab"
+                },
+                "addOnCommandParameters": {
+                  "polygon": [
+                    {
+                      "x": -6.14,
+                      "y": -5.72
+                    },
+                    {
+                      "x": -0.5,
+                      "y": -5.72
+                    },
+                    {
+                      "x": -0.5,
+                      "y": 3.08
+                    },
+                    {
+                      "x": -6.14,
+                      "y": 3.08
+                    }
+                  ],
+                  "thickness": 0.3,
+                  "level": 3.1,
+                  "floorIndex": 2,
+                  "dryRun": false,
+                  "confirmRequired": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateSlab",
+            "descriptorName": "mepbridge.CreateSlab",
+            "riskLevel": "create-element",
+            "status": "pending"
+          },
+          {
+            "id": "step-create-slab-2-7",
+            "title": "Floor 3 slab 7/8 t=0.3m top 9.1m [-0.5,9.46]x[-3.02,3.08]",
+            "action": "CreateSlab",
+            "description": "Create a slab on Floor 3 (data measured from the current AC file): thickness 0.3m, absolute top level 9.1m, reference level 3.1m (top surface relative to the home story).",
+            "expectedResult": "Creates one Slab on floorIndex=2 (thickness 0.3m, top 9.1m).",
+            "params": {
+              "polygon": [
+                {
+                  "x": -0.5,
+                  "y": -3.02
+                },
+                {
+                  "x": 9.46,
+                  "y": -3.02
+                },
+                {
+                  "x": 9.46,
+                  "y": 3.08
+                },
+                {
+                  "x": -0.5,
+                  "y": 3.08
+                }
+              ],
+              "thickness": 0.3,
+              "level": 3.1,
+              "floorIndex": 2,
+              "dryRun": false,
+              "confirmRequired": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateSlab"
+                },
+                "addOnCommandParameters": {
+                  "polygon": [
+                    {
+                      "x": -0.5,
+                      "y": -3.02
+                    },
+                    {
+                      "x": 9.46,
+                      "y": -3.02
+                    },
+                    {
+                      "x": 9.46,
+                      "y": 3.08
+                    },
+                    {
+                      "x": -0.5,
+                      "y": 3.08
+                    }
+                  ],
+                  "thickness": 0.3,
+                  "level": 3.1,
+                  "floorIndex": 2,
+                  "dryRun": false,
+                  "confirmRequired": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateSlab",
+            "descriptorName": "mepbridge.CreateSlab",
+            "riskLevel": "create-element",
+            "status": "pending"
+          },
+          {
+            "id": "step-create-slab-2-8",
+            "title": "Floor 3 slab 8/8 t=0.3m top 9.1m [4.594,9.46]x[-5.72,-3.02]",
+            "action": "CreateSlab",
+            "description": "Create a slab on Floor 3 (data measured from the current AC file): thickness 0.3m, absolute top level 9.1m, reference level 3.1m (top surface relative to the home story).",
+            "expectedResult": "Creates one Slab on floorIndex=2 (thickness 0.3m, top 9.1m).",
+            "params": {
+              "polygon": [
+                {
+                  "x": 4.594,
+                  "y": -5.72
+                },
+                {
+                  "x": 9.46,
+                  "y": -5.72
+                },
+                {
+                  "x": 9.46,
+                  "y": -3.02
+                },
+                {
+                  "x": 4.594,
+                  "y": -3.02
+                }
+              ],
+              "thickness": 0.3,
+              "level": 3.1,
+              "floorIndex": 2,
+              "dryRun": false,
+              "confirmRequired": true
+            },
+            "commandJson": {
+              "command": "API.ExecuteAddOnCommand",
+              "parameters": {
+                "addOnCommandId": {
+                  "commandNamespace": "MEPBridge",
+                  "commandName": "CreateSlab"
+                },
+                "addOnCommandParameters": {
+                  "polygon": [
+                    {
+                      "x": 4.594,
+                      "y": -5.72
+                    },
+                    {
+                      "x": 9.46,
+                      "y": -5.72
+                    },
+                    {
+                      "x": 9.46,
+                      "y": -3.02
+                    },
+                    {
+                      "x": 4.594,
+                      "y": -3.02
+                    }
+                  ],
+                  "thickness": 0.3,
+                  "level": 3.1,
+                  "floorIndex": 2,
+                  "dryRun": false,
+                  "confirmRequired": true
+                }
+              }
+            },
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateSlab",
+            "descriptorName": "mepbridge.CreateSlab",
+            "riskLevel": "create-element",
             "status": "pending"
           }
         ],
@@ -1688,11 +2379,12 @@
             "actual": "Pending execution",
             "status": "warning"
           }
-        ]
+        ],
+        "userIntent": "Replicate the source file outer walls and slabs on floors 2/3 of the current project: walls of the floor first, then its slabs, ordered bottom-up by story and slab top level."
       },
       "riskLevel": "low-mutation",
       "createdAt": "2026-07-28T00:00:00.000+08:00",
-      "updatedAt": "2026-07-28T00:00:00.000+08:00",
+      "updatedAt": "2026-09-18T05:48:50.751Z",
       "tags": [
         "starter",
         "example",
@@ -1701,7 +2393,8 @@
       ],
       "usageCount": 0,
       "version": "1.0",
-      "notes": "Creation-based template: build the outer shell on floors 2/3 using CreateWall x4 + CreateSlab x1 per floor. Parameters come from measured ground-floor geometry (GetElementGeometry); each step is self-contained with coordinates, no GUID dependency, works across projects. Consistent with tpl-starter-room-walls (4 CreateWall) and tpl-starter-scan-structure (CreateSlab). Replaced the previous \"copy\" template because CopyElements with empty sourceGuids is blocked at three layers (resolver / schema minItems / C++ NO_SOURCE_GUIDS)."
+      "notes": "Creation-based template: build the outer shell on floors 2/3 using CreateWall x4 + CreateSlab x1 per floor. Parameters come from measured ground-floor geometry (GetElementGeometry); each step is self-contained with coordinates, no GUID dependency, works across projects. Consistent with tpl-starter-room-walls (4 CreateWall) and tpl-starter-scan-structure (CreateSlab). Replaced the previous \"copy\" template because CopyElements with empty sourceGuids is blocked at three layers (resolver / schema minItems / C++ NO_SOURCE_GUIDS).",
+      "code": "TPL-007"
     },
     {
       "id": "tpl-starter-create-elevated-mesh",
@@ -1821,7 +2514,8 @@
       ],
       "usageCount": 0,
       "version": "1.0",
-      "notes": "preview-first; pending AC28/AC29 APX rebuild and runtime readback."
+      "notes": "preview-first; pending AC28/AC29 APX rebuild and runtime readback.",
+      "code": "TPL-008"
     },
     {
       "id": "tpl-starter-create-extruded-morph",
@@ -1927,7 +2621,8 @@
       ],
       "usageCount": 0,
       "version": "1.0",
-      "notes": "preview-first; pending AC28/AC29 APX rebuild and runtime readback."
+      "notes": "preview-first; pending AC28/AC29 APX rebuild and runtime readback.",
+      "code": "TPL-009"
     },
     {
       "id": "tpl-starter-create-wall-from-favorite",
@@ -2047,7 +2742,8 @@
       ],
       "usageCount": 0,
       "version": "1.0",
-      "notes": "Preview-first. Resolve required current-project identities before execution; no GUID or attribute index is hard-coded."
+      "notes": "Preview-first. Resolve required current-project identities before execution; no GUID or attribute index is hard-coded.",
+      "code": "TPL-010"
     },
     {
       "id": "tpl-starter-create-structural-member-from-profile",
@@ -2204,7 +2900,8 @@
       ],
       "usageCount": 0,
       "version": "1.0",
-      "notes": "Preview-first. Resolve required current-project identities before execution; no GUID or attribute index is hard-coded."
+      "notes": "Preview-first. Resolve required current-project identities before execution; no GUID or attribute index is hard-coded.",
+      "code": "TPL-011"
     },
     {
       "id": "tpl-starter-batch-set-layer",
@@ -2341,7 +3038,8 @@
       ],
       "usageCount": 0,
       "version": "1.0",
-      "notes": "Preview-first. Resolve required current-project identities before execution; no GUID or attribute index is hard-coded."
+      "notes": "Preview-first. Resolve required current-project identities before execution; no GUID or attribute index is hard-coded.",
+      "code": "TPL-012"
     },
     {
       "id": "tpl-starter-assign-classification",
@@ -2482,7 +3180,8 @@
       ],
       "usageCount": 0,
       "version": "1.0",
-      "notes": "Preview-first. Resolve required current-project identities before execution; no GUID or attribute index is hard-coded."
+      "notes": "Preview-first. Resolve required current-project identities before execution; no GUID or attribute index is hard-coded.",
+      "code": "TPL-013"
     }
   ],
   "commands": [

@@ -10,6 +10,7 @@ import {
   validatePlaceholderValue,
   type TaskTemplate
 } from '../userAssets';
+import { describePostReplayStep, resolvePostReplaySteps } from '../postReplay';
 
 interface TemplateReplayModalProps {
   isOpen: boolean;
@@ -42,6 +43,10 @@ export const TemplateReplayModal: React.FC<TemplateReplayModalProps> = ({
 
   if (!isOpen || !template) return null;
 
+  // 回放后步骤：普通步骤全部成功后自动执行（如「结构功能 = 承重元素」的统一属性），
+  // 目标元素按运行时新建的构件解析（见 src/postReplay.ts），此处仅用于预览告知。
+  const postReplaySteps = resolvePostReplaySteps(template.plan);
+
   const handleReplay = () => {
     // 校验所有占位符
     const newErrors: Record<string, string> = {};
@@ -70,9 +75,16 @@ export const TemplateReplayModal: React.FC<TemplateReplayModalProps> = ({
       <div className="w-full max-w-lg bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
-          <h2 className="text-sm font-semibold font-display tracking-wider uppercase text-zinc-200">
-            {template.name}
-          </h2>
+          <div className="flex items-center gap-2 min-w-0">
+            {template.code && (
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-pink-200 whitespace-nowrap">
+                {template.code}
+              </span>
+            )}
+            <h2 className="text-sm font-semibold font-display tracking-wider uppercase text-zinc-200 truncate">
+              {template.name}
+            </h2>
+          </div>
           <button
             onClick={onClose}
             className="text-zinc-500 hover:text-zinc-300 transition-colors"
@@ -98,6 +110,13 @@ export const TemplateReplayModal: React.FC<TemplateReplayModalProps> = ({
               </span>
               <span className="text-zinc-500">
                 {template.plan.steps.length} {lang === "zh-CN" ? "步" : "steps"}
+                {postReplaySteps.length > 0 && (
+                  <span className="text-amber-400/80">
+                    {lang === "zh-CN"
+                      ? ` + ${postReplaySteps.length} 收尾步骤`
+                      : ` + ${postReplaySteps.length} finishing step(s)`}
+                  </span>
+                )}
               </span>
               <span className="text-zinc-600">
                 {template.category}
@@ -176,6 +195,17 @@ export const TemplateReplayModal: React.FC<TemplateReplayModalProps> = ({
                     {idx + 1}
                   </span>
                   <span className="text-zinc-300">{step.title || step.action || `Step ${idx + 1}`}</span>
+                </div>
+              ))}
+              {postReplaySteps.map((step, idx) => (
+                <div key={step.id || `post-${idx}`} className="flex items-center gap-2 text-xs">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 font-mono">
+                    {template.plan.steps.length + idx + 1}
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] whitespace-nowrap">
+                    {lang === "zh-CN" ? "回放后" : "after replay"}
+                  </span>
+                  <span className="text-zinc-300">{describePostReplayStep(step)}</span>
                 </div>
               ))}
             </div>

@@ -17,6 +17,12 @@ const { extractTemplateParams } = require('./nl-param-extractors');
 
 const TEMPLATES_FILE = migrateLegacyFile('.task-templates.json');
 
+// ── 示例box 组合模板（TPL-021）冻结字面量 ──
+// 来源：运行时用户模板冻结快照（柱梁 TPL-STRUCT-FRAME-20260918 / 机电 TPL-007 2026-09-20 重采）。
+// 与用户模板不自动同步；内置更新需重跑本拼接或手工维护。
+const BOX_STRUCT_STEPS = [{"action":"CreateColumn","title":"Column 001 [首层] 层0 (-5.84,-11.22) h=2.8","params":{"position":{"x":-5.84,"y":-11.22},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":0},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 002 [首层] 层0 (-5.84,2.78) h=2.8","params":{"position":{"x":-5.84,"y":2.78},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":0},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 003 [首层] 层0 (9.16,2.78) h=2.8","params":{"position":{"x":9.16,"y":2.78},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":0},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 004 [首层] 层0 (9.16,-11.22) h=2.8","params":{"position":{"x":9.16,"y":-11.22},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":0},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 005 [首层] 层0 (-5.84,-6.02) h=2.8","params":{"position":{"x":-5.84,"y":-6.02},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":0},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 006 [首层] 层0 (9.16,-6.02) h=2.8","params":{"position":{"x":9.16,"y":-6.02},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":0},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 007 [首层] 层0 (-2.21,-11.22) h=2.8","params":{"position":{"x":-2.21,"y":-11.22},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":0},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 008 [首层] 层0 (-2.21,2.78) h=2.8","params":{"position":{"x":-2.21,"y":2.78},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":0},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 009 [首层] 层0 (-2.21,-6.02) h=2.8","params":{"position":{"x":-2.21,"y":-6.02},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":0},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 010 [首层] 层0 (4.55,-11.22) h=2.8","params":{"position":{"x":4.55,"y":-11.22},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":0},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 011 [首层] 层0 (4.55,2.78) h=2.8","params":{"position":{"x":4.55,"y":2.78},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":0},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 012 [首层] 层0 (4.55,-6.02) h=2.8","params":{"position":{"x":4.55,"y":-6.02},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":0},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 013 [二层] 层1 (-5.84,-11.22) h=2.8","params":{"position":{"x":-5.84,"y":-11.22},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":1},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 014 [二层] 层1 (-5.84,2.78) h=2.8","params":{"position":{"x":-5.84,"y":2.78},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":1},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 015 [二层] 层1 (9.16,2.78) h=2.8","params":{"position":{"x":9.16,"y":2.78},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":1},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 016 [二层] 层1 (9.16,-11.22) h=2.8","params":{"position":{"x":9.16,"y":-11.22},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":1},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 017 [二层] 层1 (-5.84,-6.02) h=2.8","params":{"position":{"x":-5.84,"y":-6.02},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":1},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 018 [二层] 层1 (9.16,-6.02) h=2.8","params":{"position":{"x":9.16,"y":-6.02},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":1},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 019 [二层] 层1 (-2.21,-11.22) h=2.8","params":{"position":{"x":-2.21,"y":-11.22},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":1},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 020 [二层] 层1 (-2.21,2.78) h=2.8","params":{"position":{"x":-2.21,"y":2.78},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":1},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 021 [二层] 层1 (-2.21,-6.02) h=2.8","params":{"position":{"x":-2.21,"y":-6.02},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":1},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 022 [二层] 层1 (4.55,-11.22) h=2.8","params":{"position":{"x":4.55,"y":-11.22},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":1},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 023 [二层] 层1 (4.55,2.78) h=2.8","params":{"position":{"x":4.55,"y":2.78},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":1},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 024 [二层] 层1 (4.55,-6.02) h=2.8","params":{"position":{"x":4.55,"y":-6.02},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":1},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 001 [二层] 层1 (-6.14,-5.87)->(9.46,-5.87) L=15.6 offset=0 Z=[2.6, 3]","params":{"start":{"x":-6.14,"y":-5.87},"end":{"x":9.46,"y":-5.87},"floorIndex":1,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 002 [二层] 层1 (-6.14,2.93)->(9.46,2.93) L=15.6 offset=0 Z=[2.6, 3]","params":{"start":{"x":-6.14,"y":2.93},"end":{"x":9.46,"y":2.93},"floorIndex":1,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 003 [二层] 层1 (-6,-0.37)->(9.318,-0.37) L=15.318 offset=0 Z=[2.6, 3]","params":{"start":{"x":-6,"y":-0.37},"end":{"x":9.317653,"y":-0.37},"floorIndex":1,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 004 [二层] 层1 (-2.06,-11.52)->(-2.06,3.08) L=14.6 offset=0 Z=[2.6, 3]","params":{"start":{"x":-2.06,"y":-11.52},"end":{"x":-2.06,"y":3.08},"floorIndex":1,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 005 [二层] 层1 (-5.99,-11.52)->(-5.99,3.08) L=14.6 offset=0 Z=[2.6, 3]","params":{"start":{"x":-5.99,"y":-11.52},"end":{"x":-5.99,"y":3.08},"floorIndex":1,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 006 [二层] 层1 (-6.14,-11.37)->(9.31,-11.37) L=15.45 offset=0 Z=[2.6, 3]","params":{"start":{"x":-6.14,"y":-11.37},"end":{"x":9.310103,"y":-11.37},"floorIndex":1,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 007 [二层] 层1 (4.7,-11.52)->(4.7,3.08) L=14.6 offset=0 Z=[2.6, 3]","params":{"start":{"x":4.7,"y":-11.52},"end":{"x":4.7,"y":3.08},"floorIndex":1,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 008 [二层] 层1 (9.31,-11.52)->(9.31,3.08) L=14.6 offset=0 Z=[2.6, 3]","params":{"start":{"x":9.31,"y":-11.52},"end":{"x":9.31,"y":3.08},"floorIndex":1,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 025 [三层] 层2 (-5.84,-11.22) h=2.8","params":{"position":{"x":-5.84,"y":-11.22},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":2},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 026 [三层] 层2 (-5.84,2.78) h=2.8","params":{"position":{"x":-5.84,"y":2.78},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":2},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 027 [三层] 层2 (9.16,2.78) h=2.8","params":{"position":{"x":9.16,"y":2.78},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":2},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 028 [三层] 层2 (9.16,-11.22) h=2.8","params":{"position":{"x":9.16,"y":-11.22},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":2},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 029 [三层] 层2 (-5.84,-6.02) h=2.8","params":{"position":{"x":-5.84,"y":-6.02},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":2},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 030 [三层] 层2 (9.16,-6.02) h=2.8","params":{"position":{"x":9.16,"y":-6.02},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":2},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 031 [三层] 层2 (-2.21,-11.22) h=2.8","params":{"position":{"x":-2.21,"y":-11.22},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":2},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 032 [三层] 层2 (-2.21,2.78) h=2.8","params":{"position":{"x":-2.21,"y":2.78},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":2},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 033 [三层] 层2 (-2.21,-6.02) h=2.8","params":{"position":{"x":-2.21,"y":-6.02},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":2},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 034 [三层] 层2 (4.55,-11.22) h=2.8","params":{"position":{"x":4.55,"y":-11.22},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":2},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 035 [三层] 层2 (4.55,2.78) h=2.8","params":{"position":{"x":4.55,"y":2.78},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":2},"riskLevel":"create-element"},{"action":"CreateColumn","title":"Column 036 [三层] 层2 (4.55,-6.02) h=2.8","params":{"position":{"x":4.55,"y":-6.02},"height":2.8,"dryRun":false,"confirmRequired":true,"floorIndex":2},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 009 [三层] 层2 (-6.14,2.93)->(9.46,2.93) L=15.6 offset=0 Z=[5.6, 6]","params":{"start":{"x":-6.14,"y":2.93},"end":{"x":9.46,"y":2.93},"floorIndex":2,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 010 [三层] 层2 (-6,-0.37)->(9.318,-0.37) L=15.318 offset=0 Z=[5.6, 6]","params":{"start":{"x":-6,"y":-0.37},"end":{"x":9.317653,"y":-0.37},"floorIndex":2,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 011 [三层] 层2 (9.31,-11.52)->(9.31,3.08) L=14.6 offset=0 Z=[5.6, 6]","params":{"start":{"x":9.31,"y":-11.52},"end":{"x":9.31,"y":3.08},"floorIndex":2,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 012 [三层] 层2 (4.7,-11.52)->(4.7,3.08) L=14.6 offset=0 Z=[5.6, 6]","params":{"start":{"x":4.7,"y":-11.52},"end":{"x":4.7,"y":3.08},"floorIndex":2,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 013 [三层] 层2 (-2.06,-11.52)->(-2.06,3.08) L=14.6 offset=0 Z=[5.6, 6]","params":{"start":{"x":-2.06,"y":-11.52},"end":{"x":-2.06,"y":3.08},"floorIndex":2,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 014 [三层] 层2 (-6.14,-11.37)->(9.31,-11.37) L=15.45 offset=0 Z=[5.6, 6]","params":{"start":{"x":-6.14,"y":-11.37},"end":{"x":9.310103,"y":-11.37},"floorIndex":2,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 015 [三层] 层2 (-6.14,-5.87)->(9.46,-5.87) L=15.6 offset=0 Z=[5.6, 6]","params":{"start":{"x":-6.14,"y":-5.87},"end":{"x":9.46,"y":-5.87},"floorIndex":2,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 016 [三层] 层2 (-5.99,-11.52)->(-5.99,3.08) L=14.6 offset=0 Z=[5.6, 6]","params":{"start":{"x":-5.99,"y":-11.52},"end":{"x":-5.99,"y":3.08},"floorIndex":2,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 017 [屋面] 层3 (-6.14,-5.87)->(9.46,-5.87) L=15.6 offset=0 Z=[8.6, 9]","params":{"start":{"x":-6.14,"y":-5.87},"end":{"x":9.46,"y":-5.87},"floorIndex":3,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 018 [屋面] 层3 (-6.14,-11.37)->(9.31,-11.37) L=15.45 offset=0 Z=[8.6, 9]","params":{"start":{"x":-6.14,"y":-11.37},"end":{"x":9.310103,"y":-11.37},"floorIndex":3,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 019 [屋面] 层3 (-6.14,2.93)->(9.46,2.93) L=15.6 offset=0 Z=[8.6, 9]","params":{"start":{"x":-6.14,"y":2.93},"end":{"x":9.46,"y":2.93},"floorIndex":3,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 020 [屋面] 层3 (-6,-0.37)->(9.318,-0.37) L=15.318 offset=0 Z=[8.6, 9]","params":{"start":{"x":-6,"y":-0.37},"end":{"x":9.317653,"y":-0.37},"floorIndex":3,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 021 [屋面] 层3 (9.31,-11.52)->(9.31,3.08) L=14.6 offset=0 Z=[8.6, 9]","params":{"start":{"x":9.31,"y":-11.52},"end":{"x":9.31,"y":3.08},"floorIndex":3,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 022 [屋面] 层3 (4.7,-11.52)->(4.7,3.08) L=14.6 offset=0 Z=[8.6, 9]","params":{"start":{"x":4.7,"y":-11.52},"end":{"x":4.7,"y":3.08},"floorIndex":3,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 023 [屋面] 层3 (-2.06,-11.52)->(-2.06,3.08) L=14.6 offset=0 Z=[8.6, 9]","params":{"start":{"x":-2.06,"y":-11.52},"end":{"x":-2.06,"y":3.08},"floorIndex":3,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"},{"action":"CreateBeam","title":"Beam 024 [屋面] 层3 (-5.99,-11.52)->(-5.99,3.08) L=14.6 offset=0 Z=[8.6, 9]","params":{"start":{"x":-5.99,"y":-11.52},"end":{"x":-5.99,"y":3.08},"floorIndex":3,"dryRun":false,"confirmRequired":true},"riskLevel":"create-element"}];
+const BOX_MEP_STEPS = [{"action":"CreateDuct","title":"新风干管1 (6.75,-10.12)→(5.65,-10.12)→(5.65,-6.81) 600×300mm z=2.4m","params":{"waypoints":[{"x":6.75,"y":-10.12,"z":2.4},{"x":5.653,"y":-10.12,"z":2.4},{"x":5.653,"y":-6.808,"z":2.4}],"width":0.6,"height":0.3},"riskLevel":"create-element"},{"action":"CreateDuct","title":"新风干管2 (5.65,-6.81)→(-1.26,-6.81)→(-1.26,-1.55) 500×300mm z=2.4m","params":{"waypoints":[{"x":5.653,"y":-6.808,"z":2.4},{"x":-1.262,"y":-6.814,"z":2.4},{"x":-1.262,"y":-1.548,"z":2.4}],"width":0.5,"height":0.3},"riskLevel":"create-element"},{"action":"CreateDuct","title":"新风干管3 (5.65,-6.81)→(5.65,-1.31)→(6.75,-1.31) 600×300mm z=2.4m","params":{"waypoints":[{"x":5.653,"y":-6.808,"z":2.4},{"x":5.653,"y":-1.314,"z":2.4},{"x":6.75,"y":-1.314,"z":2.4}],"width":0.6,"height":0.3},"riskLevel":"create-element"},{"action":"CreateDuct","title":"新风支管4 (-1.26,-6.81)→(-4,-6.81)→(-4,-8.7) 300×250mm z=2.4m","params":{"waypoints":[{"x":-1.262,"y":-6.814,"z":2.4},{"x":-4,"y":-6.814,"z":2.4},{"x":-4,"y":-8.7,"z":2.4}],"width":0.3,"height":0.25},"riskLevel":"create-element"},{"action":"CreateDuct","title":"新风支管5 (-1.26,-1.55)→(-1.26,1.3)→(-4,1.3) 300×250mm z=2.4m","params":{"waypoints":[{"x":-1.262,"y":-1.548,"z":2.4},{"x":-1.262,"y":1.3,"z":2.4},{"x":-4,"y":1.3,"z":2.4}],"width":0.3,"height":0.25},"riskLevel":"create-element"},{"action":"CreateDuct","title":"新风支管6 (-1.26,-3.5)→(-4,-3.5)→(-4,-3.2) 300×250mm z=2.4m","params":{"waypoints":[{"x":-1.262,"y":-3.5,"z":2.4},{"x":-4,"y":-3.5,"z":2.4},{"x":-4,"y":-3.2,"z":2.4}],"width":0.3,"height":0.25},"riskLevel":"create-element"},{"action":"CreateDuct","title":"新风支管7 (3.3,-6.81)→(3.3,-9.4) 300×250mm z=2.4m","params":{"waypoints":[{"x":3.3,"y":-6.814,"z":2.4},{"x":3.3,"y":-9.4,"z":2.4}],"width":0.3,"height":0.25},"riskLevel":"create-element"},{"action":"CreateDuct","title":"新风支管8 (5.65,-7.5)→(7.9,-7.5) 300×250mm z=2.4m","params":{"waypoints":[{"x":5.653,"y":-7.5,"z":2.4},{"x":7.9,"y":-7.5,"z":2.4}],"width":0.3,"height":0.25},"riskLevel":"create-element"},{"action":"CreateDuct","title":"新风支管9 (5.65,-4.7)→(7.9,-4.7) 300×250mm z=2.4m","params":{"waypoints":[{"x":5.653,"y":-4.7,"z":2.4},{"x":7.9,"y":-4.7,"z":2.4}],"width":0.3,"height":0.25},"riskLevel":"create-element"},{"action":"CreateDuct","title":"新风干管10 (-1.26,-1.55)→(-1.26,-1.05)→(-0.4,-1.05) 500×300mm z=2.4m","params":{"waypoints":[{"x":-1.262,"y":-1.548,"z":2.4},{"x":-1.262,"y":-1.048,"z":2.4},{"x":-0.4,"y":-1.048,"z":2.4}],"width":0.5,"height":0.3},"riskLevel":"create-element"},{"action":"CreateDuct","title":"新风支管11 (0.3,-6.81)→(0.3,-9.4) 300×250mm z=2.4m","params":{"waypoints":[{"x":0.3,"y":-6.814,"z":2.4},{"x":0.3,"y":-9.4,"z":2.4}],"width":0.3,"height":0.25},"riskLevel":"create-element"},{"action":"CreateCableCarrier","title":"电缆桥架12 (9.06,0.2)→(-1.69,0.2)→(-1.69,-7.23)→(5,-7.23)→(5,-11.12) 200×100mm z=2.1m","params":{"waypoints":[{"x":9.06,"y":0.196854438,"z":2.1},{"x":-1.693238115,"y":0.196854438,"z":2.1},{"x":-1.693238115,"y":-7.225874143,"z":2.1},{"x":5.001537618,"y":-7.225874143,"z":2.1},{"x":5.001537618,"y":-11.12,"z":2.1}],"width":0.2,"height":0.1},"riskLevel":"create-element"}];
+
 // 内置 10+ 场景模板（H5.5 基础集）
 // TPL-001 于 2026-07-06 基于参照文件首层实际19面墙重新生成
 // 数据来源: GetElementsByType(Wall, floorIndex=0) + GetElementGeometry 逐面读取
@@ -29,7 +35,7 @@ const TEMPLATES_FILE = migrateLegacyFile('.task-templates.json');
 const BUILTIN_TEMPLATES = [
   {
     id: 'TPL-001',
-    name: '示例首层房间墙体',
+    name: '示例box创建首层房间墙体',
     category: 'building',
     keywords: { zh: ['示例住宅', '住宅户型', '建住宅', '建房子', '户型', '标准住宅', '小户型', '建一个住宅', '首层墙体', '示例首层'], en: ['sample house', 'residential layout', 'apartment plan', 'build a house', 'ground floor walls'] },
     description: '\u{6309} AC28 \u{6587}\u{4ef6}\u{9996}\u{5c42}\u{5df2}\u{6709}\u{5899}\u{4f53}\u{53c2}\u{6570}\u{521b}\u{5efa}\u{793a}\u{4f8b}\u{9996}\u{5c42}\u{623f}\u{95f4}\u{5899}\u{4f53}\u{ff0c}\u{5305}\u{542b}\u{5916}\u{5899}\u{3001}\u{627f}\u{91cd}\u{5899}\u{548c}\u{5185}\u{9694}\u{5899}\u{7684}\u{5b9e}\u{6d4b}\u{5750}\u{6807}\u{3002}',
@@ -77,10 +83,10 @@ const BUILTIN_TEMPLATES = [
   },
   {
     id: 'TPL-002',
-    name: '示例布置首层风管',
+    name: '示例box创建布置首层风管',
     category: 'mep',
     keywords: { zh: ['首层风管', '布置风管', '示例风管', '空调管', '暖通风管', '新风管', '送风管', '示例布置首层风管'], en: ['duct layout', 'hvac duct', 'ground floor duct', 'air duct', 'fresh air duct', 'supply duct'] },
-    description: '\u{6309} AC28 \u{6587}\u{4ef6}\u{9996}\u{5c42}\u{5df2}\u{6709}\u{6784}\u{4ef6}\u{53c2}\u{6570}\u{521b}\u{5efa}\u{ff1a}2\u{6bb5}10\u{6b65}\u{697c}\u{68af} + 1\u{5757}\u{8fde}\u{63a5}\u{697c}\u{68af}\u{697c}\u{677f}\u{ff0c}\u{540c}\u{56fe}\u{5c42}\u{4f4d}\u{7f6e}\u{3002}\u{697c}\u{68af}\u{9ad8}1.5m\u{3001}\u{5bbd}1.2m\u{ff1b}\u{5e73}\u{53f0}\u{697c}\u{677f}\u{539a}0.24m\u{3001}level=1.5m\u{ff0c}\u{5750}\u{6807}(-0.4,-5.62)\u{5230}(1.1,-2.87)\u{3002}\u{53c2}\u{6570}\u{6765}\u{81ea}\u{5f53}\u{524d}\u{6587}\u{4ef6} mesh/AABB \u{8bfb}\u{53d6}\u{7ed3}\u{679c}\u{3002}',
+    description: '按 AC28 文件首层已有构件参数创建 3 条新风路由（CreateDuct ×3）：贴顶标高 2.4m，矩形 600×300 / 500×300，waypoints 为实测坐标，同图层位置（MEP - 空调系统）。参数来自当前文件 GetElementsByType(MEPRoute) 读取结果。',
     generate: (params = {}) => {
       // 数据来源: AC28 当前文件 GetElementsByType(MEPRoute, includeAabb=true) + GetMEPElementInfo(routeGuid) 2026-07-13
       // 3条新风路由，系统名=新风，domain=Ventilation，floorIndex=0，layerName=MEP - 空调系统
@@ -109,7 +115,7 @@ const BUILTIN_TEMPLATES = [
   },
   {
     id: 'TPL-003',
-    name: '首层双跑楼梯与平台楼板',
+    name: '示例box创建首层双跑楼梯与平台楼板',
     category: 'building',
     keywords: {
       zh: ['示例楼梯', '示例首层楼梯', '创建楼梯', '首层楼梯', '建楼梯', '画楼梯', '示例创建首层楼梯', '楼梯楼板', '楼梯平台', '两段楼梯', '2段楼梯'],
@@ -289,7 +295,7 @@ const BUILTIN_TEMPLATES = [
   },
   {
     id: 'TPL-013',
-    name: '复制楼梯与平台楼板到2/3层',
+    name: '示例box复制楼梯与平台楼板到2/3层',
     category: 'building',
     keywords: {
       zh: ['复制楼梯', '多楼层楼梯', '2层楼梯', '3层楼梯', '复制首层楼梯', '楼梯复制到二层三层', '二层三层楼梯', '复制楼梯到2层3层'],
@@ -352,17 +358,17 @@ const BUILTIN_TEMPLATES = [
   },
   {
     id: 'TPL-014',
-    name: '在第2/3层创建外墙与楼板',
+    name: '示例box在第2/3层创建外墙与楼板',
     category: 'building',
     keywords: {
       zh: ['创建墙楼板到2层3层', '创建首层到2层3层', '创建墙和楼板', '创建首层墙', '创建外围墙到2层3层', '创建外墙到二层三层', '把首层创建到2层3层', '把首层创建到二层三层', '复制墙楼板', '复制首层到2层3层', '复制外围墙到2层3层'],
       en: ['create shell on floors', 'create walls and slab on floors', 'create ground floor on upper floors', 'create shell to floor 2 and 3', 'replicate shell to floors', 'copy walls and slab to floors']
     },
-    description: '在第 2 层与第 3 层各创建 4 面外墙 + 1 块楼板（共 10 步）。墙体参数来自首层实测几何（厚度 0.3m，高度 3m），楼板为 15.55x14.55m 矩形。每步自包含坐标，不依赖 GUID，跨项目可用。',
+    description: '按「该层墙 → 该层楼板」从低到高在第 2/3 层创建 8 面外墙 + 12 块楼板（共 20 步）。外墙厚 0.3m（第 2 层高 3.0m、第 3 层高 4.0m）；楼板厚 0.3m，轮廓取自当前模型实测（二层 4 块、三层 8 块，含三层高位/屋面标高那组 4 块），参考面 level 已按「顶面相对楼层标高」修正（实测 0→0.10、3→3.10）。每步自包含坐标，不依赖 GUID，跨项目可用。',
     generate: (params = {}) => {
       const targetFloors = Array.isArray(params.targetFloors) && params.targetFloors.length > 0 ? params.targetFloors : [1, 2];
 
-      // Measured ground-floor outer wall geometries (from GetElementGeometry)
+      // 外墙（实测参照线；厚度全 0.3m）：方向标签用于标题
       const walls = [
         { id: 'south', label: '南墙', start: { x: -5.99, y: -11.37 }, end: { x: 9.31, y: -11.37 } },
         { id: 'north', label: '北墙', start: { x: -5.99, y: 2.93 }, end: { x: 9.31, y: 2.93 } },
@@ -370,28 +376,41 @@ const BUILTIN_TEMPLATES = [
         { id: 'east', label: '东墙', start: { x: 9.31, y: -11.37 }, end: { x: 9.31, y: 2.93 } }
       ];
       const wallThickness = 0.3;
-      const wallHeight = 3;
-      const slabPolygon = [
-        { x: -6.24, y: -11.37 },
-        { x: 9.31, y: -11.37 },
-        { x: 9.31, y: 3.18 },
-        { x: -6.24, y: 3.18 }
-      ];
       const slabThickness = 0.3;
-      const slabLevel = 0;
+
+      // 楼板平面轮廓：实测 4 块拼成整层（南 / 西 / 东 / 东南补块）
+      // 坐标保留毫米精度：4.594 不可写成 4.59（差 4mm）
+      const SLAB_PLANES = [
+        [{ x: -6.14, y: -11.52 }, { x: 9.46, y: -11.52 }, { x: 9.46, y: -5.72 }, { x: -6.14, y: -5.72 }],
+        [{ x: -6.14, y: -5.72 }, { x: -0.5, y: -5.72 }, { x: -0.5, y: 3.08 }, { x: -6.14, y: 3.08 }],
+        [{ x: -0.5, y: -3.02 }, { x: 9.46, y: -3.02 }, { x: 9.46, y: 3.08 }, { x: -0.5, y: 3.08 }],
+        [{ x: 4.594, y: -5.72 }, { x: 9.46, y: -5.72 }, { x: 9.46, y: -3.02 }, { x: 4.594, y: -3.02 }]
+      ];
+      const planes = (level) => SLAB_PLANES.map((polygon) => ({ level, polygon }));
+
+      // 各层实测数据：第 2 层（floorIndex=1）墙高 3.0m + 楼面标高 4 块；
+      //               第 3 层（floorIndex=2）墙高 4.0m + 楼面标高 4 块 + 屋面/高位标高 4 块
+      // CreateSlab 的 level 落在板顶面，故写「顶面相对楼层标高」（0.10 / 3.10），不是元素里的 0 / 3。
+      const FLOOR_SPEC = {
+        1: { wallHeight: 3, slabs: planes(0.1) },
+        2: { wallHeight: 4, slabs: [...planes(0.1), ...planes(3.1)] }
+      };
+      // 其它楼层（调用方显式指定时）回落到通用规格：墙高 3m + 楼面标高 4 块
+      const fallbackSpec = { wallHeight: 3, slabs: planes(0.1) };
 
       const steps = [];
       for (const floorIndex of targetFloors) {
+        const spec = FLOOR_SPEC[floorIndex] || fallbackSpec;
         const floorLabel = `第 ${floorIndex + 1} 层`;
         for (const w of walls) {
           steps.push({
             action: 'CreateWall',
-            title: `${floorLabel} ${w.label} (${w.start.x},${w.start.y})→(${w.end.x},${w.end.y})`,
+            title: `${floorLabel} ${w.label} (${w.start.x},${w.start.y})→(${w.end.x},${w.end.y}) h=${spec.wallHeight}m`,
             params: {
               start: w.start,
               end: w.end,
               thickness: wallThickness,
-              height: wallHeight,
+              height: spec.wallHeight,
               floorIndex,
               dryRun: false,
               confirmRequired: true
@@ -399,23 +418,25 @@ const BUILTIN_TEMPLATES = [
             riskLevel: 'low-mutation'
           });
         }
-        steps.push({
-          action: 'CreateSlab',
-          title: `${floorLabel} 楼板 level=${slabLevel}m thickness=${slabThickness}m`,
-          params: {
-            polygon: slabPolygon,
-            thickness: slabThickness,
-            level: slabLevel,
-            floorIndex,
-            dryRun: false,
-            confirmRequired: true
-          },
-          riskLevel: 'low-mutation'
+        spec.slabs.forEach((slab, index) => {
+          steps.push({
+            action: 'CreateSlab',
+            title: `${floorLabel} 楼板 ${index + 1}/${spec.slabs.length} 厚${slabThickness}m level=${slab.level}m（参考面=板顶面，相对楼层）`,
+            params: {
+              polygon: slab.polygon,
+              thickness: slabThickness,
+              level: slab.level,
+              floorIndex,
+              dryRun: false,
+              confirmRequired: true
+            },
+            riskLevel: 'low-mutation'
+          });
         });
       }
 
       return {
-        userIntent: `在第 ${targetFloors.map(i => i + 1).join(' 和 ')} 层创建 4 外墙 + 1 楼板（floorIndex=${targetFloors.join(',')}），共 ${steps.length} 步`,
+        userIntent: `在第 ${targetFloors.map(i => i + 1).join(' 和 ')} 层按「墙 → 楼板」从低到高创建外墙与楼板（floorIndex=${targetFloors.join(',')}），共 ${steps.length} 步`,
         steps
       };
     }
@@ -626,12 +647,83 @@ const BUILTIN_TEMPLATES = [
         ]
       };
     }
+  },
+  {
+    id: 'TPL-021',
+    name: '示例创建box结构机电建筑',
+    category: 'building',
+    keywords: {
+      zh: ['示例创建box结构机电建筑', '创建box结构机电建筑', 'box结构机电建筑', '结构机电建筑', '整体示例建筑', 'box整体示例', '创建整体示例'],
+      en: ['sample box structural mep building', 'build complete box sample', 'structural mep building sample', 'box structural mep building']
+    },
+    description: '组合示例：先完成全部主体（柱梁 60：层0→屋面 + 楼梯 9：首层3+2/3层6），再逐层「墙 → 机电 → 楼板」（首层 墙19+机电12；二层 墙4+机电12+楼板4；三层 墙4+机电12+楼板8），共 144 步。二层/三层机电为首层实测管线上移 3.0m/6.0m 重复创建（层高 3.0m），每层机电插在该层楼板之前。各子块为已实测的示例box配方。',
+    generate: (params = {}) => {
+      const byId = (id) => BUILTIN_TEMPLATES.find((t) => t.id === id);
+      const take = (id, genParams) => {
+        const tpl = byId(id);
+        if (!tpl || typeof tpl.generate !== 'function') throw new Error('composite sub-template missing: ' + id);
+        const plan = tpl.generate({ ...(params || {}), ...(genParams || {}) });
+        return Array.isArray(plan.steps) ? plan.steps : [];
+      };
+
+      // 冻结结构柱梁按楼层分组（柱→梁；层0 仅柱 12，层1/2 柱12+梁8，层3 屋面仅梁 8）
+      const structFor = (floorIndex) => BOX_STRUCT_STEPS
+        .filter((s) => s.params.floorIndex === floorIndex)
+        .map((s) => ({ ...s, params: { ...s.params }, commandNamespace: 'MEPBridge', commandName: s.action }));
+
+      // 首层机电（12：风管11 + 桥架1，实测 z）。二层/三层 = 同形复制、标高整体上移
+      // 层高 3.0m（实测：层1顶 3.0 / 层2顶 6.0 / 屋面顶 9.0），waypoints z 为绝对模型坐标。
+      const mepFor = (floorIndex) => {
+        const floorLabel = ['首层', '二层', '三层'][floorIndex];
+        const rise = floorIndex * 3.0;
+        return BOX_MEP_STEPS.map((s) => ({
+          ...s,
+          title: `${floorLabel} ${s.title}`.replace(/z=([\d.]+)m/, (_, z) => `z=${(Number(z) + rise).toFixed(1)}m`),
+          params: {
+            ...s.params,
+            waypoints: s.params.waypoints.map((pt) => ({ ...pt, z: Number((pt.z + rise).toFixed(3)) }))
+          },
+          commandNamespace: 'MEPBridge',
+          commandName: s.action
+        }));
+      };
+
+      const stairSteps = take('TPL-003');     // 首层楼梯 3（含平台楼板，随楼梯块走）
+      const stairCopySteps = take('TPL-013'); // 2/3层楼梯 6
+      const stairCopyFor = (floorIndex) => stairCopySteps.filter((s) => s.params.floorIndex === floorIndex);
+      const wallSteps = take('TPL-001');      // 首层墙体 19
+      const shellSteps = take('TPL-014');     // 2/3层墙+楼板 20
+      const shellFor = (floorIndex, action) => shellSteps
+        .filter((s) => s.params.floorIndex === floorIndex && s.action === action);
+
+      // 主体先行（层0→屋面层）：柱梁 → 楼梯（首层 + 2/3层复制），共 69 步
+      // 再逐层「墙 → 机电 → 楼板」（机电插在每层楼板之前），共 75 步
+      const steps = [
+        // —— 主体柱梁楼梯 ——
+        ...structFor(0),            // 首层柱 12
+        ...stairSteps,              // 首层楼梯 3
+        ...structFor(1),            // 二层柱梁 20
+        ...stairCopyFor(1),         // 二层楼梯 3
+        ...structFor(2),            // 三层柱梁 20
+        ...stairCopyFor(2),         // 三层楼梯 3
+        ...structFor(3),            // 屋面梁 8
+        // —— 逐层：墙 → 机电 → 楼板 ——
+        ...wallSteps, ...mepFor(0),                                       // 首层：墙19 + 机电12
+        ...shellFor(1, 'CreateWall'), ...mepFor(1), ...shellFor(1, 'CreateSlab'), // 二层：墙4 + 机电12 + 楼板4
+        ...shellFor(2, 'CreateWall'), ...mepFor(2), ...shellFor(2, 'CreateSlab')  // 三层：墙4 + 机电12 + 楼板8
+      ];
+      return {
+        userIntent: '示例创建box结构机电建筑（主体柱梁楼梯先行 → 逐层 墙→机电→楼板，共 144 步）',
+        steps
+      };
+    }
   }
+
 ];
 
 const ENGLISH_TEMPLATE_METADATA = {
   'TPL-001': {
-    name: 'Sample ground-floor room walls',
+    name: 'Sample box: ground-floor room walls',
     description: 'Creates sample ground-floor room walls from measured reference coordinates.',
     userIntent: 'Create sample ground-floor room walls from measured reference coordinates',
     stepLabels: [
@@ -657,7 +749,7 @@ const ENGLISH_TEMPLATE_METADATA = {
     ],
   },
   'TPL-002': {
-    name: 'Sample ground-floor ventilation ducts',
+    name: 'Sample box: ground-floor duct layout',
     description: 'Creates three measured fresh-air duct routes on the ground floor.',
     userIntent: 'Lay out three sample ground-floor fresh-air duct routes',
     stepLabels: [
@@ -667,7 +759,7 @@ const ENGLISH_TEMPLATE_METADATA = {
     ],
   },
   'TPL-003': {
-    name: 'Two-flight stair and landing slab',
+    name: 'Sample box: ground-floor stair with landing slab',
     description: 'Creates two stair flights and one connecting landing slab from measured reference geometry.',
     userIntent: 'Create a sample two-flight ground-floor stair with a connecting landing slab',
     stepLabels: [
@@ -731,7 +823,7 @@ const ENGLISH_TEMPLATE_METADATA = {
     stepLabels: ['Rotate selected elements'],
   },
   'TPL-013': {
-    name: 'Replicate stair and landing slab to floors 2 and 3',
+    name: 'Sample box: copy stair and landing to floors 2/3',
     description: 'Copies the two-flight stair and landing slab (TPL-003 parameters) to floor index 1 and 2 (the 2nd and 3rd stories). Same plan position; relative-to-story heights are preserved (landing level=1.5m, lower flight baseLevel=0m, upper flight baseLevel=1.5m).',
     userIntent: 'Replicate the ground-floor stair and landing slab to floors 2 and 3',
     stepLabels: [
@@ -744,20 +836,30 @@ const ENGLISH_TEMPLATE_METADATA = {
     ],
   },
   'TPL-014': {
-    name: 'Create outer walls and slab on floors 2 and 3',
-    description: 'Creates 4 outer walls + 1 slab on each of floors 2 and 3 (10 steps total). Wall parameters come from measured ground-floor geometry (thickness 0.3m, height 3m); slab is a 15.55x14.55m rectangle. Each step is self-contained with coordinates, no GUID dependency, works across projects.',
-    userIntent: 'Create outer walls and slab on floors 2 and 3',
+    name: 'Sample box: exterior walls and slabs on floors 2/3',
+    description: 'Creates 8 outer walls + 12 slabs bottom-up on floors 2 and 3 (20 steps, "walls of the floor, then slabs of the floor"). Wall thickness 0.3m (floor 2 height 3.0m, floor 3 height 4.0m); slab thickness 0.3m with outlines measured from the current model (4 slabs on floor 2, 8 on floor 3 including the 4 high/roof-level ones). Slab reference level is corrected to the top surface relative to the home story (0→0.10, 3→3.10). Each step is self-contained with coordinates, no GUID dependency, works across projects.',
+    userIntent: 'Create outer walls and slabs on floors 2 and 3',
     stepLabels: [
       'Floor 2 south wall',
       'Floor 2 north wall',
       'Floor 2 west wall',
       'Floor 2 east wall',
-      'Floor 2 slab',
+      'Floor 2 slab 1/4',
+      'Floor 2 slab 2/4',
+      'Floor 2 slab 3/4',
+      'Floor 2 slab 4/4',
       'Floor 3 south wall',
       'Floor 3 north wall',
       'Floor 3 west wall',
       'Floor 3 east wall',
-      'Floor 3 slab',
+      'Floor 3 slab 1/8',
+      'Floor 3 slab 2/8',
+      'Floor 3 slab 3/8',
+      'Floor 3 slab 4/8',
+      'Floor 3 slab 5/8 (high)',
+      'Floor 3 slab 6/8 (high)',
+      'Floor 3 slab 7/8 (high)',
+      'Floor 3 slab 8/8 (high)',
     ],
   },
   'TPL-015': {
@@ -795,6 +897,11 @@ const ENGLISH_TEMPLATE_METADATA = {
     description: 'Reads the current selection and project classifications, then previews assigning a classification item.',
     userIntent: 'Read selected elements and classifications, then preview classification assignment',
     stepLabels: ['Read the editable selection', 'Read classification systems and root items', 'Preview classification assignment'],
+  },
+  'TPL-021': {
+    name: 'Sample box: full structural and MEP building',
+    description: 'Composite sample in 144 steps: complete all primary structure first (columns/beams across all stories plus stairs), then per story walls -> MEP routes -> slabs (MEP always before the slabs). Floors 2/3 repeat the measured ground-floor MEP routes shifted up by 3.0m/6.0m.',
+    userIntent: 'Create the complete sample box building (primary structure first, then per story walls, MEP before slabs)',
   }
 };
 
@@ -925,7 +1032,22 @@ class TaskTemplateRegistry {
   tryGenerate(text, context = {}) {
     const tpl = this.match(text);
     if (!tpl) return null;
+    return this._generateFromTemplate(tpl, text, context);
+  }
 
+  /**
+   * 按模板 id 直接生成计划（如「TPL-014」这类编号引用）。
+   * 与 tryGenerate 的区别：不经过关键词匹配 —— 用户明确给出的编号优先于任何文本猜测。
+   */
+  generateById(templateId, text = '', context = {}) {
+    if (!templateId) return null;
+    const wanted = String(templateId).trim().toUpperCase();
+    const tpl = this.templates.find((t) => t && String(t.id).toUpperCase() === wanted);
+    if (!tpl) return null;
+    return this._generateFromTemplate(tpl, text, context);
+  }
+
+  _generateFromTemplate(tpl, text, context = {}) {
     try {
       // 从原文提取参数，再让显式传入的 templateParams 覆盖。
       //
@@ -964,6 +1086,8 @@ class TaskTemplateRegistry {
     const normalizedLocale = normalizeUiLocale(locale);
     return this.templates.map(t => ({
       id: t.id,
+      // 出厂编号（SYS-0NN）：面板「出厂模板」分组展示 + 聊天按编号直达用
+      code: String(t.id || '').toUpperCase().startsWith('TPL-') ? 'SYS-' + String(t.id).slice(4) : null,
       name: normalizedLocale === 'en-US'
         ? (ENGLISH_TEMPLATE_METADATA[t.id]?.name || t.name)
         : t.name,
@@ -971,7 +1095,19 @@ class TaskTemplateRegistry {
       description: normalizedLocale === 'en-US'
         ? (ENGLISH_TEMPLATE_METADATA[t.id]?.description || t.description || '')
         : (t.description || ''),
+      // 需要用户先提供输入项（收藏夹 / 截面 / 选择集等）：面板据此提示"建议用聊天触发"
+      needsInput: this._needsUserInput(t),
     }));
+  }
+
+  /** 模板是否需要额外输入项（只看 generate 返回的 inputRequirements，不调用 LLM） */
+  _needsUserInput(template) {
+    try {
+      const plan = template.generate ? template.generate({}) : null;
+      return Boolean(plan && plan.inputRequirements && Object.keys(plan.inputRequirements).length > 0);
+    } catch (error) {
+      return false;
+    }
   }
 }
 

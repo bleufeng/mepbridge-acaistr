@@ -16,13 +16,49 @@ const READ_ONLY = [
   'API.GetProductInfo',
   'API.GetStoryNavigatorItems',
   'API.GetClassificationsOfElements',
+  'API.GetBuiltInContainerNavigatorItems',
+  'API.GetDetailNavigatorItems',
+  'API.GetDocument3DNavigatorItems',
+  'API.GetElevationNavigatorItems',
+  'API.GetInteriorElevationNavigatorItems',
+  'API.GetLayoutSettings',
+  'API.GetNavigatorItemsType',
+  'API.GetNavigatorItemTree',
+  'API.GetSectionNavigatorItems',
+  'API.GetWorksheetNavigatorItems',
 ];
 
 const PLAN_CHAIN_READS = [
   'API.GetSelectedElements',
   'API.GetAllElements',
   'API.GetElementsByType',
+  'API.GetBuiltInContainerNavigatorItems',
+  'API.GetDetailNavigatorItems',
+  'API.GetDocument3DNavigatorItems',
+  'API.GetElevationNavigatorItems',
+  'API.GetInteriorElevationNavigatorItems',
+  'API.GetLayoutSettings',
+  'API.GetNavigatorItemsType',
+  'API.GetNavigatorItemTree',
+  'API.GetSectionNavigatorItems',
+  'API.GetWorksheetNavigatorItems',
 ];
+
+// Added in the 2026-09-14 offline scope expansion. These official JSON names
+// are whitelisted at code level, but they still require AC28 / AC29 runtime
+// probes before they may be treated as confirmed scope.
+const PENDING_RUNTIME_READS = new Set([
+  'API.GetBuiltInContainerNavigatorItems',
+  'API.GetDetailNavigatorItems',
+  'API.GetDocument3DNavigatorItems',
+  'API.GetElevationNavigatorItems',
+  'API.GetInteriorElevationNavigatorItems',
+  'API.GetLayoutSettings',
+  'API.GetNavigatorItemsType',
+  'API.GetNavigatorItemTree',
+  'API.GetSectionNavigatorItems',
+  'API.GetWorksheetNavigatorItems',
+]);
 
 // These are design candidates only. Keeping them in the source makes their
 // fail-closed status visible without accidentally putting them in a whitelist.
@@ -69,7 +105,9 @@ for (const command of READ_ONLY) {
     mutation: false,
     requiresAuthorization: false,
     supportsPreview: false,
-    status: 'implemented-scope',
+    status: PENDING_RUNTIME_READS.has(command)
+      ? 'implemented-scope-pending-runtime'
+      : 'implemented-scope',
     readbackCommand: null,
   });
 }
