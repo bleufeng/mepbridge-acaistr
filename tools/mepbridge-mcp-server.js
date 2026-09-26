@@ -182,6 +182,21 @@ function extractorSpecToJsonSchema(key, spec = {}, defaultValue) {
       return pointSchema(3, description, 'coordinate/value');
     case 'delta3d':
       return pointSchema(3, description, 'offset in millimeters');
+    case 'delta3dMeters':
+      // MoveBuildingElements uses vector.{dx,dy,dz} in METERS (native APIEdit_Drag),
+      // unlike the mm/{x,y,z} deltaMm used by MEP move/copy/multiply. Keep it a
+      // distinct type so the mm-based delta3d schema is not disturbed.
+      return {
+        type: 'object',
+        description,
+        properties: {
+          dx: { type: 'number', description: 'X translation delta in meters' },
+          dy: { type: 'number', description: 'Y translation delta in meters' },
+          dz: { type: 'number', description: 'Z translation delta in meters (optional)' },
+        },
+        required: ['dx', 'dy'],
+        additionalProperties: false,
+      };
     case 'point2dList':
       return arraySchema(
         pointSchema(2, '2D point', 'coordinate in meters'),
@@ -289,6 +304,16 @@ function descriptorToMcpTool(desc) {
 function normalizeToolArguments(desc, args, cmdParams) {
   const normalizedArgs = { ...(args || {}) };
   const commandName = desc.commandName;
+
+  if (commandName === 'ChangeStorySettings') {
+    const hasElevation = normalizedArgs.elevation !== undefined && normalizedArgs.elevation !== null;
+    const hasHeight = normalizedArgs.height !== undefined && normalizedArgs.height !== null;
+
+    // The descriptor commandJson is also used as a human-readable example. Do not
+    // let an example value become an implicit argument for this exclusive pair.
+    if (!hasElevation) delete cmdParams.elevation;
+    if (!hasHeight) delete cmdParams.height;
+  }
 
   if (commandName === 'MoveElements') {
     if (typeof normalizedArgs.routeGuid === 'string' && normalizedArgs.routeGuid.trim()) {

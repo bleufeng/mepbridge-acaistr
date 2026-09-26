@@ -17,6 +17,7 @@ const {
   getCommandSafetyCapabilities,
   normalizeCommandSafetyParameters
 } = require('../services/command-capabilities');
+const userTemplateCodes = require('../services/user-template-codes');
 
 // 用户数据统一存放到 user-data/ 目录（便于用户查找、备份、迁移）
 const USER_DATA_DIR = migrateLegacyDirectory('user-data', 'user-data');
@@ -58,6 +59,28 @@ function createStarterAssets(locale, metadata = {}) {
   });
 }
 
+// 内置示例模板/命令与用户存储里的同 id 条目：以 updatedAt 较新的一方为准。
+//
+// 2026-09-18 实测缺陷：原实现无条件用 starter 覆盖同 id 条目，导致用户对内置模板的修改
+// 永远不可见 —— 更新了「在第 2/3 层创建外墙与楼板」的楼板与墙高后，/api/user-assets/load
+// 仍返回发布包旧版本（10 步），前端回放自然也一直是旧数据。
+// 现在的规则：① 发布包更新（starter 更新）仍能下发给已有用户；② 用户改过的（updatedAt 更新）
+// 优先，用户资产不会被静默回滚。
+function assetTimestamp(asset) {
+  const parsed = Date.parse(asset && typeof asset.updatedAt === 'string' ? asset.updatedAt : '');
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function pickNewerAsset(stored, starterVersion) {
+  if (!starterVersion) {
+    return stored;
+  }
+  if (!stored) {
+    return starterVersion;
+  }
+  return assetTimestamp(stored) > assetTimestamp(starterVersion) ? stored : starterVersion;
+}
+
 function localizeStarterAssets(assets, locale) {
   const starter = loadStarterAssets(locale);
   if (!starter) {
@@ -75,16 +98,99 @@ function localizeStarterAssets(assets, locale) {
     ...assets,
     notes: starter.notes || assets.notes,
     templates: (assets.templates || []).map((template) =>
-      localizedTemplates.get(template.id) || template
+      pickNewerAsset(template, localizedTemplates.get(template.id))
     ),
     commands: (assets.commands || []).map((command) =>
-      localizedCommands.get(command.id) || command
+      pickNewerAsset(command, localizedCommands.get(command.id))
     ),
   });
 }
 
 function visibleTemplates(templates) {
   return (templates || []).filter((template) => template.geometryTemplate === undefined);
+}
+
+// 内置任务模板的 id 也是 TPL-0NN，但用户模板编号**不再避开内置区间**（维护者 2026-09-18 裁定）：
+// 用户模板从 TPL-001 起按列表顺序连续编号；编号直达时用户模板优先，未命中才回落到内置模板 id。
+function reservedTemplateCodes() {
+  return [];
+}
+
+/**
+ * "面板模板"判定：可见（非 geometryTemplate）**且**不被出厂模板替代。
+ * 被出厂模板替代的（见 user-template-codes#SUPERSEDED_BY_BUILTIN）数据仍保留在
+ * assets.json 里（可导出/可回退），但不再进面板、也不占编号 —— 避免与 SYS-0NN 重复。
+ */
+function isPanelTemplate(template) {
+  return Boolean(template)
+    && template.geometryTemplate === undefined
+    && !userTemplateCodes.builtinCodeForTemplateId(template.id);
+}
+
+function panelTemplates(templates) {
+  return (templates || []).filter(isPanelTemplate);
+}
+
+/**
+ * 用户模板编号 = 列表序号：就地重排为 TPL-001、TPL-002 …（返回变更个数）。
+ * 只对**面板模板**编号（隐藏项与被替代项不占号），全量连续 ⇒ 天然不重复；
+ * 新增模板落到末尾，删除后自动补齐。
+ */
+function ensureTemplateCodes(assets) {
+  if (!assets || !Array.isArray(assets.templates)) return 0;
+  return userTemplateCodes.renumberTemplateCodes(panelTemplates(assets.templates));
+}
+
+/**
+ * 非面板模板（geometryTemplate / 已被出厂模板替代）不参与编号：清掉其 code，
+ * 避免"面板看不到的行"与可见行出现同号（编号只在面板列表内连续）。
+ */
+function clearHiddenTemplateCodes(assets) {
+  let cleared = 0;
+  for (const tpl of (assets && assets.templates) || []) {
+    if (tpl && tpl.code && !isPanelTemplate(tpl)) {
+      delete tpl.code;
+      cleared += 1;
+    }
+  }
+  return cleared;
+}
+
+/**
+ * 面板展示 /「按编号复现」共用的模板列表：
+ * 存储资产（user-data）+ 发布包 starter 合并 → 本地化 → 保证每个模板都有稳定编号。
+ */
+/**
+ * 把存储侧已分配的编号按 id 回填到合并结果。
+ * 发布包 starter 版本不带 code 字段；若不回填，兜底分配会跳过已占用编号，
+ * 把同一个模板编成与存储侧不同的号（面板显示与实际不一致）。
+ */
+function applyStoredTemplateCodes(mergedTemplates, storedTemplates) {
+  const codeById = new Map((storedTemplates || []).map((tpl) => [tpl.id, tpl.code]));
+  for (const tpl of mergedTemplates || []) {
+    if (tpl && !tpl.code && codeById.has(tpl.id)) {
+      tpl.code = codeById.get(tpl.id);
+    }
+  }
+}
+
+function loadVisibleTemplates(locale = 'zh-CN') {
+  const storedAssets = loadAssets();
+  // 重复项（同 id 多条）只保留最新，避免同一模板占两个编号（展示层兜底，不删数据）
+  const deduped = userTemplateCodes.dedupeTemplates(panelTemplates(storedAssets.templates));
+  if (deduped.removed.length > 0) {
+    console.warn(`[UserAssets] Ignored ${deduped.removed.length} duplicate template(s) while listing; kept the newest per id`);
+  }
+  const storedVisible = { ...storedAssets, templates: deduped.templates };
+  const hiddenCleared = clearHiddenTemplateCodes(storedAssets);
+  if (ensureTemplateCodes(storedVisible) > 0 || hiddenCleared > 0) {
+    // 编号 = 列表序号：重排后落盘，保证下次读取一致（旧资产无 code 时也在此补齐）
+    saveAssets(storedAssets);
+  }
+  const merged = localizeStarterAssets(storedVisible, locale);
+  applyStoredTemplateCodes(merged.templates, storedVisible.templates);
+  ensureTemplateCodes(merged); // 发布包独有的模板再兜底编号
+  return localizeTemplateDisplayNames(merged, locale).templates || [];
 }
 
 // 用户采集模板可携带可选 nameEn（英文 UI 显示名）。en-US 下用 nameEn 替换展示名；
@@ -162,9 +268,45 @@ function normalizeUserTemplateSafety(template) {
     ...template,
     plan: {
       ...template.plan,
-      steps: template.plan.steps.map(normalizeUserStepSafety)
+      steps: template.plan.steps.map(normalizeUserStepSafety),
+      // 回放后步骤（postReplaySteps）同样是回放体会真实执行的命令，
+      // 必须走同一套安全归一化（mutation 步骤不得沿用 Add-On 的 dryRun=true 默认值）。
+      ...(Array.isArray(template.plan.postReplaySteps)
+        ? { postReplaySteps: template.plan.postReplaySteps.map(normalizeUserStepSafety) }
+        : {})
     }
   };
+}
+
+/**
+ * E.7: 校验 plan 里所有会被回放执行的步骤 action 都命中白名单。
+ * 覆盖 plan.steps（普通步骤）与 plan.postReplaySteps（回放后收尾步骤）——
+ * 后者同样会把命令发给 Archicad，不能绕过 SYNC-3 白名单。
+ */
+function validatePlanActionWhitelist(plan) {
+  if (!plan || typeof plan !== 'object') {
+    return { valid: true };
+  }
+
+  const groups = [
+    { key: 'steps', label: 'Step' },
+    { key: 'postReplaySteps', label: 'PostReplayStep' }
+  ];
+
+  for (const { key, label } of groups) {
+    const list = plan[key];
+    if (!Array.isArray(list)) continue;
+    for (let i = 0; i < list.length; i++) {
+      const step = list[i];
+      if (!step || !step.action) continue;
+      const check = validateActionWhitelist(step.action);
+      if (!check.valid) {
+        return { valid: false, error: `${label} ${i + 1} action validation failed: ${check.error}` };
+      }
+    }
+  }
+
+  return { valid: true };
 }
 
 function normalizeUserCommandSafety(command) {
@@ -325,7 +467,17 @@ function loadAssets() {
 
 // 保存资产文件
 function saveAssets(data) {
-  fs.writeFileSync(ASSETS_FILE, JSON.stringify(normalizeUserAssetsSafety(data), null, 2));
+  const normalized = normalizeUserAssetsSafety(data);
+  // 重复项（同 id）只保留最新：编号 = 列表序号，一条模板只能占一个编号
+  const deduped = userTemplateCodes.dedupeTemplates(normalized.templates);
+  if (deduped.removed.length > 0) {
+    console.warn(`[UserAssets] Dropped ${deduped.removed.length} duplicate template(s) on save; kept the newest per id`);
+    normalized.templates = deduped.templates;
+  }
+  // 隐藏模板（geometryTemplate）不参与编号，先清掉再对可见模板重排 TPL-001、TPL-002 …
+  clearHiddenTemplateCodes(normalized);
+  ensureTemplateCodes(normalized);
+  fs.writeFileSync(ASSETS_FILE, JSON.stringify(normalized, null, 2));
 }
 
 function writeAssetsBackup(assets, reason = 'manual') {
@@ -361,12 +513,19 @@ router.get('/load', (req, res) => {
     }
     const storedVisibleAssets = {
       ...storedAssets,
-      templates: visibleTemplates(storedAssets.templates)
+      templates: panelTemplates(storedAssets.templates)
     };
+    const hiddenCodesCleared = clearHiddenTemplateCodes(storedAssets);
+    if (ensureTemplateCodes(storedVisibleAssets) > 0 || hiddenCodesCleared > 0) {
+      // 编号 = 列表序号（TPL-001…）：重排后落盘，保证下次读取一致
+      saveAssets(storedAssets);
+    }
     const assets = localizeTemplateDisplayNames(
       localizeStarterAssets(storedVisibleAssets, locale),
       locale
     );
+    applyStoredTemplateCodes(assets.templates, storedVisibleAssets.templates);
+    ensureTemplateCodes(assets);
     const tier = getCurrentTier();
     res.json({
       success: true,
@@ -426,20 +585,13 @@ router.post('/templates', (req, res) => {
       });
     }
 
-    // E.7 安全白名单校验：模板 plan.steps 中所有 step.action 必须命中白名单
-    if (template.plan && Array.isArray(template.plan.steps)) {
-      for (let i = 0; i < template.plan.steps.length; i++) {
-        const step = template.plan.steps[i];
-        if (step.action) {
-          const check = validateActionWhitelist(step.action);
-          if (!check.valid) {
-            return res.status(400).json({
-              success: false,
-              error: `Step ${i + 1} action validation failed: ${check.error}`
-            });
-          }
-        }
-      }
+    // E.7 安全白名单校验：plan.steps 与 plan.postReplaySteps 中所有 step.action 必须命中白名单
+    const planActionCheck = validatePlanActionWhitelist(template.plan);
+    if (!planActionCheck.valid) {
+      return res.status(400).json({
+        success: false,
+        error: planActionCheck.error
+      });
     }
 
     if (template.riskLevel && !['read', 'low-mutation'].includes(template.riskLevel)) {
@@ -621,21 +773,11 @@ router.post('/import', (req, res) => {
         if (exists) {
           templatesSkipped++;
         } else {
-          // E.7: 校验导入的模板 steps.action
-          let valid = true;
-          if (template.plan && Array.isArray(template.plan.steps)) {
-            for (const step of template.plan.steps) {
-              if (step.action) {
-                const check = validateActionWhitelist(step.action);
-                if (!check.valid) {
-                  templatesSkipped++;
-                  valid = false;
-                  break;
-                }
-              }
-            }
-          }
-          if (valid) {
+          // E.7: 校验导入的模板 steps.action 与 postReplaySteps.action
+          const valid = validatePlanActionWhitelist(template.plan).valid;
+          if (!valid) {
+            templatesSkipped++;
+          } else {
             assets.templates.push(normalizeUserTemplateSafety(template));
             templatesAdded++;
           }
@@ -791,6 +933,16 @@ router.get('/backups', (req, res) => {
 });
 
 module.exports = router;
+// 用户模板编号能力（面板展示 +「按编号复现」）：
+//   loadVisibleTemplates(locale)  → 合并后的模板列表（带 code）
+//   其余纯函数直接转发自 services/user-template-codes.js
+module.exports.templateCodes = {
+  loadVisibleTemplates,
+  ensureTemplateCodes,
+  reservedTemplateCodes,
+  ...userTemplateCodes
+};
+
 module.exports._test = {
   getStarterAssetsFile,
   localizeStarterAssets,
@@ -798,4 +950,6 @@ module.exports._test = {
   normalizeUserCommandSafety,
   normalizeUserTemplateSafety,
   normalizeUiLocale,
+  assetTimestamp,
+  pickNewerAsset,
 };

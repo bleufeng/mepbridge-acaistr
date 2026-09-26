@@ -46,7 +46,13 @@ const CLEANUP_DELETE_CHUNK = 200;
 const REPLAY_STRATEGIES = {
   Wall: {
     createCommand: 'CreateWall',
-    mapGeometry: (g) => ({ start: pickPoint(g.start), end: pickPoint(g.end), thickness: g.thickness, height: g.height })
+    mapGeometry: (g) => {
+      const params = { start: pickPoint(g.start), end: pickPoint(g.end), thickness: g.thickness, height: g.height };
+      // V16-REPLAY-TRUTH-01: 复现墙的 bottomOffset（基线相对楼层的偏移）。GetElementGeometry
+      // 读侧已返回 bottomOffset；仅在有限数值时传，旧快照缺该字段则保持 CreateWall 默认行为。
+      if (typeof g.bottomOffset === 'number' && Number.isFinite (g.bottomOffset)) params.bottomOffset = g.bottomOffset;
+      return params;
+    }
   },
   Column: {
     createCommand: 'CreateColumn',
@@ -73,13 +79,20 @@ const REPLAY_STRATEGIES = {
   },
   Roof: {
     createCommand: 'CreateRoof',
-    // 平面屋顶近似：GetElementGeometry 不回读 pitch，重建为轮廓 baseLevel 处的 PlaneRoof
-    mapGeometry: (g) => ({
-      vertices: normalizePolygon(g.polygon),
-      thickness: g.thickness,
-      baseLevel: g.baseLevel,
-      pitchAngle: 0
-    })
+    mapGeometry: (g) => {
+      const params = {
+        vertices: normalizePolygon(g.polygon),
+        thickness: g.thickness,
+        baseLevel: g.baseLevel
+      };
+      if (typeof g.pitchAngle === 'number') params.pitchAngle = g.pitchAngle;
+      if (g.baseLine && g.baseLine.start && g.baseLine.end) {
+        params.baseLineStart = pickPoint(g.baseLine.start);
+        params.baseLineEnd = pickPoint(g.baseLine.end);
+      }
+      if (typeof g.posSign === 'boolean') params.posSign = g.posSign;
+      return params;
+    }
   },
   Mesh: {
     createCommand: 'CreateMesh',
@@ -1063,6 +1076,22 @@ function createSnapshotReplayService (deps = {}) {
             actual: { vertexCount: Array.isArray(act) ? act.length : null }
           });
         }
+      }
+    }
+
+    if (type === 'Roof') {
+      if (requested.pitchAngle !== undefined
+        && (actual.pitchAngle === undefined || !numbersClose(requested.pitchAngle, actual.pitchAngle))) {
+        mismatches.push({ field: 'pitchAngle', requested: requested.pitchAngle, actual: actual.pitchAngle });
+      }
+      if (requested.baseLine && (
+        !pointsClose(requested.baseLine.start, actual.baseLine && actual.baseLine.start)
+        || !pointsClose(requested.baseLine.end, actual.baseLine && actual.baseLine.end)
+      )) {
+        mismatches.push({ field: 'baseLine', requested: requested.baseLine, actual: actual.baseLine });
+      }
+      if (requested.posSign !== undefined && requested.posSign !== actual.posSign) {
+        mismatches.push({ field: 'posSign', requested: requested.posSign, actual: actual.posSign });
       }
     }
 
