@@ -206,7 +206,20 @@ function main() {
   }
 
   const englishList = taskTemplates.list('en-US');
-  assert.strictEqual(englishList.length, 20);
+  const chineseList = taskTemplates.list('zh-CN');
+  // Locale parity is the real invariant here; the numeric floor keeps a template
+  // from being dropped from the catalog unnoticed. The exact count is
+  // deliberately not pinned: it drifted stale when TPL-021 (SYS-021) was added
+  // and blocked this test before it could run the localisation scan.
+  assert.strictEqual(
+    englishList.length,
+    chineseList.length,
+    'English and Chinese built-in template catalogs must have the same size'
+  );
+  assert.ok(
+    englishList.length >= 21,
+    `Expected at least 21 built-in templates, found ${englishList.length}`
+  );
   assertNoCjk('English task template catalog', englishList);
 
   const chinesePlan = taskTemplates.tryGenerate('创建楼板', { locale: 'zh-CN' });
