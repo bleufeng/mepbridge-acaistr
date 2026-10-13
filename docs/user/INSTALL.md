@@ -1,4 +1,4 @@
-# MEPbridge ACAIstr v0.1.6 Installation
+# MEPbridge ACAIstr v0.1.7 Installation
 
 This guide applies to the Windows release packages for Archicad 28 and Archicad 29.
 
@@ -271,6 +271,21 @@ backslashes inside JSON must be escaped as `\\`.
 | Claude Desktop | Merge the JSON into `%APPDATA%\Claude\claude_desktop_config.json`, then restart Claude Desktop |
 | CodeBuddy | Write the JSON into the project `.codebuddy\.mcp.json` or the user-level `~\.codebuddy\.mcp.json`, then restart the IDE |
 | Codex CLI | Append to `%USERPROFILE%\.codex\config.toml` (TOML format): `[mcp_servers.mepbridge]`, `command = "node"`, `args = ["<extraction-dir>/tools/mepbridge-mcp-server.js"]`, `env = { MEPBRIDGE_ENDPOINT = "http://127.0.0.1:19780" }` |
+| Antigravity CLI (formerly Gemini CLI) | Merge the JSON into the top-level `mcpServers` object of `%USERPROFILE%\.gemini\settings.json`, then start a new session |
+| Google Antigravity | Write the JSON into `%USERPROFILE%\.gemini\config\mcp_config.json`, then restart Antigravity |
+
+> **Antigravity CLI and Google Antigravity both live under `~/.gemini/`, but they read different files.**
+> Antigravity CLI (`agy`) reads `~/.gemini/settings.json`; Google Antigravity reads
+> `~/.gemini/config/mcp_config.json`. Writing to the wrong one has no effect.
+
+### Check the connection status in the UI
+
+The left sidebar of the workbench shows an **MCP Integrations** section that lists every
+configured host, refreshed every 10 seconds. It distinguishes two states:
+
+- **Connected** — the host completed the MCP `initialize` handshake, so the tools are live.
+- **Configured** — the configuration file contains MEPBridge and the host process is running.
+  This does *not* prove the connection works; restart the host if the tools do not appear.
 
 ### Other MCP hosts (not listed above)
 

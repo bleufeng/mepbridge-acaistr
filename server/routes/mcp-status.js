@@ -53,13 +53,71 @@ function isHostRunning(processText, matchers = []) {
   return matchers.some((matcher) => processText.includes(String(matcher).toLowerCase()));
 }
 
+// Node 系宿主（Gemini CLI / Claude Code / Codex ...）都跑在 node.exe 上，进程名无法区分。
+// tasklist 只输出进程名、不含命令行，因此改用 CIM 读取完整命令行做精确匹配。
+// 惰性求值 + 结果缓存：/api/mcp/status 有 10s 轮询，不能每次都拉全量命令行。
+let _nodeCommandLineCache = { at: 0, text: '' };
+const NODE_CMDLINE_TTL_MS = 5000;
+
+function getNodeCommandLineText(platform = process.platform) {
+  const now = Date.now();
+  if (now - _nodeCommandLineCache.at < NODE_CMDLINE_TTL_MS) {
+    return _nodeCommandLineCache.text;
+  }
+
+  let text = '';
+  try {
+    if (platform === 'win32') {
+      // 过滤到 node/gemini 进程，避免拉全量命令行（性能：见 REVIEW_20260822 审计记录）
+      const raw = execFileSync(
+        'powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-Command',
+          "Get-CimInstance Win32_Process -Filter \"Name='node.exe' OR Name='gemini.exe'\" " +
+          '| Select-Object -ExpandProperty CommandLine'],
+        { encoding: 'utf8', timeout: 5000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }
+      );
+      text = String(raw || '').toLowerCase();
+    } else {
+      text = execFileSync('ps', ['-axo', 'comm,args'], {
+        encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'],
+      }).toLowerCase();
+    }
+  } catch (_) {
+    text = '';
+  }
+
+  _nodeCommandLineCache = { at: now, text };
+  return text;
+}
+
+// 命令行精确匹配：要求同时命中宿主标记，且不落在其他宿主的命令行里。
+// 用于区分共享 node.exe 的多个宿主，避免「A 装了 MCP 就把 B 也标成 running」。
+function isNodeHostRunning(commandLineText, { require = [], deny = [] } = {}) {
+  if (!commandLineText) return false;
+  // 空 require 视为「无判据」直接判否：与 isHostRunning 的空 matcher 行为保持一致，
+  // 否则 [].every() === true 会让任何进程都被误判为该宿主在运行。
+  if (!require.length) return false;
+  const hasAllRequire = require.every((token) => commandLineText.includes(String(token).toLowerCase()));
+  if (!hasAllRequire) return false;
+  return !deny.some((token) => commandLineText.includes(String(token).toLowerCase()));
+}
+
+// 测试用：清空命令行缓存，避免用例之间互相污染
+function _resetNodeCommandLineCache() {
+  _nodeCommandLineCache = { at: 0, text: '' };
+}
+
 // 配置探测：配置文件里有 mepbridge + 宿主进程在跑。
 // 注意这**不能**证明 MCP 已连接（宿主可能启动失败、或扩展未加载），因此只标记为
 // configured/running，connected 交给握手注册表判定。
-function detectConfig(name, configPaths, processText, processMatchers, marker = 'mepbridge') {
+function detectConfig(name, configPaths, processText, processMatchers, marker = 'mepbridge', options = {}) {
   const paths = Array.isArray(configPaths) ? configPaths : [configPaths];
   const configuredPath = paths.find((p) => safeExists(p) && fileContains(p, marker));
-  const running = isHostRunning(processText, processMatchers);
+  // Node 系宿主需要按命令行判定（共享 node.exe，进程名无法区分），
+  // 通过 options.isRunning 覆盖默认的进程名匹配。
+  const running = typeof options.isRunning === 'function'
+    ? Boolean(options.isRunning())
+    : isHostRunning(processText, processMatchers);
   if (!configuredPath || !running) return null;
   return {
     name,
@@ -193,10 +251,56 @@ router.get('/status', (req, res) => {
         path.join(home, 'AppData', 'Local', 'Doubao', 'User Data', 'Default', 'Preferences')
       ],
       processMatchers: ['doubao.exe']
+    },
+    {
+      // Antigravity（Google）：独立 Electron 桌面 IDE，进程名 Antigravity.exe 可直接匹配。
+      //
+      // MCP 配置用 mcp_config.json 格式，位置基准由 Antigravity 自带的文档字符串确认：
+      //   - 全局：~/.gemini/config/mcp_config.json（对所有 session 生效）
+      //   - 插件：plugins/<plugin_name>/mcp_config.json（插件启用时生效）
+      //
+      // 注意探测路径以 home 为基准而非安装目录：配置文件属于用户机器，
+      // 无论 MEPBridge 解压到哪里都不会影响探测，因此第三方用户升级后即可自动识别。
+      // 连接判定仍以 initialize 握手自报为准（自报名 antigravity-client，由别名映射为 Antigravity）。
+      name: 'Antigravity',
+      configPaths: [
+        path.join(home, '.gemini', 'config', 'mcp_config.json'),
+        path.join(ROOT, '.agents', 'plugins', 'mepbridge', 'mcp_config.json')
+      ],
+      processMatchers: ['antigravity.exe']
+    },
+    {
+      // Gemini CLI（Google，npm 全局包，@google/gemini-cli）。
+      //
+      // 与 Antigravity 共用 ~/.gemini/ 根目录，但配置文件不同（实测 bundle 源码）：
+      //   Gemini CLI   → ~/.gemini/settings.json（顶层 mcpServers），bundle 中无 mcp_config.json 命中
+      //   Antigravity  → ~/.gemini/config/mcp_config.json
+      // 两者配置路径互不重叠，因此不会互相误判。
+      //
+      // 进程匹配用严格策略：Gemini CLI 跑在 node.exe 上，直接匹配 node.exe 会把
+      // Claude Code / Codex 等所有 Node 宿主一并算成 running。这里改为读命令行，
+      // 要求命中 gemini 脚本标记，并排除其他已知 Node 宿主的标志。
+      // 握手自报名 gemini-cli，由注册表别名映射为 Gemini CLI。
+      name: 'Gemini CLI',
+      configPaths: [
+        path.join(home, '.gemini', 'settings.json')
+      ],
+      processMatchers: ['gemini'],
+      nodeHostMatch: {
+        require: ['gemini'],
+        // 排除同在 node.exe 上的其他宿主，避免交叉误判
+        deny: ['claude', 'codex', 'mcpbridge-mcp-server', 'antigravity']
+      }
     }
   ];
   const probed = candidates
-    .map(({ name, configPaths, processMatchers, marker }) => detectConfig(name, configPaths, processText, processMatchers, marker || 'mepbridge'))
+    .map(({ name, configPaths, processMatchers, marker, nodeHostMatch }) => {
+      // Node 系宿主走命令行精确匹配，其余沿用进程名匹配
+      const options = nodeHostMatch
+        ? { isRunning: () => isNodeHostRunning(getNodeCommandLineText(), nodeHostMatch) }
+        : undefined;
+      return detectConfig(name, configPaths, processText, processMatchers, marker || 'mepbridge', options);
+    })
     .filter(Boolean);
 
   const clients = clientRegistry.list();
@@ -221,4 +325,7 @@ module.exports._test = {
   isHostRunning,
   mergeClientsAndPlatforms,
   clientRegistry,
+  isNodeHostRunning,
+  getNodeCommandLineText,
+  _resetNodeCommandLineCache,
 };

@@ -8,7 +8,7 @@ review, and test the C2 Workbench layer:
 - React Workbench source
 - Node.js Server source
 - MCP Server
-- 88 Add-On-backed tool descriptors matching the `v0.1.5` released APX boundary
+- 89 Add-On-backed tool descriptors matching the exported APX boundary
 - 4 server-side tools that run in the Node.js Server and never require an APX rebuild
 - reviewed module registry, schema, modules, and module tests
 - the narrowly scoped public command-safety regression test at `tests/test-command-capabilities.js`
@@ -32,12 +32,12 @@ The public repository is not a reproducible APX build source.
 ## Capability Boundary
 
 The public repository declares the same command boundary as the reviewed
-`v0.1.5` release binaries:
+`v0.1.7` release binaries:
 
 - 89 registered C++ commands
-- 88 Add-On descriptors
+- 89 Add-On descriptors
 - 4 server tools
-- 92 descriptor entries in total
+- 93 descriptor entries in total
 
 Development commands that exist in the engineering source but are not part of
 the reviewed binary release are filtered out during the public export. The

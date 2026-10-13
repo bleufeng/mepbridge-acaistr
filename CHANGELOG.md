@@ -2,6 +2,28 @@
 
 Public user-facing changes. Versions follow Semantic Versioning.
 
+## [Unreleased]
+
+## [0.1.7] - 2026-10-09
+
+### Added
+
+- `CreateBeam` descriptor explicitly exposes the `topOffset` parameter for precise beam level and offset control under slabs and slopes.
+- The workbench left sidebar now reports **Google Antigravity** and **Antigravity CLI** (compatible with Gemini CLI) in the "MCP Integrations" list, alongside CodeBuddy, WorkBuddy, Codex, Cursor, Claude Code, Claude Desktop and Doubao. Both are detected automatically once their MCP configuration is present, with no version-specific setup.
+- Installation guides document where Google Antigravity (`~/.gemini/config/mcp_config.json`) and Antigravity CLI (`~/.gemini/settings.json`) keep their MCP configuration, and explain that the two share the `~/.gemini/` folder but read different files.
+
+### Fixed
+
+- `CreateObject` absoluteZ resolution now sets the floor index guard properly; element GUID, element type, library part index, and verified home story level are validated within the creation transaction, guaranteeing readback consistency.
+- `CreateBeam` identity, home story, and topOffset gates are unified into the creation and properties transaction with strict 1 mm tolerance; readback mismatches trigger `BEAM_READBACK_FAILED`, `BEAM_FLOOR_INDEX_MISMATCH`, or `BEAM_TOP_OFFSET_MISMATCH` with atomic rollback.
+- Stair geometry and assembly (`CreateStair`): tread depth is calibrated to effective treads to eliminate false rule conflicts, "starts with riser, ends with riser" is explicitly supported for symmetric switchback stairs, and baseline limits are removed to support multi-segment polyline and arc paths.
+- `CreateLamp` coordinates and rotation angle undergo finite sanity checks and in-transaction geometry readback; normalized angles and coordinates are validated within 1 mm / 0.001 rad tolerances, rolling back on deviations.
+- `GetElementProperties` gracefully handles partial property failures (such as inaccessible internal parameters) with an individual-fallback degraded read mode: readable properties are returned alongside detailed errors and `PROPERTY_VALUES_INCOMPLETE`, rather than failing the entire batch.
+- `MirrorSelectedElements` resolves GUID-mode MCP accessibility and enforces identity-only mutation gates.
+- `EnsurePropertyDefinitions` internal mutation command is isolated and prevented from leaking into external MCP tools.
+- Google Antigravity and Antigravity CLI are identified by their MCP handshake identity rather than raw internal names, so the panel shows clean display names instead of `antigravity-client` / `gemini-cli`, and each host appears on a single row.
+- Node-based hosts are now matched by command line instead of process name. Previously a shared `node.exe` signature would mark every Node-based host (Claude Code, Codex, ...) as running at once.
+
 ## [0.1.6] - 2026-09-25
 
 ### Added

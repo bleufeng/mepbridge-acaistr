@@ -47,13 +47,15 @@ const PLAN_CHAIN_READS = [
 // Added in the 2026-09-14 offline scope expansion. These official JSON names
 // are whitelisted at code level, but they still require AC28 / AC29 runtime
 // probes before they may be treated as confirmed scope.
+// GetLayoutSettings was individually closed on 2026-10-08: AC28/AC29 40/40 checks
+// (outputs/ws4-getlayoutsettings-runtime-20261008-dual-1791432858141.json).
+// This does not promote the remaining Navigator family as a group.
 const PENDING_RUNTIME_READS = new Set([
   'API.GetBuiltInContainerNavigatorItems',
   'API.GetDetailNavigatorItems',
   'API.GetDocument3DNavigatorItems',
   'API.GetElevationNavigatorItems',
   'API.GetInteriorElevationNavigatorItems',
-  'API.GetLayoutSettings',
   'API.GetNavigatorItemsType',
   'API.GetNavigatorItemTree',
   'API.GetSectionNavigatorItems',

@@ -42,6 +42,8 @@ module.exports = {
     { id: 'BC-103', category: 'fireproof', rule: 'Fire wall fire resistance rating >= 2.0h (safety mandatory)', source: 'IBC 2021 705.3', severity: 'error', field: null },
     { id: 'BC-104', category: 'fireproof', rule: 'Egress doors swing in direction of exit travel when occupant load > 50', source: 'IBC 2021 1010.1.2.1', severity: 'warning', field: null },
     { id: 'BC-105', category: 'fireproof', rule: 'Fire door ratings: 3h (Class A) / 1.5h (Class B) / 0.75h (Class C) (safety mandatory)', source: 'NFPA 80-2022', severity: 'error', field: null },
+    { id: 'BC-106', category: 'fireproof', rule: 'Enclosed stairwells require Class B+ fire door swinging in egress direction, default 1.5m wide x 2.4m high centered (mandatory)', source: 'IBC 2021 1023.4', severity: 'error', field: null },
+    { id: 'BC-107', category: 'fireproof', rule: 'Door opening width exceeding 1.2m (4ft) defaults to double-leaf door (mandatory)', source: 'IBC 2021 1010.1.1', severity: 'error', field: null },
     // ICC A117.1 Accessibility
     { id: 'BC-201', category: 'accessibility', rule: 'Accessible door clear width >= 32in (815mm) (design reference)', source: 'ICC A117.1-2017 404.2.3', severity: 'warning', field: 'width', minValue: 0.815 },
     { id: 'BC-202', category: 'accessibility', rule: 'Accessible ramp slope <= 1:12 (design reference)', source: 'ICC A117.1-2017 405.2', severity: 'warning', field: null },
