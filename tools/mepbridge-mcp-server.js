@@ -297,6 +297,7 @@ function descriptorToMcpTool(desc) {
       type: 'object',
       properties,
       required: required.length > 0 ? required : undefined,
+      additionalProperties: false,
     },
   };
 }
@@ -335,13 +336,44 @@ function normalizeToolArguments(desc, args, cmdParams) {
   return normalizedArgs;
 }
 
+// Exposure is separate from source/native availability. Keep isolated descriptors
+// discoverable for audits, but never advertise or dispatch them through MCP.
+function assertMcpExposed(desc) {
+  if (desc.mcpExposure?.enabled === false) {
+    const error = new Error(desc.mcpExposure.reason || 'This MCP entry is isolated.');
+    error.code = 'MCP_TOOL_ISOLATED';
+    throw error;
+  }
+}
+
 function buildCommandJson(desc, args = {}) {
+  assertMcpExposed(desc);
   const commandJson = JSON.parse(JSON.stringify(desc.commandJson));
-  const cmdParams = commandJson.parameters?.addOnCommandParameters || {};
+  if (!commandJson.parameters) commandJson.parameters = {};
+
+  // ARG-MERGE-02 structural fix (V017 runtime audit 2026-10-01): the descriptor
+  // commandJson doubles as a human-readable example AND the outbound wire template.
+  // Cloning its addOnCommandParameters made every example business value an implicit
+  // outbound argument whenever the user omitted that key (79/89 tools affected:
+  // ChangeElementGeometry silently moved walls to the example (0,0)-(5,0), etc.).
+  // Outbound now starts from an explicit per-command safeDefaults whitelist (empty by
+  // default); only user-supplied params are merged on top. A missing required field now
+  // produces a clear C++ error instead of a silently-injected example value.
+  const safeDefaults = desc.safeDefaults && typeof desc.safeDefaults === 'object' && !Array.isArray(desc.safeDefaults)
+    ? JSON.parse(JSON.stringify(desc.safeDefaults))
+    : {};
+  const cmdParams = safeDefaults;
   const normalizedArgs = normalizeToolArguments(desc, args, cmdParams);
 
+  // ARG-WHITELIST-01 (V017 Case 7 audit 2026-10-03): only forward params that are
+  // declared in the descriptor's paramExtractors (+ safety fields). Any undeclared
+  // keys (e.g. start/end on ChangeStairGeometry from a creative MCP client) are
+  // silently dropped so they never reach the C++ add-on command.
+  const allowedKeys = new Set(Object.keys(desc.paramExtractors || {}));
+  allowedKeys.add('dryRun');
+  allowedKeys.add('confirmRequired');
   for (const [key, value] of Object.entries(normalizedArgs)) {
-    if (value !== undefined && value !== null) {
+    if (value !== undefined && value !== null && allowedKeys.has(key)) {
       cmdParams[key] = value;
     }
   }
@@ -361,7 +393,7 @@ function buildCommandJson(desc, args = {}) {
 function getMcpTools() {
   if (_toolsCache) return _toolsCache;
   const { descriptors } = loadDescriptors();
-  _toolsCache = (descriptors || []).map(descriptorToMcpTool).filter(t => t.name);
+  _toolsCache = (descriptors || []).filter(d => d.mcpExposure?.enabled !== false).map(descriptorToMcpTool).filter(t => t.name);
   return _toolsCache;
 }
 
@@ -506,6 +538,16 @@ async function executeTool(toolName, args = {}) {
   if (!desc) {
     return {
       content: [{ type: 'text', text: `❌ Tool not found: ${toolName}` }],
+      isError: true,
+    };
+  }
+
+  // Reject cached/known names too, before any endpoint or Add-On request.
+  try {
+    assertMcpExposed(desc);
+  } catch (error) {
+    return {
+      content: [{ type: 'text', text: JSON.stringify({ code: error.code, message: error.message }) }],
       isError: true,
     };
   }

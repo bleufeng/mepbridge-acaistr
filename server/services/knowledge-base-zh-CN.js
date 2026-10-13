@@ -56,6 +56,8 @@ module.exports = {
     { id: 'BC-103', category: 'fireproof', rule: '防火墙耐火极限 ≥ 3.0h（安全强制）', source: 'GB 55037-2022', severity: 'error', field: null },
     { id: 'BC-104', category: 'fireproof', rule: '疏散门应向疏散方向开启（人数>60人时）', source: 'GB 50016-2014(2018年版)', severity: 'warning', field: null },
     { id: 'BC-105', category: 'fireproof', rule: '防火门耐火极限：甲级1.5h / 乙级1.0h / 丙级0.5h（安全强制）', source: 'GB 12955-2024', severity: 'error', field: null },
+    { id: 'BC-106', category: 'fireproof', rule: '封闭楼梯间应设置乙级及以上防火门并向疏散方向开启，默认净宽1.5m×净高2.4m居中布置（安全强制）', source: 'GB 50016-2014(2018年版) 6.4.2条', severity: 'error', field: null },
+    { id: 'BC-107', category: 'fireproof', rule: '门净宽超过 1.2m 时默认应采用双开门（双扇平开门）（设计强制）', source: 'GB 50016-2014(2018年版) / GB 55037-2022', severity: 'error', field: null },
     // 建筑与市政工程无障碍通用规范 GB 55019-2021 + 无障碍设计规范 GB 50763-2012
     { id: 'BC-201', category: 'accessibility', rule: '无障碍门净宽 ≥ 0.8m（设计参考）', source: 'GB 55019-2021', severity: 'warning', field: 'width', minValue: 0.8 },
     { id: 'BC-202', category: 'accessibility', rule: '无障碍坡道坡度 ≤ 1:12（设计参考）', source: 'GB 55019-2021', severity: 'warning', field: null },

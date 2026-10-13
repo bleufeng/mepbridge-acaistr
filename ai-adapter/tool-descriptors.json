@@ -584,8 +584,12 @@
           "description": "Extract x/y/z offset from text"
         },
         "targetStoryIndex": {
-          "type": "story-index",
-          "description": "Optional target story index for story copy requests, e.g. copy to story 2 / copy to second floor / copy to 2F"
+          "type": "integer",
+          "description": "Optional target story index for story copy"
+        },
+        "allowedTypes": {
+          "type": "array",
+          "description": "Optional list of allowed element types to copy"
         }
       },
       "targetResolution": {
@@ -1562,7 +1566,12 @@
           "system list"
         ]
       },
-      "paramExtractors": {},
+      "paramExtractors": {
+        "domain": {
+          "type": "string",
+          "description": "Optional domain filter (e.g., Piping, Ducting, CableCarrier)"
+        }
+      },
       "commandJson": {
         "command": "API.ExecuteAddOnCommand",
         "parameters": {
@@ -1670,6 +1679,14 @@
         "guids": {
           "type": "guidList",
           "description": "MEP route element GUIDs to delete"
+        },
+        "routeGuid": {
+          "type": "string",
+          "description": "Optional single route GUID to delete (alias)"
+        },
+        "routeGuids": {
+          "type": "array",
+          "description": "Optional array of route GUIDs to delete (alias)"
         }
       },
       "commandJson": {
@@ -1736,6 +1753,14 @@
         "acknowledgeCount": {
           "type": "integer",
           "description": "Required when more than 50 elements resolve: echo the resolvedCount from the dry-run response. Unlike confirmRequired it cannot be hardcoded, so it evidences that the preview was read. Deletion has no programmatic undo (/api/undo returns 501); only Ctrl+Z in Archicad reverses it."
+        },
+        "routeGuid": {
+          "type": "string",
+          "description": "Optional single route GUID to delete (alias)"
+        },
+        "routeGuids": {
+          "type": "array",
+          "description": "Optional array of route GUIDs to delete (alias)"
         }
       },
       "commandJson": {
@@ -1824,8 +1849,8 @@
           "description": "Legacy end point [x,y,z]; normalized to waypoints"
         },
         "referenceId": {
-          "type": "string",
-          "description": "PREFERRED. Pipe cross-section reference ID from GetAvailableSizes; resolves to an exact preference-table row. Use this rather than diameterMm."
+          "type": "integer",
+          "description": "PREFERRED. Pipe cross-section reference ID (integer) from GetAvailableSizes; resolves to an exact preference-table row. Use this rather than diameterMm."
         },
         "diameterMm": {
           "type": "number",
@@ -2210,6 +2235,18 @@
         "profileGuid": {
           "type": "string",
           "description": "Complex profile attribute GUID (from GetProfiles). When set, applies API_ProfileStructure + profileAttr, overriding rectangular thickness. Optional, backward compatible."
+        },
+        "properties": {
+          "type": "keyValuePairs",
+          "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new Wall inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
+        },
+        "refLinePosition": {
+          "type": "string",
+          "description": "Reference line position: center, outside, inside"
+        },
+        "refLineOffset": {
+          "type": "number",
+          "description": "Reference line offset in meters"
         }
       },
       "commandJson": {
@@ -2239,7 +2276,7 @@
     {
       "name": "mepbridge.create_column",
       "title": "MEPBridge create column (architectural)",
-      "description": "Create a vertical column at a 2D position using native Archicad API (API_ColumnID). Supports height and rotation. V2 H1.1 channel A.",
+      "description": "Create a vertical column at a 2D position using native Archicad API (API_ColumnID). Supports height and rotation. V2 H1.1 channel A. MCP floorIndex exposure deferred on 2026-10-08: native narrowing and post-create verification/cleanup require a separately bounded fix. Existing MCP parameter surface unchanged.",
       "featureArea": "Architecture",
       "status": "v2-h1",
       "executionKind": "mepbridge-addon-command",
@@ -2288,6 +2325,10 @@
         "profileGuid": {
           "type": "string",
           "description": "Complex profile attribute GUID (from GetProfiles). When set, applies API_ProfileStructure + profileAttr. Optional, backward compatible."
+        },
+        "properties": {
+          "type": "keyValuePairs",
+          "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new Column inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
         }
       },
       "commandJson": {
@@ -2312,9 +2353,9 @@
     {
       "name": "mepbridge.create_beam",
       "title": "MEPBridge create beam (architectural)",
-      "description": "Create a straight beam between two 2D points using native Archicad API (API_BeamID). V2 H1.1 channel A.",
+      "description": "Create a straight beam between two 2D points using native Archicad API (API_BeamID). V2 H1.1 channel A. Optional topOffset exposure and transactional home-story/top-offset readback added 2026-10-08; new source batch pending build and dual-version validation.",
       "featureArea": "Architecture",
-      "status": "v2-h1",
+      "status": "code-complete-pending-runtime",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "CreateBeam",
@@ -2355,6 +2396,14 @@
         "profileGuid": {
           "type": "string",
           "description": "Complex profile attribute GUID (from GetProfiles). When set, applies API_ProfileStructure + profileAttr. Optional, backward compatible."
+        },
+        "properties": {
+          "type": "keyValuePairs",
+          "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new Beam inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
+        },
+        "topOffset": {
+          "type": "number",
+          "description": "Optional finite beam-top offset relative to the home story, in meters; negative values allowed. Omit to retain Archicad tool defaults. Mutually exclusive with direct-API absoluteZ. New MCP exposure and strengthened readback pending AC28/AC29 validation."
         }
       },
       "commandJson": {
@@ -2434,6 +2483,10 @@
         "floorIndex": {
           "type": "integer",
           "description": "Story index (0 = home story)"
+        },
+        "properties": {
+          "type": "keyValuePairs",
+          "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new Slab inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
         }
       },
       "commandJson": {
@@ -2569,6 +2622,14 @@
         ]
       },
       "paramExtractors": {
+        "elementGuids": {
+          "type": "array",
+          "description": "Optional array of element GUIDs to mirror. If omitted or empty, selection is used."
+        },
+        "useCurrentSelection": {
+          "type": "boolean",
+          "description": "If true, operates on currently selected elements."
+        },
         "axisStart": {
           "type": "point2d",
           "description": "Mirror axis start point {x,y} in meters"
@@ -2666,6 +2727,26 @@
         "libPartIndex": {
           "type": "integer",
           "description": "Library part index for door object"
+        },
+        "objectRef": {
+          "type": "object-reference",
+          "description": "OPENING-ENH: stable door library selection {source:'projectLibrary', guid?, name?}. Mutually exclusive with libPartIndex; resolution failure is a hard error (no index guessing). Favorite openings are not supported yet."
+        },
+        "reflected": {
+          "type": "boolean",
+          "description": "OPENING-ENH: flip the door across its plane (API_OpeningBaseType.reflected)."
+        },
+        "oSide": {
+          "type": "boolean",
+          "description": "OPENING-ENH: mirror the door to the X axis (API_OpeningBaseType.oSide)."
+        },
+        "refSide": {
+          "type": "boolean",
+          "description": "OPENING-ENH: reference side flag (API_OpeningBaseType.refSide)."
+        },
+        "properties": {
+          "type": "keyValuePairs",
+          "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new Door inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
         }
       },
       "commandJson": {
@@ -2750,6 +2831,26 @@
         "libPartIndex": {
           "type": "integer",
           "description": "Library part index for window object"
+        },
+        "objectRef": {
+          "type": "object-reference",
+          "description": "OPENING-ENH: stable window library selection {source:'projectLibrary', guid?, name?}. Mutually exclusive with libPartIndex; resolution failure is a hard error (no index guessing). Favorite openings are not supported yet."
+        },
+        "reflected": {
+          "type": "boolean",
+          "description": "OPENING-ENH: flip the window across its plane (API_OpeningBaseType.reflected)."
+        },
+        "oSide": {
+          "type": "boolean",
+          "description": "OPENING-ENH: mirror the window to the X axis (API_OpeningBaseType.oSide)."
+        },
+        "refSide": {
+          "type": "boolean",
+          "description": "OPENING-ENH: reference side flag (API_OpeningBaseType.refSide)."
+        },
+        "properties": {
+          "type": "keyValuePairs",
+          "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new Window inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
         }
       },
       "commandJson": {
@@ -2843,6 +2944,10 @@
         "floorIndex": {
           "type": "integer",
           "description": "Story index (0-based)"
+        },
+        "properties": {
+          "type": "keyValuePairs",
+          "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new Roof inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
         }
       },
       "commandJson": {
@@ -2930,6 +3035,10 @@
           "type": "point2dList",
           "description": "Exactly two baseline vertices [{x,y}] for a straight stair. Overrides start/end when provided; more than two vertices returns UNSUPPORTED_BASELINE_SHAPE"
         },
+        "arcs": {
+          "type": "array",
+          "description": "Optional list of arc records for curved or switchback stairs. E.g. [{\"fromIndex\": 2, \"toIndex\": 3, \"angle\": 3.14159}]. Indices are 1-based matching the waypoints array."
+        },
         "totalHeight": {
           "type": "number",
           "description": "Total stair height in meters (e.g. 3.0 for one floor)"
@@ -2953,6 +3062,10 @@
         "floorIndex": {
           "type": "integer",
           "description": "Story index; omitted means the current story"
+        },
+        "properties": {
+          "type": "keyValuePairs",
+          "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new Stair inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
         }
       },
       "commandJson": {
@@ -2982,9 +3095,80 @@
       }
     },
     {
+      "name": "mepbridge.change_stair_geometry",
+      "title": "MEPBridge change stair geometry (medium-mutation)",
+      "description": "Modify the directly-stored scalar geometry of an existing stair by GUID: totalHeight, stepNum, flightWidth. Every supplied field is re-read after ACAPI_Element_Change and compared with the requested value at a 0.1 mm tolerance; a mismatch returns STAIR_CHANGE_VERIFICATION_FAILED instead of reporting success. SCOPE: this descriptor deliberately exposes NO baseline (start/end) and NO treadDepth. The baseline is applied through memo.stairBaseLine rather than API_StairType, so it is verified by a separate memo readback (readback.baselineStart / baselineEnd / baselineApplied) and stays on the direct Add-On path until AC28+AC29 runtime validation; treadDepth is solver-governed and advisory (readback.treadDepthApplied). dryRun defaults to true; an actual modification requires confirmRequired=true.",
+      "featureArea": "Architecture",
+      "status": "compile-validated-pending-runtime",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "ChangeStairGeometry",
+      "riskLevel": "medium-mutation",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only",
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "single-undo-command",
+      "nlTriggers": {
+        "zh": [
+          "改楼梯",
+          "修改楼梯",
+          "楼梯改高度",
+          "改踏步数",
+          "改梯段宽",
+          "调整楼梯"
+        ],
+        "en": [
+          "change stair",
+          "modify stair",
+          "stair height",
+          "stair steps",
+          "flight width"
+        ]
+      },
+      "paramExtractors": {
+        "elementGuid": {
+          "type": "string",
+          "description": "GUID of the stair to modify (required)"
+        },
+        "totalHeight": {
+          "type": "number",
+          "description": "New stair total height in meters (strictly verified on readback)"
+        },
+        "stepNum": {
+          "type": "integer",
+          "minimum": 2,
+          "description": "New step count, at least 2 (strictly verified on readback)"
+        },
+        "flightWidth": {
+          "type": "number",
+          "description": "New flight width in meters (strictly verified on readback)"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "ChangeStairGeometry"
+          },
+          "addOnCommandParameters": {
+            "elementGuid": "{element-guid-placeholder}",
+            "totalHeight": 3,
+            "stepNum": 18,
+            "flightWidth": 1.2,
+            "dryRun": true,
+            "confirmRequired": true
+          }
+        }
+      }
+    },
+    {
       "name": "mepbridge.create_object",
       "title": "MEPBridge create object (architectural)",
-      "description": "Create a placeable GSM Object at a position. Supports exact project-library resolution by stable main GUID/name and Object Favorites; ambiguous or stale selectors fail explicitly. Source and offline contract complete; AC28/AC29 APX rebuild and runtime readback pending.",
+      "description": "Create a placeable GSM Object at a position. Supports exact project-library resolution by stable main GUID/name and Object Favorites; ambiguous or stale selectors fail explicitly. Source and offline contract complete; AC28/AC29 APX rebuild and runtime readback pending. 2026-10-08: absoluteZ home-story guard and actual floor readback amended; this new source batch is not yet compiled or runtime-validated.",
       "featureArea": "Architecture",
       "status": "code-complete-pending-runtime",
       "executionKind": "mepbridge-addon-command",
@@ -3042,6 +3226,10 @@
         "objectRef": {
           "type": "object-reference",
           "description": "Stable GSM selector: {source: favorite|projectLibrary, guid?, name?}. Favorite name resolves through the project Favorite and its stored libraryPart index."
+        },
+        "properties": {
+          "type": "keyValuePairs",
+          "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new Object (GSM) inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
         }
       },
       "commandJson": {
@@ -3070,9 +3258,9 @@
     {
       "name": "mepbridge.create_lamp",
       "title": "MEPBridge create lamp (architectural)",
-      "description": "Create a lamp/light fixture at a position. API_LampID (= API_ObjectType typedef). V2 channel A.",
+      "description": "Create a lamp/light fixture at a position. API_LampID (= API_ObjectType typedef). V2 channel A. Transactional identity/home-story/position/requested-angle readback added 2026-10-08; new source batch pending build and dual-version validation. absoluteZ selects home story only, not exact insertion Z.",
       "featureArea": "Architecture",
-      "status": "v2-extended",
+      "status": "code-complete-pending-runtime",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "CreateLamp",
@@ -3121,6 +3309,10 @@
         "floorIndex": {
           "type": "integer",
           "description": "Story index"
+        },
+        "properties": {
+          "type": "keyValuePairs",
+          "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new Lamp inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
         }
       },
       "commandJson": {
@@ -3191,6 +3383,10 @@
         "floorIndex": {
           "type": "integer",
           "description": "Story index"
+        },
+        "properties": {
+          "type": "keyValuePairs",
+          "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new Mesh inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
         }
       },
       "commandJson": {
@@ -3293,6 +3489,10 @@
         "floorIndex": {
           "type": "integer",
           "description": "Story index"
+        },
+        "properties": {
+          "type": "keyValuePairs",
+          "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new Zone inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
         }
       },
       "commandJson": {
@@ -3529,6 +3729,10 @@
         "routingPreference": {
           "type": "string",
           "description": "Routing strategy: minimizeTurns|minimizeLength|preferOrthogonal|manualWaypointsFirst (default)"
+        },
+        "obstacles": {
+          "type": "object",
+          "description": "Optional obstacles specification for routing"
         }
       },
       "commandJson": {
@@ -3645,9 +3849,9 @@
     {
       "name": "mepbridge.get_element_properties",
       "title": "MEPBridge get element properties by GUID",
-      "description": "Read Archicad Properties of a route/element by GUID. Returns property values with definition names, groups, and types. LLM uses this to inspect element attributes (material, fire rating, system tag, etc.) before deciding modifications. V2 property readback core.",
+      "description": "Read Archicad Properties of a route/element by GUID. Returns property values with definition names, groups, and types. LLM uses this to inspect element attributes (material, fire rating, system tag, etc.) before deciding modifications. V2 property readback core. 2026-10-08 source change (pending build/runtime): failed or incomplete bulk reads fall back per GUID. Partial results return status=error, complete=false, PROPERTY_VALUES_INCOMPLETE, requested/failed counts and propertyErrors; never treat these as a complete success.",
       "featureArea": "Architecture",
-      "status": "runtime-validated",
+      "status": "code-complete-pending-runtime",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "GetElementProperties",
@@ -4009,6 +4213,18 @@
         "export": {
           "type": "string",
           "description": "Export mode: none|rows|csv|both (default none)"
+        },
+        "properties": {
+          "type": "raw",
+          "description": "Alias for conditions: Array of {propertyGuid|groupName+propertyName, valueString}"
+        },
+        "includeProperties": {
+          "type": "boolean",
+          "description": "If true, returns all property details for matched routes"
+        },
+        "includeMatchedProperties": {
+          "type": "boolean",
+          "description": "If true, returns only the matched property details for matched routes"
         }
       },
       "commandJson": {
@@ -4102,9 +4318,9 @@
     {
       "name": "mepbridge.ensure_property_definitions",
       "title": "MEPBridge ensure property definitions exist",
-      "description": "Ensure MEP metadata property definitions exist for route elements (externalId/systemCode/routeName/floor/discipline/source/Note). Creates property group + string definitions if missing. LLM uses this as a prerequisite before setting custom metadata on routes. V2 MEP property workflow.",
+      "description": "MCP ENTRY ISOLATED: MCP descriptor omits required routeGuid and usable group/target classification contract. Isolated for v0.1.7; native command and internal helpers retained. Full property-definition write design deferred.",
       "featureArea": "MEP",
-      "status": "runtime-validated",
+      "status": "mcp-isolated",
       "executionKind": "mepbridge-addon-command",
       "commandNamespace": "MEPBridge",
       "commandName": "EnsurePropertyDefinitions",
@@ -4157,6 +4373,10 @@
             ]
           }
         }
+      },
+      "mcpExposure": {
+        "enabled": false,
+        "reason": "MCP descriptor omits required routeGuid and usable group/target classification contract. Isolated for v0.1.7; native command and internal helpers retained. Full property-definition write design deferred."
       }
     },
     {
@@ -4803,6 +5023,18 @@
         "libPartIndex": {
           "type": "integer",
           "description": "New library part index for style"
+        },
+        "reflected": {
+          "type": "boolean",
+          "description": "OPENING-ENH: flip the opening across its plane (API_OpeningBaseType.reflected)."
+        },
+        "oSide": {
+          "type": "boolean",
+          "description": "OPENING-ENH: mirror the opening to the X axis (API_OpeningBaseType.oSide)."
+        },
+        "refSide": {
+          "type": "boolean",
+          "description": "OPENING-ENH: reference side flag (API_OpeningBaseType.refSide)."
         }
       },
       "commandJson": {
@@ -5788,6 +6020,10 @@
           "type": "string",
           "description": "All/UserDefined/BuiltIn (default All)"
         },
+        "floorIndex": {
+          "type": "integer",
+          "description": "Optional exact home-story index (not spatial location or the active story). Omitted means no story restriction; zero and negative indices are valid. Filters element headers after type enumeration, before property evaluation."
+        },
         "includeProperty": {
           "type": "boolean",
           "description": "Include full property object in response (default true)"
@@ -6289,6 +6525,10 @@
         "body": {
           "type": "object",
           "description": "Explicit freeform Solid body (bodyType, vertices, edges, polygons). Mutually exclusive with polygon + extrudeHeight; compile-validated by V16-BUILD-01 and pending runtime validation."
+        },
+        "properties": {
+          "type": "keyValuePairs",
+          "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new Morph inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
         }
       },
       "commandJson": {
@@ -6623,6 +6863,10 @@
         "secondaryCount": {
           "type": "integer",
           "description": "Copies along the second vector (array mode only, 1-100)"
+        },
+        "allowedTypes": {
+          "type": "array",
+          "description": "Optional list of allowed element types to multiply"
         }
       },
       "commandJson": {

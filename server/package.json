@@ -1,6 +1,6 @@
 {
   "name": "mepbridge-acaistr-server",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "MEPBridge ACAIstr Backend Server",
   "main": "server.js",
   "scripts": {
@@ -8,7 +8,7 @@
     "dev": "nodemon server.js",
     "validate:modules": "node ../tools/validate-modules.js",
     "validate:mep-systems": "node ../tools/validate-mep-system-identifiers.js",
-    "validate:version": "node ../tools/validate-public-version.js --base HEAD",
+    "validate:version": "node ../tools/validate-public-version.js --root .. --base HEAD",
     "check:release": "node ../tools/release-go-no-go.js --root ..",
     "check:release:evidence": "node ../tools/release-go-no-go.js --root .. --out ../outputs/release-evidence.json",
     "test:modules": "node ../modules/project-insights/tests/module.test.js && node tests/extension-manager.test.js",

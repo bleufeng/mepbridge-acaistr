@@ -1,4 +1,4 @@
-# MEPbridge ACAIstr v0.1.6 安装说明
+# MEPbridge ACAIstr v0.1.7 安装说明
 
 本说明适用于 Archicad 28 和 Archicad 29 的 Windows 发布包。
 
@@ -248,6 +248,20 @@ Windows 反斜杠必须写成 `\\`。
 | Claude Desktop | 将 JSON 合并进 `%APPDATA%\Claude\claude_desktop_config.json`，重启 Claude Desktop |
 | CodeBuddy | 将 JSON 写入项目 `.codebuddy\.mcp.json` 或用户级 `~\.codebuddy\.mcp.json`，重启 IDE |
 | Codex CLI | 在 `%USERPROFILE%\.codex\config.toml` 追加（TOML 格式）：`[mcp_servers.mepbridge]`、`command = "node"`、`args = ["<解压目录>/tools/mepbridge-mcp-server.js"]`、`env = { MEPBRIDGE_ENDPOINT = "http://127.0.0.1:19780" }` |
+| Antigravity CLI（原 Gemini CLI） | 将 JSON 合并进 `%USERPROFILE%\.gemini\settings.json` 顶层的 `mcpServers` 对象，然后新开一个会话 |
+| Google Antigravity | 将 JSON 写入 `%USERPROFILE%\.gemini\config\mcp_config.json`，重启 Antigravity |
+
+> **Antigravity CLI 与 Google Antigravity 同在 `~/.gemini/` 目录下，但读取的是不同配置文件。**
+> Antigravity CLI（agy）读 `~/.gemini/settings.json`；Antigravity 平台读 `~/.gemini/config\mcp_config.json`。
+> 写错文件不会生效。
+
+### 在界面里查看接入状态
+
+工作台左区有「**MCP 接入状态**」区块，每 10 秒自动刷新，列出所有已配置的宿主端。它区分两种状态：
+
+- **已连接** —— 宿主端已完成 MCP `initialize` 握手，工具可正常使用。
+- **已配置** —— 配置文件里有 MEPBridge 且宿主进程在运行。这**不能**证明连接可用；
+  若工具没出现，请重启对应宿主端。
 
 ### 其它 MCP 宿主端（表中没有的）
 

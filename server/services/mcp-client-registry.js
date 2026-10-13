@@ -36,6 +36,18 @@ const CLIENT_NAME_ALIASES = new Map([
   ['copilot', 'Doubao'],
   ['doubao', 'Doubao'],
   ['豆包', 'Doubao'],
+  // Antigravity（Google）：MCP 客户端在 initialize 时自报 clientInfo.name。
+  // 别名表的作用是让握手名与「配置探测」的候选名 Antigravity 归一，
+  // 否则 mergeClientsAndPlatforms 会因 name 不匹配而在面板上重复渲染两行。
+  ['antigravity', 'Antigravity'],
+  ['antigravity-client', 'Antigravity'],
+  ['antigravity-agent', 'Antigravity'],
+  // Gemini CLI：握手自报名为 "gemini-cli"（实测 gemini-cli 0.60.0 bundle 源码），
+  // 归一到展示名，否则面板上会显示成小写 gemini-cli。
+  // 注意与 Antigravity 区分：后者自报名 antigravity-client，配置走 mcp_config.json。
+  ['gemini-cli', 'Gemini CLI'],
+  ['gemini cli', 'Gemini CLI'],
+  ['google-gemini-cli', 'Gemini CLI'],
 ]);
 
 function normalizeClientName(rawName) {
