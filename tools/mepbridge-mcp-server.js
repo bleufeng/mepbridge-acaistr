@@ -79,6 +79,85 @@ function loadDescriptors() {
   return _descriptorsCache;
 }
 
+// 自动查找 command-boundary.json (V18-SRV-01)
+function findBoundaryPath() {
+  const candidates = [
+    process.env.MEPBRIDGE_BOUNDARY,
+    path.join(__dirname, '..', 'ai-adapter', 'command-boundary.json'),
+    path.join(__dirname, 'command-boundary.json'),
+    path.join(process.cwd(), 'ai-adapter', 'command-boundary.json'),
+  ].filter(Boolean);
+
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+let _boundaryCache = null;
+
+function loadCommandBoundary() {
+  if (_boundaryCache) return _boundaryCache;
+  const p = findBoundaryPath();
+  if (!p) {
+    _boundaryCache = {};
+    return _boundaryCache;
+  }
+  try {
+    _boundaryCache = JSON.parse(fs.readFileSync(p, 'utf8'));
+    return _boundaryCache;
+  } catch (e) {
+    console.error(`[MCP] Failed to parse command-boundary.json: ${e.message}`);
+    _boundaryCache = {};
+    return _boundaryCache;
+  }
+}
+
+/**
+ * 严格校验调用参数白名单与子类型发布边界 (V18-SRV-01)
+ * @param {object} descriptor - 来自 tool-descriptors.json 的命令契约
+ * @param {object} boundaryEntry - 来自 command-boundary.json 的边界配置
+ * @param {object} rawArgs - 客户端/LLM 传入的参数对象
+ */
+function validateCommandContractAndBoundary(descriptor, boundaryEntry, rawArgs = {}) {
+  // 1. 隔离命令拦截 (如 EnsurePropertyDefinitions 维持 MCP_TOOL_ISOLATED)
+  if (boundaryEntry?.mcpExposure?.enabled === false || descriptor?.mcpExposure?.enabled === false) {
+    const err = new Error(`Command '${descriptor.name}' is isolated from MCP exposure.`);
+    err.code = 'MCP_TOOL_ISOLATED';
+    throw err;
+  }
+
+  // 2. 严格参数白名单检查：拒绝任何未在 inputSchema.properties 中声明的参数 (V18-SRV-01)
+  const tool = descriptorToMcpTool(descriptor);
+  const schemaProps = tool.inputSchema?.properties || {};
+  const allowedKeys = new Set(Object.keys(schemaProps));
+  const unknownKeys = Object.keys(rawArgs || {}).filter((k) => !allowedKeys.has(k));
+
+  if (unknownKeys.length > 0) {
+    const err = new Error(
+      `Unknown parameter(s) [${unknownKeys.join(', ')}] for command '${descriptor.name}'. ` +
+      `Allowed parameters: [${Array.from(allowedKeys).join(', ')}]`
+    );
+    err.code = 'MCP_UNKNOWN_PARAMETER_REJECTED';
+    err.details = { command: descriptor.name, unknownKeys, allowedKeys: Array.from(allowedKeys) };
+    throw err;
+  }
+
+  // 3. 子类型级 (Subtype-level) 动态门禁检查 (保护 CreateComplexElement V18-NAT-04)
+  if (boundaryEntry?.allowedSubTypes && Array.isArray(boundaryEntry.allowedSubTypes)) {
+    const subTypeField = boundaryEntry.subTypeParameter || (schemaProps.elementType ? 'elementType' : 'type');
+    const requestedSubType = rawArgs[subTypeField] || rawArgs.elementType || rawArgs.type;
+    if (requestedSubType && !boundaryEntry.allowedSubTypes.includes(requestedSubType)) {
+      const err = new Error(
+        `Subtype '${requestedSubType}' for '${descriptor.name}' is currently gated. ` +
+        `Enabled subtypes: [${boundaryEntry.allowedSubTypes.join(', ')}]`
+      );
+      err.code = 'MCP_SUBTYPE_GATED';
+      throw err;
+    }
+  }
+}
+
 function pointSchema(dimensions, description, unitDescription) {
   const coordinateProperties = {
     x: { type: 'number', description: `X ${unitDescription}` },
@@ -231,6 +310,7 @@ function extractorSpecToJsonSchema(key, spec = {}, defaultValue) {
         description
       );
     case 'guidList':
+    case 'stringList':
       return arraySchema({ type: 'string' }, description);
     case 'elementTypeList':
       return arraySchema({ type: 'string' }, description);
@@ -516,24 +596,6 @@ function findDescriptorByToolName(toolName) {
 async function executeTool(toolName, args = {}) {
   args = args || {};
 
-  // 特殊内置工具：ping
-  if (toolName === 'mepbridge_ping') {
-    try {
-      const result = await callPing();
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        }],
-      };
-    } catch (e) {
-      return {
-        content: [{ type: 'text', text: `❌ Server connection failed: ${e.message}\nEndpoint: ${SERVER_ENDPOINT}` }],
-        isError: true,
-      };
-    }
-  }
-
   const desc = findDescriptorByToolName(toolName);
   if (!desc) {
     return {
@@ -542,23 +604,22 @@ async function executeTool(toolName, args = {}) {
     };
   }
 
-  // Reject cached/known names too, before any endpoint or Add-On request.
+  // V18-SRV-01: 校验调用参数白名单与子类型发布边界
+  const boundary = loadCommandBoundary();
+  const boundaryEntry = boundary?.commandOverrides?.[desc.commandName] ||
+                        boundary?.commandOverrides?.[desc.name] || {};
+
   try {
-    assertMcpExposed(desc);
+    validateCommandContractAndBoundary(desc, boundaryEntry, args);
   } catch (error) {
     return {
-      content: [{ type: 'text', text: JSON.stringify({ code: error.code, message: error.message }) }],
+      content: [{ type: 'text', text: JSON.stringify({ code: error.code, message: error.message, details: error.details }) }],
       isError: true,
     };
   }
 
   // 按 executionKind 分派。server-endpoint 类由本地 Server 承载，不经 Add-On，
   // 因此不构造 addOnCommandParameters，也不要求 commandNamespace/commandName。
-  //
-  // 技术债（v0.1.4 批次 D 后清理）：上面的 mepbridge_ping 仍是按工具名硬编码的特例，
-  // 它事实上也属于 server-endpoint（直接调 /api/ping）。收编它需要同时调整
-  // tests/test-t5-e2e-all-descriptors.js 的 NS-01 断言（nsCount['MEPBridge'] === 74 会变 73），
-  // 故与那 6 处硬编码 74 一并处理，避免同时改动两个变量。
   if (desc.executionKind === 'server-endpoint') {
     if (!desc.serverEndpoint || !desc.serverEndpoint.path) {
       return {
@@ -844,10 +905,14 @@ if (require.main === module) {
 module.exports = {
   buildCommandJson,
   descriptorToMcpTool,
+  executeTool,
   extractorSpecToJsonSchema,
+  findBoundaryPath,
   getMcpTools,
   handleRequest,
+  loadCommandBoundary,
   loadDescriptors,
   normalizeToolArguments,
   startStdioServer,
+  validateCommandContractAndBoundary,
 };

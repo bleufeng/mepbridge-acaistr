@@ -95,6 +95,7 @@ const gsmObjectsRouter = require('./routes/gsm-objects');           // Offline G
 const snapshotReplayRouter = require('./routes/snapshot-replay');   // D-2: element snapshot & preview-first replay
 const buildingJsonRouter = require('./routes/building-json');       // AUD-4: local Building JSON export
 const cadLayersRouter = require('./routes/cad-layers');             // CAD-0: read-only layer recognition
+const cInsRouter = require('./routes/c-ins');                       // C-INS: instance snapshot, A/B diff & visual review
 
 // FO-2 (2026-06-26): 启动选择集事件监听服务（C++ SelectionChangeHandler → 文件信号 → SSE）
 const selectionEventService = require('./services/selection-events');
@@ -121,6 +122,7 @@ app.use('/api/gsm-objects', gsmObjectsRouter);        // v0.1.3: offline catalog
 app.use('/api/snapshot-replay', snapshotReplayRouter); // D-2: capture / preview / apply（preview-first 回放）
 app.use('/api/building-json', buildingJsonRouter);     // AUD-4: local Building JSON export（只读导出）
 app.use('/api/cad-layers', cadLayersRouter);             // CAD-0: read-only layer recognition（只读建议）
+app.use('/api/c-ins', cInsRouter);                     // C-INS: instance snapshot, A/B diff & visual review
 
 // 健康检查
 app.get('/health', (req, res) => {

@@ -2276,7 +2276,7 @@
     {
       "name": "mepbridge.create_column",
       "title": "MEPBridge create column (architectural)",
-      "description": "Create a vertical column at a 2D position using native Archicad API (API_ColumnID). Supports height and rotation. V2 H1.1 channel A. MCP floorIndex exposure deferred on 2026-10-08: native narrowing and post-create verification/cleanup require a separately bounded fix. Existing MCP parameter surface unchanged.",
+      "description": "Create a vertical column at a 2D position using native Archicad API (API_ColumnID). Supports height, rotation, and floorIndex (V18-NAT-02 guarded against 16-bit short overflow with in-transaction readback).",
       "featureArea": "Architecture",
       "status": "v2-h1",
       "executionKind": "mepbridge-addon-command",
@@ -2325,6 +2325,10 @@
         "profileGuid": {
           "type": "string",
           "description": "Complex profile attribute GUID (from GetProfiles). When set, applies API_ProfileStructure + profileAttr. Optional, backward compatible."
+        },
+        "floorIndex": {
+          "type": "integer",
+          "description": "Target home story index (V18-NAT-02: guarded against 16-bit short overflow and verified inside transaction; omitted means active story)"
         },
         "properties": {
           "type": "keyValuePairs",
@@ -3062,6 +3066,10 @@
         "floorIndex": {
           "type": "integer",
           "description": "Story index; omitted means the current story"
+        },
+        "debugRetainOnMismatch": {
+          "type": "boolean",
+          "description": "Diagnostic switch (V18-NAT-03): if false (default), readback mismatch deletes element and rolls back transaction; if true, retains element for live inspection while still reporting error"
         },
         "properties": {
           "type": "keyValuePairs",
@@ -4669,6 +4677,14 @@
         "items": {
           "type": "raw",
           "description": "Array of element specs: Wall/Beam items need {start,end}, Column items need {position} (min 2, max 500)"
+        },
+        "atomic": {
+          "type": "boolean",
+          "description": "If true (default), strict all-or-nothing transaction rollback on any single item failure. If false, element-isolated mode keeping succeeded items."
+        },
+        "atomicityPolicy": {
+          "type": "string",
+          "description": "Tiered atomicity policy: 'strict_all_or_nothing' for interactive AI modeling, or 'element_isolated' for large-batch CAD reverse modeling (up to 500 elements)"
         }
       },
       "commandJson": {
@@ -6765,7 +6781,7 @@
         },
         "thickness": {
           "type": "number",
-          "description": "Wall/Slab: thickness in meters"
+          "description": "Wall/Slab/PlaneRoof: thickness in meters (V18-NAT-05)"
         },
         "width": {
           "type": "number",
@@ -6789,7 +6805,43 @@
         },
         "level": {
           "type": "number",
-          "description": "Slab only: reference level relative to its floor"
+          "description": "Slab or PlaneRoof: elevation/level in meters relative to floor (V18-NAT-05)"
+        },
+        "floorIndex": {
+          "type": "integer",
+          "description": "Optional new home story index"
+        },
+        "elevation": {
+          "type": "number",
+          "description": "Elevation/level in meters for PlaneRoof (alias for level, V18-NAT-05)"
+        },
+        "slopeDegrees": {
+          "type": "number",
+          "description": "Roof pitch angle in degrees (0 to 89) for PlaneRoof (V18-NAT-05)"
+        },
+        "pitchDegrees": {
+          "type": "number",
+          "description": "Alias for slopeDegrees on PlaneRoof (0 to 89)"
+        },
+        "angleRad": {
+          "type": "number",
+          "description": "Roof pitch angle in radians for PlaneRoof (V18-NAT-05)"
+        },
+        "pivotBegX": {
+          "type": "number",
+          "description": "PlaneRoof pivot line start X in meters (V18-NAT-05)"
+        },
+        "pivotBegY": {
+          "type": "number",
+          "description": "PlaneRoof pivot line start Y in meters (V18-NAT-05)"
+        },
+        "pivotEndX": {
+          "type": "number",
+          "description": "PlaneRoof pivot line end X in meters (V18-NAT-05)"
+        },
+        "pivotEndY": {
+          "type": "number",
+          "description": "PlaneRoof pivot line end Y in meters (V18-NAT-05)"
         }
       },
       "commandJson": {
@@ -7027,6 +7079,232 @@
             "operation": "Subtract",
             "dryRun": true,
             "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.create_complex_element",
+      "title": "MEPBridge create a complex architectural element",
+      "description": "COMPLEX-W1: native creation for Extruded Shell, two-point straight Railing, line or rectangular default Curtain Wall, and Roof-hosted Skylight. Supports create only with BaseAddOnCommand, UndoableTransactionGuard with in-transaction readback and ValidateHostElement pre-check (V18-NAT-04). Actual runs require dryRun=false and confirmRequired=true; subType gating enforced via command-boundary.",
+      "featureArea": "Architecture",
+      "status": "compile-validated-pending-runtime",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "CreateComplexElement",
+      "riskLevel": "medium-mutation",
+      "automationModes": [
+        "confirmed-run"
+      ],
+      "requiresConfirmationDefault": true,
+      "rollbackSupport": "undoable-command",
+      "nlTriggers": {
+        "zh": [
+          "创建壳体",
+          "创建栏杆",
+          "创建幕墙",
+          "创建天窗"
+        ],
+        "en": [
+          "create shell",
+          "create railing",
+          "create curtain wall",
+          "create skylight"
+        ]
+      },
+      "paramExtractors": {
+        "elementType": {
+          "type": "string",
+          "required": true,
+          "description": "CurtainWall, ExtrudedShell, Shell, Railing, or Skylight"
+        },
+        "operation": {
+          "type": "string",
+          "required": true,
+          "description": "create"
+        },
+        "parameters": {
+          "type": "object",
+          "required": true,
+          "description": "Typed create parameters: exactly one of Shell / Railing / CurtainWall / Skylight, matching elementType. Each typed object is validated with additionalProperties=false, so the nested keys documented here are the complete wire contract.",
+          "typedParameters": {
+            "Shell": {
+              "profile": "array of {x,y,z} in metres, minimum 3 points",
+              "extrusionEnd": "{x,y,z} extrusion end in metres",
+              "floorIndex": "integer, optional"
+            },
+            "Railing": {
+              "path": "array of {x,y,z} in metres, exactly 2 points (straight path only)",
+              "floorIndex": "integer, optional"
+            },
+            "CurtainWall": {
+              "boundary": "array of {x,y,z} in metres: 2 points (one segment) or 4 rectangle corners; a grid needs the 2-point form",
+              "floorIndex": "integer, optional",
+              "grid": {
+                "primary": "horizontal pattern axis: { mode, value }",
+                "secondary": "vertical pattern axis: { mode, value }",
+                "mode": "divisions (integer count) or spacing (fixed module) - mandatory, never inferred from key presence",
+                "value": "for mode=divisions an integer 1-500; for mode=spacing a number > 0 in metres",
+                "height": "number > 0 in metres - mandatory whenever grid is present",
+                "nominalWidth": "number > 0 in metres, optional",
+                "boundaryFramePosition": "Center | Outside | Inside, optional"
+              }
+            },
+            "Skylight": {
+              "hostGuid": "GUID string of an existing Roof element",
+              "anchorPosition": "{x,y,z} anchor on the host roof surface",
+              "floorIndex": "integer, optional"
+            }
+          }
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Preview without mutation; defaults to true"
+        },
+        "confirmRequired": {
+          "type": "boolean",
+          "description": "Must be true for dryRun=false"
+        },
+        "requestId": {
+          "type": "string",
+          "required": false,
+          "description": "Optional correlation id"
+        },
+        "properties": {
+          "type": "keyValuePairs",
+          "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new complex element (Shell/Railing/CurtainWall/Skylight) inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "CreateComplexElement"
+          },
+          "addOnCommandParameters": {
+            "elementType": "Shell",
+            "operation": "create",
+            "parameters": {
+              "Shell": {
+                "profile": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0
+                  },
+                  {
+                    "x": 0,
+                    "y": 1,
+                    "z": 0
+                  },
+                  {
+                    "x": 1,
+                    "y": 1,
+                    "z": 0
+                  }
+                ],
+                "extrusionEnd": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 3
+                }
+              }
+            },
+            "dryRun": true,
+            "confirmRequired": false
+          }
+        }
+      }
+    },
+    {
+      "name": "mepbridge.read_drafting_elements",
+      "title": "MEPBridge read 2D drafting elements",
+      "description": "Read-only extraction of 2D lines, polylines, arcs, circles, text, hatches, and drawing memos from the active floor plan, worksheet, or detail window. Supports layer filtering, bounding box filtering, pagination, and SP-1 channel probing for CAD reverse modeling.",
+      "featureArea": "Architecture",
+      "status": "code-complete-pending-runtime",
+      "executionKind": "mepbridge-addon-command",
+      "commandNamespace": "MEPBridge",
+      "commandName": "ReadDraftingElements",
+      "riskLevel": "read",
+      "automationModes": [
+        "manual-preview",
+        "dry-run-only"
+      ],
+      "requiresConfirmationDefault": false,
+      "rollbackSupport": "not-required",
+      "nlTriggers": {
+        "zh": [
+          "读取图面",
+          "提取线",
+          "提取多段线",
+          "读取底图",
+          "底图图元",
+          "图层统计",
+          "CAD底图提取"
+        ],
+        "en": [
+          "read drafting",
+          "extract 2d",
+          "read lines",
+          "read polylines",
+          "extract drafting elements",
+          "cad underlay scan"
+        ]
+      },
+      "paramExtractors": {
+        "windowType": {
+          "type": "string",
+          "description": "Target window type: floorPlan, worksheet, or detail (default: floorPlan)"
+        },
+        "databaseUnId": {
+          "type": "string",
+          "description": "Optional specific worksheet/detail database GUID"
+        },
+        "sourceMode": {
+          "type": "string",
+          "description": "Source extraction channel: auto, exploded_2d, or drawing_memo (default: auto)"
+        },
+        "summaryOnly": {
+          "type": "boolean",
+          "description": "When true, returns only layerSummary, totalCount, and originCheck without elements array to save token payload (default: false)"
+        },
+        "storyIndex": {
+          "type": "integer",
+          "description": "Floor plan story index filter (optional, defaults to active story)"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of 2D elements returned per batch (default: 5000)"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Pagination offset for returned elements (default: 0)"
+        },
+        "layerFilter": {
+          "type": "elementTypeList",
+          "description": "Optional layer name whitelist to extract only matching layers (e.g. ['WALL', 'AXIS', 'COLUMN'])"
+        },
+        "elementTypes": {
+          "type": "elementTypeList",
+          "description": "Subset of 2D element types to extract (defaults to Line, PolyLine, Arc, Circle, Text, Hatch)"
+        },
+        "boundingBox": {
+          "type": "object",
+          "description": "Optional 2D bounding box filter {minX, minY, maxX, maxY} in meters"
+        }
+      },
+      "commandJson": {
+        "command": "API.ExecuteAddOnCommand",
+        "parameters": {
+          "addOnCommandId": {
+            "commandNamespace": "MEPBridge",
+            "commandName": "ReadDraftingElements"
+          },
+          "addOnCommandParameters": {
+            "summaryOnly": false,
+            "limit": 5000,
+            "offset": 0
           }
         }
       }

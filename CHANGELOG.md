@@ -4,6 +4,26 @@ Public user-facing changes. Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-10-19
+
+### Added
+
+- Command architecture foundation: a shared command base class, an in-transaction rollback guard, a memo-handle RAII guard and centralized validation helpers give every write command one consistent transaction, exception and resource-safety baseline.
+- In-transaction atomic rollback: geometry readback checks and out-of-tolerance rollbacks for creation commands now run inside the same transaction; any mismatch triggers a kernel-level rollback and leaves no dirty model state.
+- Complex element creation is now part of the release boundary: curtain walls (including grid subdivision), extruded shells, railings and skylights are built natively with parametric construction instead of geometric approximation.
+- Drawing awareness: a new read-only drafting-view extractor safely reads lines, arcs, polylines and text from the active view without modifying the model.
+- Mono-pitch roof editing now covers slope, level and pivot-axis changes.
+
+### Fixed
+
+- Skylight creation pre-checks and post-creation readback disagreed for shell hosts, so those hosts always failed readback; both roof and shell hosts now share one rule.
+- Element editing previously validated only floor ownership, so out-of-tolerance geometry changes could be committed as success; every editable geometry field now performs a 1 mm tolerance readback with atomic rollback.
+- Project-wide response contract governance: the root required field is now the status field, and every response exit (including dry-run and empty-input branches) carries a status, so error responses can no longer be masked by schema validation.
+
+### Changed
+
+- Version unified at 0.1.8; the registered boundary is 91 native commands / 91 descriptor tools / 4 local server tools (95 in total).
+
 ## [0.1.7] - 2026-10-09
 
 ### Added

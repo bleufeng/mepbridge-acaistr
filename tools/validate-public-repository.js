@@ -283,12 +283,27 @@ if (typeof expectedDescriptors !== 'number') {
       }
     }
   }
-  const prohibitedDevelopmentCommands = entries
-    .map((entry) => entry?.commandName)
-    .filter((commandName) => typeof commandName === 'string');
-  for (const prohibitedCommandName of ['CreateComplexElement']) {
-    if (prohibitedDevelopmentCommands.includes(prohibitedCommandName)) {
-      failures.push(`Public descriptor registry must not contain excluded command: ${prohibitedCommandName}`);
+  // v0.1.8 retires the v0.1.7 whole-command exclusion of CreateComplexElement: the
+  // boundary now gates exposure per subtype (commandOverrides[].allowedSubTypes).
+  // Instead of hard-coding command names here, keep the single source of truth in
+  // lock-step: any command the boundary marks as not MCP-exposed must be explicitly
+  // marked mcp-isolated in its descriptor, so isolation can never be silently lost.
+  const registryByName = new Map(
+    entries
+      .filter((entry) => entry && typeof entry.commandName === 'string')
+      .map((entry) => [entry.commandName, entry])
+  );
+  const isolationOverrides = Object.entries(commandBoundary?.commandOverrides || {})
+    .filter(([, override]) => override && override.mcpExposure && override.mcpExposure.enabled === false)
+    .map(([commandName]) => commandName);
+  for (const isolatedCommandName of isolationOverrides) {
+    const entry = registryByName.get(isolatedCommandName);
+    if (!entry) {
+      failures.push(`Boundary isolates '${isolatedCommandName}' but the public registry has no descriptor for it.`);
+      continue;
+    }
+    if (entry.status !== 'mcp-isolated') {
+      failures.push(`Public descriptor '${isolatedCommandName}' must declare status=mcp-isolated to match the boundary isolation override.`);
     }
   }
 }
