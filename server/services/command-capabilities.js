@@ -14,6 +14,7 @@ const DRY_RUN_AND_CONFIRM_COMMANDS = new Set([
   'CopyElements',
   'CreateBeam',
   'CreateColumn',
+  'CreateComplexElement',
   'CreateDimension',
   'CreateDoor',
   'CreateLabel',

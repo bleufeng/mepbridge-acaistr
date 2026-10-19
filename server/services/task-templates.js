@@ -141,16 +141,17 @@ const BUILTIN_TEMPLATES = [
         { x: -0.4, y: -2.87 }
       ].map(translatePoint);
 
-      // Derived from current file mesh/AABB:
-      // Stable Archicad baseline readback is 3.5m for each flight.
-      // Upper: x 1.093790198..4.593790198; lower: x 1.066209814..4.566209814.
+      // Derived from Archicad native stair rules (riser=[0.15, 0.20], going=[0.25, 0.35], 2R+G=[0.60, 0.65]):
+      // For 10 steps (9 treads) at height 1.5m (riser=0.150m), going=0.300m -> 2R+G=0.600m (golden comfort).
+      // Calibrated baseline length is 2.70m for each flight.
+      // Upper: x 1.093790198..3.793790198; lower: x 3.766209814..1.066209814.
       // STAIR-0 boundary: each CreateStair step uses a two-point straight baseline.
       const upperFlightWaypoints = [
         { x: 1.093790198, y: -3.47 },
-        { x: 4.593790198, y: -3.47 }
+        { x: 3.793790198, y: -3.47 }
       ].map(translatePoint);
       const lowerFlightWaypoints = [
-        { x: 4.566209814, y: -5.02 },
+        { x: 3.766209814, y: -5.02 },
         { x: 1.066209814, y: -5.02 }
       ].map(translatePoint);
 
@@ -165,13 +166,13 @@ const BUILTIN_TEMPLATES = [
           },
           {
             action: 'CreateStair',
-            title: `\u{521b}\u{5efa}\u{4e0a}\u{8dd1}\u{697c}\u{68af}\u{6bb5} 10\u{6b65}\u{9ad8}1.5m\u{5bbd}1.2m\u{ff0c}baseLevel=1.5m\u{ff0c}3.5m\u{4e2d}\u{7ebf} (1.09,-3.47)->(4.59,-3.47)`,
+            title: `创建上跑楼梯段 10步高1.5m宽1.2m，baseLevel=1.5m，2.7m中线 (1.09,-3.47)->(3.79,-3.47)`,
             params: { start: upperFlightWaypoints[0], end: upperFlightWaypoints[upperFlightWaypoints.length - 1], waypoints: upperFlightWaypoints, totalHeight, baseLevel: upperFlightBaseLevel, stepNum, flightWidth, floorIndex, dryRun: true, confirmRequired: true },
             riskLevel: 'create-element'
           },
           {
             action: 'CreateStair',
-            title: `\u{521b}\u{5efa}\u{4e0b}\u{8dd1}\u{697c}\u{68af}\u{6bb5} 10\u{6b65}\u{9ad8}1.5m\u{5bbd}1.2m\u{ff0c}baseLevel=0m\u{ff0c}3.5m\u{4e2d}\u{7ebf} (4.57,-5.02)->(1.07,-5.02)`,
+            title: `创建下跑楼梯段 10步高1.5m宽1.2m，baseLevel=0m，2.7m中线 (3.77,-5.02)->(1.07,-5.02)`,
             params: { start: lowerFlightWaypoints[0], end: lowerFlightWaypoints[lowerFlightWaypoints.length - 1], waypoints: lowerFlightWaypoints, totalHeight, baseLevel: lowerFlightBaseLevel, stepNum, flightWidth, floorIndex, dryRun: true, confirmRequired: true },
             riskLevel: 'create-element'
           }
@@ -320,10 +321,10 @@ const BUILTIN_TEMPLATES = [
       // STAIR-0 boundary: two separate straight flights, never a multi-vertex stair baseline.
       const upperFlightWaypoints = [
         { x: 1.093790198, y: -3.47 },
-        { x: 4.593790198, y: -3.47 }
+        { x: 3.793790198, y: -3.47 }
       ].map(translatePoint);
       const lowerFlightWaypoints = [
-        { x: 4.566209814, y: -5.02 },
+        { x: 3.766209814, y: -5.02 },
         { x: 1.066209814, y: -5.02 }
       ].map(translatePoint);
 

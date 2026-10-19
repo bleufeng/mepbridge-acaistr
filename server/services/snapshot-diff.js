@@ -398,5 +398,8 @@ module.exports = {
   compareSnapshots,
   DEFAULT_DISTANCE_TOLERANCE_M,
   REPORT_SCHEMA_VERSION,
-  GEOMETRY_FIELDS
+  GEOMETRY_FIELDS,
+  numbersClose,
+  pointsClose,
+  polygonsClose
 };
