@@ -214,22 +214,38 @@ function buildPlanFromTemplate(template) {
   }
   if (template.plan.steps.length === 0) return null;
 
-  return {
-    userIntent: template.plan.userIntent || template.description || template.name || template.id,
-    steps: template.plan.steps.map((step, index) => ({
+  const { getCommandSafetyCapabilities } = require('./command-capabilities');
+  const steps = template.plan.steps.map((step, index) => {
+    const params = { ...(step.params || {}) };
+    if (step.action) {
+      const caps = getCommandSafetyCapabilities(step.action);
+      if (caps.dryRun && params.dryRun === undefined) params.dryRun = false;
+      if (caps.confirmRequired && params.confirmRequired === undefined) params.confirmRequired = true;
+    }
+    return {
       id: step.id || `step_${index + 1}`,
       title: step.title || step.action || `Step ${index + 1}`,
       action: step.action || '',
       description: step.description || '',
       expectedResult: step.expectedResult || '',
-      params: step.params || {},
+      params,
       commandJson: step.commandJson || null,
       commandNamespace: step.commandNamespace || 'MEPBridge',
       commandName: step.commandName || step.action || '',
       descriptorName: step.descriptorName || null,
       riskLevel: step.riskLevel || 'create-element',
       status: 'pending'
-    })),
+    };
+  });
+
+  const isMutation = steps.some(s => s.riskLevel && (s.riskLevel.includes('mutation') || s.riskLevel.includes('create')));
+  return {
+    title: template.plan.title || template.plan.userIntent || template.name || template.id,
+    userIntent: template.plan.userIntent || template.description || template.name || template.id,
+    isMepAction: true,
+    isMutation,
+    mepCode: steps[0]?.action || '',
+    steps,
     source: 'user-template-code',
     templateId: template.id,
     templateCode: template.code || null

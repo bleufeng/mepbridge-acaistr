@@ -74,6 +74,14 @@ export interface OperationPlan {
   mepCode: string;
   steps: PlanStep[];
   parameters: VerificationParameter[];
+  /** Server-validated Archicad identity frozen when this conversational plan was created. */
+  target?: {
+    port: number;
+    archicadVersion?: number | string | null;
+    projectName?: string | null;
+    projectPath?: string | null;
+    fingerprint?: string | null;
+  };
   /** 回放后自动执行的收尾步骤（普通步骤全部成功后执行） */
   postReplaySteps?: PostReplayStep[];
   /** 采集侧记录的统一构件属性（回放后步骤的派生来源） */

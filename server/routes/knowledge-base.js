@@ -21,6 +21,11 @@ const router = express.Router();
 const knowledgeBase = require('../services/knowledge-base');
 
 const VALID_CATEGORIES = ['buildingCode', 'mepStandard', 'material'];
+function reply(res, result, fallback = 400) { return res.status(result.ok ? 200 : result.code === 'KB_REVISION_CONFLICT' ? 409 : result.code === 'KB_PERSISTENCE_FAILED' || result.code === 'KB_LOAD_FAILED' ? 503 : fallback).json(result); }
+router.get('/status', (req, res) => res.json({ ok: true, ...knowledgeBase.getStatus() }));
+router.post('/libraries/preview', (req, res) => reply(res, knowledgeBase.previewLibrary(req.body?.library)));
+router.post('/libraries/load', (req, res) => reply(res, knowledgeBase.loadLibrary(req.body?.library, req.body?.expectedRevision)));
+
 
 /**
  * GET /api/knowledge-base
@@ -29,6 +34,29 @@ const VALID_CATEGORIES = ['buildingCode', 'mepStandard', 'material'];
 router.get('/', (req, res) => {
   const all = knowledgeBase.getAll();
   res.json({ ok: true, ...all });
+});
+
+/**
+ * GET /api/knowledge-base/libraries
+ * 列出所有受支持的规范库及当前激活状态
+ */
+router.get('/libraries', (req, res) => {
+  const libraries = knowledgeBase.getLibraries();
+  res.json({ ok: true, ...knowledgeBase.getStatus(), libraries });
+});
+
+/**
+ * POST /api/knowledge-base/activation
+ * 激活指定的规范库
+ * Body: { libraryId: string }
+ */
+router.post('/activation', (req, res) => {
+  const { libraryId } = req.body || {};
+  if (!libraryId) {
+    return res.status(400).json({ ok: false, error: 'Missing required field: libraryId' });
+  }
+  const result = knowledgeBase.switchLibrary(libraryId, req.body?.expectedRevision);
+  return reply(res, result);
 });
 
 /**
@@ -59,12 +87,12 @@ router.get('/search', (req, res) => {
  * Body: { buildingCode?, mepStandard?, material?, overwrite? }
  */
 router.post('/import', (req, res) => {
-  const { buildingCode, mepStandard, material, overwrite } = req.body;
-  if (!buildingCode && !mepStandard && !material) {
+  const { buildingCode, mepStandard, material, overwrite } = req.body || {};
+  if (!buildingCode && !mepStandard && !material && !req.body?.persistence) {
     return res.status(400).json({ ok: false, error: 'No data to import. Provide buildingCode/mepStandard/material arrays.' });
   }
-  const result = knowledgeBase.importRules({ buildingCode, mepStandard, material }, overwrite === true);
-  res.json({ ok: true, ...result });
+  const categories = Object.fromEntries(Object.entries({ buildingCode, mepStandard, material }).filter(([,v]) => v !== undefined));
+  return reply(res, knowledgeBase.importRules(req.body?.persistence ? { persistence: req.body.persistence } : categories, overwrite === true, req.body?.expectedRevision));
 });
 
 /**
@@ -72,8 +100,7 @@ router.post('/import', (req, res) => {
  * 重置为内置知识库（清除所有用户修改）
  */
 router.post('/reset', (req, res) => {
-  const result = knowledgeBase.resetToBuiltin();
-  res.json({ ok: true, message: '已重置为内置知识库', ...result });
+  return reply(res, knowledgeBase.resetToBuiltin(req.body?.expectedRevision));
 });
 
 /**
@@ -82,7 +109,7 @@ router.post('/reset', (req, res) => {
  * Body: { steps: [...], userIntent: string }
  */
 router.post('/validate', (req, res) => {
-  const { steps, userIntent } = req.body;
+  const { steps, userIntent } = req.body || {};
   if (!Array.isArray(steps)) {
     return res.status(400).json({ ok: false, error: 'Missing or invalid field: steps' });
   }
@@ -100,7 +127,7 @@ router.get('/:category', (req, res) => {
     return res.status(400).json({ ok: false, error: `Invalid category. Valid: ${VALID_CATEGORIES.join(', ')}` });
   }
   const items = knowledgeBase.listByCategory(category);
-  res.json({ ok: true, category, count: items.length, items });
+  res.json({ ok: true, ...knowledgeBase.getStatus(), category, count: items.length, items });
 });
 
 /**
@@ -113,9 +140,8 @@ router.post('/:category', (req, res) => {
   if (!VALID_CATEGORIES.includes(category)) {
     return res.status(400).json({ ok: false, error: `Invalid category. Valid: ${VALID_CATEGORIES.join(', ')}` });
   }
-  const result = knowledgeBase.addRule(category, req.body);
-  if (!result.ok) return res.status(400).json(result);
-  res.json(result);
+  const result = knowledgeBase.addRule(category, req.body, req.body?.expectedRevision);
+  return reply(res, result);
 });
 
 /**
@@ -128,9 +154,8 @@ router.put('/:category/:id', (req, res) => {
   if (!VALID_CATEGORIES.includes(category)) {
     return res.status(400).json({ ok: false, error: `Invalid category. Valid: ${VALID_CATEGORIES.join(', ')}` });
   }
-  const result = knowledgeBase.updateRule(category, id, req.body);
-  if (!result.ok) return res.status(404).json(result);
-  res.json(result);
+  const result = knowledgeBase.updateRule(category, id, req.body, req.body?.expectedRevision);
+  return reply(res, result);
 });
 
 /**
@@ -142,9 +167,8 @@ router.delete('/:category/:id', (req, res) => {
   if (!VALID_CATEGORIES.includes(category)) {
     return res.status(400).json({ ok: false, error: `Invalid category. Valid: ${VALID_CATEGORIES.join(', ')}` });
   }
-  const result = knowledgeBase.deleteRule(category, id);
-  if (!result.ok) return res.status(404).json(result);
-  res.json(result);
+  const result = knowledgeBase.deleteRule(category, id, req.body?.expectedRevision);
+  return reply(res, result);
 });
 
 /**
@@ -156,9 +180,8 @@ router.post('/:category/:id/enable', (req, res) => {
   if (!VALID_CATEGORIES.includes(category)) {
     return res.status(400).json({ ok: false, error: `Invalid category. Valid: ${VALID_CATEGORIES.join(', ')}` });
   }
-  const result = knowledgeBase.enableRule(category, id);
-  if (!result.ok) return res.status(404).json(result);
-  res.json(result);
+  const result = knowledgeBase.enableRule(category, id, req.body?.expectedRevision);
+  return reply(res, result);
 });
 
 module.exports = router;

@@ -1,3 +1,4 @@
+import { workbenchFetch as fetch } from "../execution-recovery";
 // CopyElementsModal.tsx
 // 复制构件交互式对话框组件（C.1.2，对接 D3 P2 CopyElements 8 步闭环）
 

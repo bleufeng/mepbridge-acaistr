@@ -14,6 +14,7 @@ const READ_ONLY = [
   'API.GetElementsByType',
   'API.GetPropertyValuesOfElements',
   'API.GetProductInfo',
+  'API.GetTypesOfElements', // precise read-only target type; avoids full geometry memo for native edit
   'API.GetStoryNavigatorItems',
   'API.GetClassificationsOfElements',
   'API.GetBuiltInContainerNavigatorItems',

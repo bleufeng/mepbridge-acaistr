@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mepbridge-acaistr-v40';
+const CACHE_NAME = 'mepbridge-acaistr-v44';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

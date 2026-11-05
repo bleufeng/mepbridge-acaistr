@@ -193,19 +193,42 @@ function loadVisibleTemplates(locale = 'zh-CN') {
   return localizeTemplateDisplayNames(merged, locale).templates || [];
 }
 
-// 用户采集模板可携带可选 nameEn（英文 UI 显示名）。en-US 下用 nameEn 替换展示名；
-// 其余 locale 展示原始 name。替换只发生在 /load 展示层，存储与 /export 保持原数据。
+// 用户采集模板与自定义命令可携带可选 nameEn / descriptionEn（英文 UI 显示名与描述）。en-US 下替换展示；
+// 其余 locale 展示原始 name / description。替换只发生在 /load 展示层，存储与 /export 保持原数据。
 function localizeTemplateDisplayNames(assets, locale) {
-  if (normalizeUiLocale(locale) !== 'en-US' || !assets || !Array.isArray(assets.templates)) {
+  if (normalizeUiLocale(locale) !== 'en-US' || !assets) {
     return assets;
   }
+  const localizedTemplates = Array.isArray(assets.templates)
+    ? assets.templates.map((template) => {
+        if (!template || typeof template !== 'object') return template;
+        const nameEn = typeof template.nameEn === 'string' ? template.nameEn.trim() : '';
+        const descEn = typeof template.descriptionEn === 'string' ? template.descriptionEn.trim() : '';
+        return {
+          ...template,
+          ...(nameEn ? { name: nameEn } : {}),
+          ...(descEn ? { description: descEn } : {})
+        };
+      })
+    : assets.templates;
+
+  const localizedCommands = Array.isArray(assets.commands)
+    ? assets.commands.map((cmd) => {
+        if (!cmd || typeof cmd !== 'object') return cmd;
+        const nameEn = typeof cmd.nameEn === 'string' ? cmd.nameEn.trim() : '';
+        const descEn = typeof cmd.descriptionEn === 'string' ? cmd.descriptionEn.trim() : '';
+        return {
+          ...cmd,
+          ...(nameEn ? { name: nameEn } : {}),
+          ...(descEn ? { description: descEn } : {})
+        };
+      })
+    : assets.commands;
+
   return {
     ...assets,
-    templates: assets.templates.map((template) => {
-      if (!template || typeof template !== 'object') return template;
-      const nameEn = typeof template.nameEn === 'string' ? template.nameEn.trim() : '';
-      return nameEn ? { ...template, name: nameEn } : template;
-    })
+    templates: localizedTemplates,
+    commands: localizedCommands
   };
 }
 

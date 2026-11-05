@@ -1,14 +1,16 @@
 // CustomCommandsPanel.tsx
 // E.5: 自定义 NL 命令管理面板
-// 在设置页 LLM 配置入口旁加"自定义命令"分区
+// 中央自定义指令工作区：使用既有资产接口，保存不执行模型操作。
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Plus, Trash2, ToggleLeft, ToggleRight, Zap } from 'lucide-react';
 import type { CustomNLCommand, RiskLevel, TaskTemplate } from '../userAssets';
 import { generateId } from '../userAssets';
 
 interface CustomCommandsPanelProps {
   isOpen: boolean;
+  embedded?: boolean;
+  onDirtyChange?: (dirty: boolean) => void;
   onClose: () => void;
   onSaved?: () => void;
   lang: string;
@@ -16,6 +18,8 @@ interface CustomCommandsPanelProps {
 
 export const CustomCommandsPanel: React.FC<CustomCommandsPanelProps> = ({
   isOpen,
+  embedded = false,
+  onDirtyChange,
   onClose,
   onSaved,
   lang
@@ -23,6 +27,10 @@ export const CustomCommandsPanel: React.FC<CustomCommandsPanelProps> = ({
   const [commands, setCommands] = useState<CustomNLCommand[]>([]);
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [operationError, setOperationError] = useState("");
+  const [operationBusy, setOperationBusy] = useState(false);
+  const operationGate = useRef(false);
+  const loadEpoch = useRef(0);
   const [showAddForm, setShowAddForm] = useState(false);
 
   // 新建命令表单状态
@@ -33,18 +41,24 @@ export const CustomCommandsPanel: React.FC<CustomCommandsPanelProps> = ({
   const [newParams, setNewParams] = useState("{}");
   const [newRiskLevel, setNewRiskLevel] = useState<RiskLevel>("read");
 
+  const dirty = Boolean(newTriggers || newTemplateId || newAction || newParams !== "{}");
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
+  useEffect(() => { if(typeof window === "undefined") return; const guard=(event:BeforeUnloadEvent)=>{if(dirty){event.preventDefault();event.returnValue="";}};window.addEventListener("beforeunload",guard);return()=>window.removeEventListener("beforeunload",guard); },[dirty]);
   useEffect(() => {
     if (isOpen) {
-      loadCommands();
+      void loadCommands();
     }
+    return () => { loadEpoch.current++; };
   }, [isOpen, lang]);
 
   const loadCommands = async () => {
     setIsLoading(true);
+    const epoch = ++loadEpoch.current;
     try {
       const res = await fetch(`/api/user-assets/load?locale=${encodeURIComponent(lang)}`);
       const data = await res.json();
-      if (data.success) {
+      if (!res.ok || !data.success) throw Error(data.error || "USER_ASSETS_LOAD_FAILED");
+      if (epoch === loadEpoch.current) {
         if (Array.isArray(data.commands)) {
           setCommands(data.commands);
         }
@@ -53,15 +67,22 @@ export const CustomCommandsPanel: React.FC<CustomCommandsPanelProps> = ({
         }
       }
     } catch (err) {
-      console.error("[CustomCommandsPanel] Load error:", err);
+      if(epoch === loadEpoch.current) setOperationError(String(err));
     } finally {
-      setIsLoading(false);
+      if(epoch === loadEpoch.current) setIsLoading(false);
     }
   };
 
+  const mutate = async (url: string, init: RequestInit) => {
+    if(operationGate.current) return;
+    operationGate.current=true;setOperationBusy(true);setOperationError("");
+    try { const res=await fetch(url,init);const data=await res.json();if(!res.ok || !data.success) throw Error(data.error||"USER_ASSET_WRITE_UNKNOWN");await loadCommands();onSaved?.();return true; }
+    catch(e:any){setOperationError(e.message+" — "+(lang==="zh-CN"?"重新读取资产后再决定是否重试。":"Reload assets before deciding to retry."));return false;}
+    finally{operationGate.current=false;setOperationBusy(false);}
+  };
   const handleAdd = async () => {
     const triggers = newTriggers.split("\n").map(t => t.trim()).filter(t => t.length > 0);
-    if (triggers.length === 0) return;
+    if (operationGate.current || triggers.length === 0) return;
 
     if (newBindType === "template" && !newTemplateId.trim()) return;
     if (newBindType === "singleStep" && !newAction.trim()) return;
@@ -80,65 +101,32 @@ export const CustomCommandsPanel: React.FC<CustomCommandsPanelProps> = ({
       let params = {};
       try {
         params = JSON.parse(newParams);
+        if (!params || typeof params !== "object" || Array.isArray(params)) throw Error("PARAMETERS_OBJECT_REQUIRED");
       } catch {
-        params = {};
+        window.alert(lang === "zh-CN" ? "参数 JSON 无效，未保存。" : "Invalid parameters JSON. Not saved.");
+        return;
       }
       command.singleStep = {
         action: newAction.trim(),
-        params,
+        params: params as Record<string, unknown>,
         riskLevel: newRiskLevel,
       };
     }
 
-    try {
-      const res = await fetch("/api/user-assets/commands", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(command),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setNewTriggers("");
-        setNewTemplateId("");
-        setNewAction("");
-        setNewParams("{}");
-        setShowAddForm(false);
-        loadCommands();
-        if (onSaved) onSaved();
-      }
-    } catch (err) {
-      console.error("[CustomCommandsPanel] Add error:", err);
-    }
+    const ok=await mutate("/api/user-assets/commands",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(command)});
+    if(ok){setNewTriggers("");setNewTemplateId("");setNewAction("");setNewParams("{}");setShowAddForm(false);}
   };
-
-  const handleToggle = async (cmd: CustomNLCommand) => {
-    const updated = { ...cmd, enabled: !cmd.enabled };
-    try {
-      await fetch("/api/user-assets/commands", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updated),
-      });
-      loadCommands();
-    } catch (err) {
-      console.error("[CustomCommandsPanel] Toggle error:", err);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    try {
-      await fetch(`/api/user-assets/commands/${id}`, { method: "DELETE" });
-      loadCommands();
-    } catch (err) {
-      console.error("[CustomCommandsPanel] Delete error:", err);
-    }
+  const handleToggle=async(cmd:CustomNLCommand)=>{await mutate("/api/user-assets/commands",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...cmd,enabled:!cmd.enabled})});};
+  const handleDelete=async(id:string)=>{
+    if(!window.confirm(lang==="zh-CN"?"确认删除此自定义指令？":"Delete this custom command?"))return;
+    await mutate("/api/user-assets/commands/"+encodeURIComponent(id),{method:"DELETE"});
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-2xl bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+    <div className={embedded ? "flex flex-col h-full min-h-0" : "fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"}>
+      <div className={embedded ? "w-full h-full min-h-0 bg-zinc-900 flex flex-col overflow-hidden" : "w-full max-w-2xl bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
           <h2 className="text-sm font-semibold font-display tracking-wider uppercase text-zinc-200 flex items-center gap-2">
@@ -152,6 +140,8 @@ export const CustomCommandsPanel: React.FC<CustomCommandsPanelProps> = ({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto custom-scrollbar px-5 py-4 flex flex-col gap-4">
+          {operationError && <p role="alert" className="text-amber-400 text-xs">{operationError}</p>}
+          {operationBusy && <p className="text-xs">{lang === "zh-CN" ? "保存中…" : "Saving…"}</p>}
           {/* 说明 */}
           <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3 text-xs text-indigo-300/80">
             {lang === "zh-CN"
@@ -197,6 +187,7 @@ export const CustomCommandsPanel: React.FC<CustomCommandsPanelProps> = ({
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       <button
+                        disabled={operationBusy}
                         onClick={() => handleToggle(cmd)}
                         className={`transition-colors ${cmd.enabled ? "text-emerald-400 hover:text-emerald-300" : "text-zinc-600 hover:text-zinc-500"}`}
                         title={cmd.enabled ? (lang === "zh-CN" ? "已启用" : "Enabled") : (lang === "zh-CN" ? "已禁用" : "Disabled")}
@@ -204,6 +195,7 @@ export const CustomCommandsPanel: React.FC<CustomCommandsPanelProps> = ({
                         {cmd.enabled ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
                       </button>
                       <button
+                        disabled={operationBusy}
                         onClick={() => handleDelete(cmd.id)}
                         className="text-zinc-600 hover:text-red-400 transition-colors"
                         title={lang === "zh-CN" ? "删除" : "Delete"}
@@ -219,7 +211,7 @@ export const CustomCommandsPanel: React.FC<CustomCommandsPanelProps> = ({
 
           {/* 新建命令表单 */}
           {showAddForm ? (
-            <div className="rounded-lg border border-indigo-500/30 bg-indigo-500/5 p-4 flex flex-col gap-3">
+            <fieldset disabled={operationBusy} className="rounded-lg border border-indigo-500/30 bg-indigo-500/5 p-4 flex flex-col gap-3">
               <div className="text-xs font-semibold text-indigo-300">
                 {lang === "zh-CN" ? "新建自定义命令" : "New Custom Command"}
               </div>
@@ -323,7 +315,7 @@ export const CustomCommandsPanel: React.FC<CustomCommandsPanelProps> = ({
                           newRiskLevel === "read" ? "bg-emerald-500/20 border-emerald-500 text-emerald-300" : "bg-zinc-800 border-zinc-700 text-zinc-400"
                         }`}
                       >
-                        read
+                        {lang === "zh-CN" ? "只读" : "Read"}
                       </button>
                       <button
                         onClick={() => setNewRiskLevel("low-mutation")}
@@ -331,13 +323,13 @@ export const CustomCommandsPanel: React.FC<CustomCommandsPanelProps> = ({
                           newRiskLevel === "low-mutation" ? "bg-amber-500/20 border-amber-500 text-amber-300" : "bg-zinc-800 border-zinc-700 text-zinc-400"
                         }`}
                       >
-                        low-mutation
+                        {lang === "zh-CN" ? "低风险变更" : "Low-risk mutation"}
                       </button>
                     </div>
                   </div>
                 </>
               )}
-            </div>
+            </fieldset>
           ) : null}
         </div>
 
@@ -345,13 +337,14 @@ export const CustomCommandsPanel: React.FC<CustomCommandsPanelProps> = ({
         <div className="flex items-center justify-between gap-3 border-t border-zinc-800 px-5 py-3">
           <div className="text-[10px] text-zinc-500 leading-relaxed max-w-xs">
             {lang === "zh-CN"
-              ? "导入、导出、备份和清除重置统一在中区「预设管理」执行。"
-              : "Import, export, backup, and reset are centralized in Preset Management."}
+              ? "导入、导出、备份和清除重置统一在「设置 → 预设管理」执行。"
+              : "Import, export, backup, and reset are centralized in Settings → Presets."}
           </div>
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setShowAddForm(!showAddForm)}
+              disabled={operationBusy}
+              onClick={() => {if(showAddForm && dirty && !window.confirm(lang === "zh-CN" ? "收起编辑，草稿仍保留在本次会话，是否继续？" : "Hide editor while retaining this session draft?")) return;setShowAddForm(!showAddForm);}}
               className="px-3.5 py-1.5 text-xs font-semibold text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/10 rounded cursor-pointer transition-colors flex items-center gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -360,6 +353,7 @@ export const CustomCommandsPanel: React.FC<CustomCommandsPanelProps> = ({
             {showAddForm && (
               <button
                 onClick={handleAdd}
+                disabled={operationBusy}
                 className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded flex items-center gap-2 cursor-pointer transition-all"
               >
                 {lang === "zh-CN" ? "保存命令" : "Save Command"}

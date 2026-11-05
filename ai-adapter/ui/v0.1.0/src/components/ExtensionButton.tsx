@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../ui-language";
 import React from 'react';
 import { Zap, ZapOff, Loader2 } from 'lucide-react';
 
@@ -69,6 +70,7 @@ export const ExtensionButton: React.FC<ExtensionButtonProps> = ({
   disabled = false,
   className = ''
 }) => {
+  const lang = useUiLanguage();
   // 计算实际可用状态
   const isEnabled = available && !disabled && !loading;
 
@@ -120,7 +122,7 @@ export const ExtensionButton: React.FC<ExtensionButtonProps> = ({
           ${isEnabled ? styles.enabled : styles.disabled}
           ${!isEnabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}
         `}
-        title={!isEnabled && !loading ? `需要 ${extensionName}` : undefined}
+        title={!isEnabled && !loading ? `${lang === "zh-CN" ? "需要" : "Requires"} ${extensionName}` : undefined}
       >
         <div className="flex items-center gap-3">
           {/* 图标 */}
@@ -141,7 +143,7 @@ export const ExtensionButton: React.FC<ExtensionButtonProps> = ({
           {/* 状态标签 */}
           {!isEnabled && !loading && (
             <div className="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600">
-              需要 {extensionName}
+              {lang === "zh-CN" ? "需要" : "Requires"} {extensionName}
             </div>
           )}
         </div>
@@ -151,7 +153,7 @@ export const ExtensionButton: React.FC<ExtensionButtonProps> = ({
       {!isEnabled && !loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/60 rounded-lg backdrop-blur-[1px] pointer-events-none">
           <div className="text-xs font-medium text-gray-600 bg-white px-3 py-1 rounded-full border border-gray-300 shadow-sm">
-            {extensionName} 未连接
+            {extensionName} {lang === "zh-CN" ? "未连接" : "Not connected"}
           </div>
         </div>
       )}
@@ -163,6 +165,7 @@ export const ExtensionButton: React.FC<ExtensionButtonProps> = ({
  * 简化版按钮 - 不显示遮罩层
  */
 export const SimpleExtensionButton: React.FC<ExtensionButtonProps> = (props) => {
+  const lang = useUiLanguage();
   const { available, loading, disabled, onClick, label, icon, variant = 'default', className = '' } = props;
 
   const isEnabled = available && !disabled && !loading;
@@ -192,7 +195,7 @@ export const SimpleExtensionButton: React.FC<ExtensionButtonProps> = (props) => 
       {loading ? (
         <div className="flex items-center gap-2">
           <Loader2 size={16} className="animate-spin" />
-          <span>加载中...</span>
+          <span>{lang === "zh-CN" ? "加载中..." : "Loading..."}</span>
         </div>
       ) : (
         <div className="flex items-center gap-2">
@@ -220,11 +223,12 @@ export const ExtensionStatusBadge: React.FC<ExtensionStatusBadgeProps> = ({
   version,
   loading
 }) => {
+  const lang = useUiLanguage();
   if (loading) {
     return (
       <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
         <Loader2 size={12} className="animate-spin" />
-        <span>检测中...</span>
+        <span>{lang === "zh-CN" ? "检测中..." : "Checking..."}</span>
       </div>
     );
   }
@@ -233,7 +237,7 @@ export const ExtensionStatusBadge: React.FC<ExtensionStatusBadgeProps> = ({
     return (
       <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
         <div className="w-2 h-2 rounded-full bg-green-500"></div>
-        <span>在线</span>
+        <span>{lang === "zh-CN" ? "在线" : "Online"}</span>
         {version && <span className="text-green-600">v{version}</span>}
       </div>
     );
@@ -242,7 +246,7 @@ export const ExtensionStatusBadge: React.FC<ExtensionStatusBadgeProps> = ({
   return (
     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
       <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-      <span>离线</span>
+      <span>{lang === "zh-CN" ? "离线" : "Offline"}</span>
     </div>
   );
 };

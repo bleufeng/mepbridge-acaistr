@@ -1,3 +1,5 @@
+import { workbenchFetch as fetch } from "../execution-recovery";
+import { useUiLanguage } from "../ui-language";
 // EditBuildingElementPanel.tsx
 // 建筑构件编辑面板 — BASE 模式 BUILDING 模块
 // 支持单个和批量编辑 12 种构件：Wall/Column/Beam/Slab/Door/Window/Roof/Stair/Object/Lamp/Mesh/Zone
@@ -77,22 +79,28 @@ async function callCmd(commandName: string, params: any): Promise<any> {
   return res.json();
 }
 
-const NumInput: React.FC<{ label: string; value: number | undefined; onChange: (v: number | undefined) => void; step?: number; placeholder?: string }> = ({ label, value, onChange, step = 0.01, placeholder }) => (
+const NumInput: React.FC<{ label: string; value: number | undefined; onChange: (v: number | undefined) => void; step?: number; placeholder?: string }> = ({ label, value, onChange, step = 0.01, placeholder }) => {
+  const inputLang = useUiLanguage();
+  return (
   <div className="flex flex-col gap-1">
     <label className="text-[10px] text-zinc-500 font-mono uppercase">{label}</label>
-    <input type="number" step={step} value={value ?? ''} onChange={e => onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} placeholder={placeholder || '不修改'} className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 font-mono outline-none focus:border-orange-500" />
+    <input type="number" step={step} value={value ?? ''} onChange={e => onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} placeholder={placeholder || (inputLang === 'zh-CN' ? '不修改' : 'Unchanged')} className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 font-mono outline-none focus:border-orange-500" />
   </div>
-);
+  );
+};
 
 const hasCompletePoint = (point?: { x?: number; y?: number }): boolean =>
   point?.x !== undefined && point?.y !== undefined;
 
-const TxtInput: React.FC<{ label: string; value: string | undefined; onChange: (v: string | undefined) => void; placeholder?: string }> = ({ label, value, onChange, placeholder }) => (
+const TxtInput: React.FC<{ label: string; value: string | undefined; onChange: (v: string | undefined) => void; placeholder?: string }> = ({ label, value, onChange, placeholder }) => {
+  const inputLang = useUiLanguage();
+  return (
   <div className="flex flex-col gap-1">
     <label className="text-[10px] text-zinc-500 font-mono uppercase">{label}</label>
-    <input type="text" value={value ?? ''} onChange={e => onChange(e.target.value === '' ? undefined : e.target.value)} placeholder={placeholder || '不修改'} className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 font-mono outline-none focus:border-orange-500" />
+    <input type="text" value={value ?? ''} onChange={e => onChange(e.target.value === '' ? undefined : e.target.value)} placeholder={placeholder || (inputLang === 'zh-CN' ? '不修改' : 'Unchanged')} className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 font-mono outline-none focus:border-orange-500" />
   </div>
-);
+  );
+};
 
 export const EditBuildingElementPanel: React.FC<Props> = ({ onExecute, lang, mepbridgeConnected, currentFloorIndex }) => {
   const zh = lang === 'zh-CN';
@@ -288,12 +296,12 @@ export const EditBuildingElementPanel: React.FC<Props> = ({ onExecute, lang, mep
             {selType === 'Column' && <><NumInput label={zh ? '高度(m)' : 'Height(m)'} value={editParams.height} onChange={v => setEditParams({...editParams, height: v})} placeholder="3.0" /><NumInput label={zh ? '原点X(m)' : 'Origin X(m)'} value={editParams.position?.x} onChange={v => setEditParams({...editParams, position: {...editParams.position, x: v}})} placeholder="0" /><NumInput label={zh ? '原点Y(m)' : 'Origin Y(m)'} value={editParams.position?.y} onChange={v => setEditParams({...editParams, position: {...editParams.position, y: v}})} placeholder="0" /></>}
             {selType === 'Beam' && <><NumInput label={zh ? '起点X(m)' : 'Beg X(m)'} value={editParams.begC?.x} onChange={v => setEditParams({...editParams, begC: {...editParams.begC, x: v}})} placeholder="0" /><NumInput label={zh ? '起点Y(m)' : 'Beg Y(m)'} value={editParams.begC?.y} onChange={v => setEditParams({...editParams, begC: {...editParams.begC, y: v}})} placeholder="0" /><NumInput label={zh ? '终点X(m)' : 'End X(m)'} value={editParams.endC?.x} onChange={v => setEditParams({...editParams, endC: {...editParams.endC, x: v}})} placeholder="4" /><NumInput label={zh ? '终点Y(m)' : 'End Y(m)'} value={editParams.endC?.y} onChange={v => setEditParams({...editParams, endC: {...editParams.endC, y: v}})} placeholder="0" /></>}
             {selType === 'Slab' && <><NumInput label={zh ? '厚度(m)' : 'Thick(m)'} value={editParams.thickness} onChange={v => setEditParams({...editParams, thickness: v})} placeholder="0.12" /><NumInput label={zh ? '标高(m)' : 'Level(m)'} value={editParams.level} onChange={v => setEditParams({...editParams, level: v})} placeholder="0" /></>}
-            {selType === 'Roof' && <><NumInput label={zh ? '厚度(m)' : 'Thick(m)'} value={editParams.thickness} onChange={v => setEditParams({...editParams, thickness: v})} placeholder="0.15" /><NumInput label={zh ? '坡角(°)' : 'Pitch(°)'} value={editParams.pitchAngle} onChange={v => setEditParams({...editParams, pitchAngle: v})} placeholder="30" /><NumInput label={zh ? '基标高(m)' : 'BaseL(m)'} value={editParams.baseLevel} onChange={v => setEditParams({...editParams, baseLevel: v})} placeholder="3.0" /><TxtInput label={zh ? '图层' : 'Layer'} value={editParams.layerName} onChange={v => setEditParams({...editParams, layerName: v})} placeholder="屋面" /></>}
-            {(selType === 'Door' || selType === 'Window') && <><NumInput label={zh ? '宽度(m)' : 'Width(m)'} value={editParams.width} onChange={v => setEditParams({...editParams, width: v})} placeholder="0.9" /><NumInput label={zh ? '高度(m)' : 'Height(m)'} value={editParams.height} onChange={v => setEditParams({...editParams, height: v})} placeholder="2.1" /><NumInput label={zh ? '参考位(m)' : 'RefPos(m)'} value={editParams.refPos} onChange={v => setEditParams({...editParams, refPos: v})} placeholder="0" /><TxtInput label={zh ? '图层' : 'Layer'} value={editParams.layerName} onChange={v => setEditParams({...editParams, layerName: v})} placeholder="门窗" /></>}
+            {selType === 'Roof' && <><NumInput label={zh ? '厚度(m)' : 'Thick(m)'} value={editParams.thickness} onChange={v => setEditParams({...editParams, thickness: v})} placeholder="0.15" /><NumInput label={zh ? '坡角(°)' : 'Pitch(°)'} value={editParams.pitchAngle} onChange={v => setEditParams({...editParams, pitchAngle: v})} placeholder="30" /><NumInput label={zh ? '基标高(m)' : 'BaseL(m)'} value={editParams.baseLevel} onChange={v => setEditParams({...editParams, baseLevel: v})} placeholder="3.0" /><TxtInput label={zh ? '图层' : 'Layer'} value={editParams.layerName} onChange={v => setEditParams({...editParams, layerName: v})} placeholder={zh ? "屋面" : "Roof"} /></>}
+            {(selType === 'Door' || selType === 'Window') && <><NumInput label={zh ? '宽度(m)' : 'Width(m)'} value={editParams.width} onChange={v => setEditParams({...editParams, width: v})} placeholder="0.9" /><NumInput label={zh ? '高度(m)' : 'Height(m)'} value={editParams.height} onChange={v => setEditParams({...editParams, height: v})} placeholder="2.1" /><NumInput label={zh ? '参考位(m)' : 'RefPos(m)'} value={editParams.refPos} onChange={v => setEditParams({...editParams, refPos: v})} placeholder="0" /><TxtInput label={zh ? '图层' : 'Layer'} value={editParams.layerName} onChange={v => setEditParams({...editParams, layerName: v})} placeholder={zh ? "门窗" : "Door / window"} /></>}
             {selType === 'Stair' && <><NumInput label={zh ? '总高(m)' : 'TotalH(m)'} value={editParams.totalHeight} onChange={v => setEditParams({...editParams, totalHeight: v})} placeholder="3.0" /><NumInput label={zh ? '步数' : 'Steps'} value={editParams.stepNum} onChange={v => setEditParams({...editParams, stepNum: v})} step={1} placeholder="16" /><NumInput label={zh ? '梯段宽(m)' : 'FlightW(m)'} value={editParams.flightWidth} onChange={v => setEditParams({...editParams, flightWidth: v})} placeholder="1.2" /><NumInput label={zh ? '踏步深(m)' : 'TreadD(m)'} value={editParams.treadDepth} onChange={v => setEditParams({...editParams, treadDepth: v})} placeholder="0.26" /></>}
             {(selType === 'Object' || selType === 'Lamp') && <><NumInput label={zh ? '旋转(°)' : 'Angle(°)'} value={editParams.angle} onChange={v => setEditParams({...editParams, angle: v})} placeholder="0" /><TxtInput label={zh ? '图层' : 'Layer'} value={editParams.layerName} onChange={v => setEditParams({...editParams, layerName: v})} placeholder={selType === 'Object' ? '家具' : '灯具'} /></>}
-            {selType === 'Mesh' && <><NumInput label={zh ? '标高(m)' : 'Level(m)'} value={editParams.level} onChange={v => setEditParams({...editParams, level: v})} placeholder="0" /><TxtInput label={zh ? '图层' : 'Layer'} value={editParams.layerName} onChange={v => setEditParams({...editParams, layerName: v})} placeholder="地形" /></>}
-            {selType === 'Zone' && <><TxtInput label={zh ? '区域名' : 'ZoneName'} value={editParams.zoneName} onChange={v => setEditParams({...editParams, zoneName: v})} placeholder="客厅" /><NumInput label={zh ? '高度(m)' : 'Height(m)'} value={editParams.height} onChange={v => setEditParams({...editParams, height: v})} placeholder="2.8" /><TxtInput label={zh ? '图层' : 'Layer'} value={editParams.layerName} onChange={v => setEditParams({...editParams, layerName: v})} placeholder="区域" /></>}
+            {selType === 'Mesh' && <><NumInput label={zh ? '标高(m)' : 'Level(m)'} value={editParams.level} onChange={v => setEditParams({...editParams, level: v})} placeholder="0" /><TxtInput label={zh ? '图层' : 'Layer'} value={editParams.layerName} onChange={v => setEditParams({...editParams, layerName: v})} placeholder={zh ? "地形" : "Mesh"} /></>}
+            {selType === 'Zone' && <><TxtInput label={zh ? '区域名' : 'ZoneName'} value={editParams.zoneName} onChange={v => setEditParams({...editParams, zoneName: v})} placeholder={zh ? "客厅" : "Living room"} /><NumInput label={zh ? '高度(m)' : 'Height(m)'} value={editParams.height} onChange={v => setEditParams({...editParams, height: v})} placeholder="2.8" /><TxtInput label={zh ? '图层' : 'Layer'} value={editParams.layerName} onChange={v => setEditParams({...editParams, layerName: v})} placeholder={zh ? "区域" : "Zone"} /></>}
           </div>
           <button onClick={handleApply} disabled={applying || !mepbridgeConnected} className="flex items-center justify-center gap-1.5 px-3 py-2 bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/40 rounded text-xs font-semibold text-orange-300 transition-colors disabled:opacity-50">
             {applying ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}

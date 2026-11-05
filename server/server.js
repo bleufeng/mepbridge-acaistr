@@ -88,6 +88,8 @@ const userAssetsRouter = require('./routes/user-assets');
 const selectionEventsRouter = require('./routes/selection-events'); // FO-2: 选择集事件推送
 const planChainRouter = require('./routes/plan-chain');             // H2: 自治编排引擎
 const knowledgeBaseRouter = require('./routes/knowledge-base');     // H8: 知识库建设
+const uiPreferencesRouter = require('./routes/ui-preferences');
+const uiPreferences = require('./services/ui-preferences');
 const learningMemoryRouter = require('./routes/learning-memory');   // H9: 学习记忆
 const proactiveIntelRouter = require('./routes/proactive-intelligence'); // H10: 主动智能
 const mcpStatusRouter = require('./routes/mcp-status');             // MCP host integration status
@@ -114,6 +116,8 @@ app.use('/api/copilot/message', copilotMessageRouter); // Copilot NL → Plan（
 app.use('/api/user-assets', userAssetsRouter); // E.2 用户资产持久化（模板/自定义命令/导出导入）
 app.use('/api/selection', selectionEventsRouter); // FO-2: 选择集事件推送 (SSE + REST)
 app.use('/api/plan-chain', planChainRouter);       // H2: 自治编排引擎（多步执行链 + 闸门）
+app.use('/api/ui-preferences', uiPreferencesRouter);
+app.use('/api/model-audit', require('./routes/model-audit')); // manual-only model review, no automatic host reads
 app.use('/api/knowledge-base', knowledgeBaseRouter); // H8: 知识库（建筑规范+MEP标准+材料规格）
 app.use('/api/learning-memory', learningMemoryRouter); // H9: 学习记忆（纠正记录+模式学习）
 app.use('/api/proactive', proactiveIntelRouter);      // H10: 主动智能（缺口检测+建议+预判）
@@ -146,7 +150,7 @@ const archicadHost = '127.0.0.1';
 app.get('/ui-config.json', (req, res) => {
   res.json({
     ok: true,
-    language: RELEASE_LOCALE,
+    language: uiPreferences.get().locale || RELEASE_LOCALE,
     archicadHost,
     archicadPort: getArchicadPort()
   });
@@ -156,7 +160,7 @@ app.get('/ui-config.json', (req, res) => {
 // 直接写死 /help.html 会让 en-US 发布包的用户看到中文页，因此这里按发布包 locale
 // 重定向到对应的静态页；locale 与 /ui-config.json 同源（RELEASE_MANIFEST.json）。
 app.get('/guide', (req, res) => {
-  res.redirect(RELEASE_LOCALE === 'en-US' ? '/help.en-US.html' : '/help.html');
+  res.redirect((uiPreferences.get().locale || RELEASE_LOCALE) === 'en-US' ? '/help.en-US.html' : '/help.html');
 });
 
 // 未匹配的 API 请求必须在 SPA fallback 之前明确返回 JSON 404。

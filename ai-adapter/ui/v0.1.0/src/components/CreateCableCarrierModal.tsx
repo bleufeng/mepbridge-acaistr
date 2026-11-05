@@ -1,3 +1,4 @@
+import { workbenchFetch as fetch } from "../execution-recovery";
 // CreateCableCarrierModal.tsx
 // 创建电缆桥架对话框组件 — D5 V2 MEP Electrical 模块
 
@@ -177,7 +178,7 @@ export const CreateCableCarrierModal: React.FC<CreateCableCarrierModalProps> = (
               <input type="number" step="10" min="25" max="1000" value={params.widthMm}
                 onChange={e => setParams(p => ({ ...p, widthMm: Number(e.target.value) || 0 }))}
                 className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-2 text-sm text-zinc-200 outline-none focus:border-yellow-500"
-                placeholder="e.g. 150 (tray)" />
+                placeholder={lang === "zh-CN" ? "例如 150 （托盘）" : "e.g. 150 (tray)"} />
             </div>
 
             <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3 space-y-2">
@@ -185,7 +186,7 @@ export const CreateCableCarrierModal: React.FC<CreateCableCarrierModalProps> = (
               <input type="number" step="5" min="25" max="600" value={params.heightMm}
                 onChange={e => setParams(p => ({ ...p, heightMm: Number(e.target.value) || 0 }))}
                 className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-2 text-sm text-zinc-200 outline-none focus:border-yellow-500"
-                placeholder="e.g. 80 (tray)" />
+                placeholder={lang === "zh-CN" ? "例如 80 （托盘）" : "e.g. 80 (tray)"} />
             </div>
           </div>
 

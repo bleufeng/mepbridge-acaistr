@@ -1,3 +1,5 @@
+import { workbenchFetch as fetch } from "../execution-recovery";
+import { useUiLanguage } from "../ui-language";
 // EditMEPElementPanel.tsx
 // MEP 管线编辑面板 — BASE 模式 Water/Electrical/Ventilation 模块
 // 支持单个和批量编辑 3 专业 MEP 路由：Piping(管道) / Ventilation(风管) / CableCarrier(桥架)
@@ -70,19 +72,25 @@ async function callCmd(commandName: string, params: any): Promise<any> {
   return res.json();
 }
 
-const NumInput: React.FC<{ label: string; value: number | undefined; onChange: (v: number | undefined) => void; step?: number; placeholder?: string }> = ({ label, value, onChange, step = 0.01, placeholder }) => (
+const NumInput: React.FC<{ label: string; value: number | undefined; onChange: (v: number | undefined) => void; step?: number; placeholder?: string }> = ({ label, value, onChange, step = 0.01, placeholder }) => {
+  const inputLang = useUiLanguage();
+  return (
   <div className="flex flex-col gap-1">
     <label className="text-[10px] text-zinc-500 font-mono uppercase">{label}</label>
-    <input type="number" step={step} value={value ?? ''} onChange={e => onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} placeholder={placeholder || '不修改'} className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 font-mono outline-none focus:border-cyan-500" />
+    <input type="number" step={step} value={value ?? ''} onChange={e => onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} placeholder={placeholder || (inputLang === 'zh-CN' ? '不修改' : 'Unchanged')} className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 font-mono outline-none focus:border-cyan-500" />
   </div>
-);
+  );
+};
 
-const TxtInput: React.FC<{ label: string; value: string | undefined; onChange: (v: string | undefined) => void; placeholder?: string }> = ({ label, value, onChange, placeholder }) => (
+const TxtInput: React.FC<{ label: string; value: string | undefined; onChange: (v: string | undefined) => void; placeholder?: string }> = ({ label, value, onChange, placeholder }) => {
+  const inputLang = useUiLanguage();
+  return (
   <div className="flex flex-col gap-1">
     <label className="text-[10px] text-zinc-500 font-mono uppercase">{label}</label>
-    <input type="text" value={value ?? ''} onChange={e => onChange(e.target.value === '' ? undefined : e.target.value)} placeholder={placeholder || '不修改'} className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 font-mono outline-none focus:border-cyan-500" />
+    <input type="text" value={value ?? ''} onChange={e => onChange(e.target.value === '' ? undefined : e.target.value)} placeholder={placeholder || (inputLang === 'zh-CN' ? '不修改' : 'Unchanged')} className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 font-mono outline-none focus:border-cyan-500" />
   </div>
-);
+  );
+};
 
 export const EditMEPElementPanel: React.FC<Props> = ({ domain, onExecute, lang, mepbridgeConnected, currentFloorIndex }) => {
   const zh = lang === 'zh-CN';

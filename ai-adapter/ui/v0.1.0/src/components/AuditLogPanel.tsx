@@ -307,13 +307,13 @@ export default function AuditLogPanel({ lang = "zh-CN", embedded = false }: Audi
                                     <div className="text-zinc-500 mt-0.5">{e.step.title}</div>
                                   )}
                                   {e.step?.action && (
-                                    <div className="text-indigo-400/70">action: {e.step.action}</div>
+                                    <div className="text-indigo-400/70">{lang === "zh-CN" ? "操作:" : "Action:"} {e.step.action}</div>
                                   )}
                                   {e.error && (
-                                    <div className="text-rose-400 mt-0.5">error: {e.error}</div>
+                                    <div className="text-rose-400 mt-0.5">{lang === "zh-CN" ? "错误:" : "Error:"} {e.error}</div>
                                   )}
                                   {e.finalStatus && (
-                                    <div className="text-emerald-400 mt-0.5">finalStatus: {e.finalStatus}</div>
+                                    <div className="text-emerald-400 mt-0.5">{lang === "zh-CN" ? "最终状态:" : "Final status:"} {e.finalStatus}</div>
                                   )}
                                 </div>
                               );

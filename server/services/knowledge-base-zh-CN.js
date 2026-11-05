@@ -143,15 +143,15 @@ module.exports = {
       '楼板: 现浇钢筋混凝土 120mm',
       '门: 木质夹板门 40mm / 窗: 断桥铝合金 70mm'
     ],
-    // 任务类型推断关键词
+    // 任务类型推断关键词（支持中英双语别名，消除语言识别盲区）
     intentKeywords: {
-      pipe: ['管', '风管', '桥架'],
-      building: ['墙', '楼板', '屋顶'],
-      doorWindow: ['门', '窗'],
-      drainage: ['排水', '废水', '污水', '雨水', 'waste', 'drain', 'sewage', 'rain'],
-      water: ['给水', '冷水', '热水', '循环', '冷水管', '热水管', '循环管', '供水', '进水', 'water', 'cold', 'hot', 'circulation'],
-      duct: ['风'],
-      electrical: ['桥架']
+      pipe: ['管', '管道', '布管', 'pipe', 'piping', 'plumbing', 'routing'],
+      building: ['墙', '柱', '梁', '楼板', '板', '屋顶', 'wall', 'column', 'beam', 'slab', 'roof'],
+      doorWindow: ['门', '窗', 'door', 'window'],
+      drainage: ['排水', '废水', '污水', '雨水', 'waste', 'drain', 'sewer', 'sewage', 'rain', 'storm'],
+      water: ['给水', '冷水', '热水', '循环', '冷水管', '热水管', '循环管', '供水', '进水', 'water', 'cold', 'hot', 'circulation', 'supply', 'potable'],
+      duct: ['风', '风管', '排风', '送风', '换气', 'duct', 'ventilation', 'exhaust', 'air'],
+      electrical: ['桥架', '电缆桥架', '线槽', 'cable carrier', 'cable tray', 'conduit', 'electrical']
     }
   }
 };

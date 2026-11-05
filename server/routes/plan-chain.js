@@ -21,6 +21,8 @@ const auditLogger = require('../services/audit-log');         // V2 H6.2 审计�
 const knowledgeBase = require('../services/knowledge-base');  // V2 H8.6 知识库校验钩子
 const learningMemory = require('../services/learning-memory'); // V2 H9.4 错误避免
 const { normalizeUiLocale, isEnglishUiLocale } = require('../services/ui-locale');
+const { freezeRequestTarget, executionTarget, publicTarget } = require('../services/request-target');
+const { getArchicadEndpoint } = require('../services/archicad-endpoint');
 
 // 活跃的 PlanChain 实例（单例模式：同一时间只运行一条链）
 let activeChain = null;
@@ -73,6 +75,10 @@ router.post('/execute', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Missing required field: message' });
     }
 
+    const frozenTarget = await freezeRequestTarget(req.body, { requireExplicit: false });
+    const targetEnvelope = executionTarget(frozenTarget);
+    const target = publicTarget(frozenTarget);
+
     // 如果已有活跃链，先取消
     if (activeChain && ['running', 'paused'].includes(activeChain.chain?.status)) {
       activeChain.cancel();
@@ -80,14 +86,60 @@ router.post('/execute', async (req, res) => {
 
     console.log(`[PlanChain API] Execute request: "${message.slice(0, 60)}", mode=${mode || 'copilot-auto'}`);
 
+
+    // UI auto mode enters here first. Complete deterministic single edits in the
+    // original request, not after model discovery + LLM + 1.5s status polling.
+    const nativeEdit = require('../services/native-edit-fast-path');
+    const nativePlan = nativeEdit.recognizeNativeEdit(message, req.body?.context || {});
+    if (nativePlan) {
+      if (!nativeEdit.automatic(req.body)) return res.json({
+        ok:true,status:'unsupported',chainId:null,steps:[],target,
+        message:english?'Native edit is available in the supervised plan path.':'原生编辑已转入人工审核计划。'
+      });
+      const snapshot=knowledgeBase.createSnapshot();
+      knowledgeBase.verifySnapshot(snapshot);
+      if(snapshot.automaticPlanValidation==='ON') {
+        const validation=knowledgeBase.validatePlan(nativePlan,snapshot);
+        if(!validation.passed) return res.json({ok:true,status:'validation_failed',chainId:null,steps:nativePlan.steps,validation,target});
+      }
+      const executionContext={...req.body,...targetEnvelope,autoMode:true,knowledgeSnapshot:snapshot};
+      delete executionContext.message;delete executionContext.context;
+      // Supply the operation ID silently before dispatch; transport failures can
+      // still recover via the response header, without a negotiation roundtrip.
+      if (!executionContext.execution) executionContext.execution={operationId:require('../services/execution-coordinator').operationId()};
+      if (executionContext.execution?.operationId) res.setHeader('X-MEPBridge-Operation-Id',executionContext.execution.operationId);
+      const outcome = await nativeEdit.executeNativeEditPlan(nativePlan,executionContext);
+      // The durable client owns ID generation, binding, failure/rollback and replay.
+      // Do not retry, compensate or relabel UNKNOWN here.
+      activeChain = null;
+      const completed=outcome.success===true;
+      const intact = outcome.execution?.status==='FAILED_VERIFIED' && outcome.execution?.recoveryRequired===false;
+      const nativeFailureMessage = !completed && intact
+        ? (english?'The requested edit was not applied; native verification confirmed no model effect. Do not auto-retry.':
+          '本次参数未生效，原生校验已确认未修改或完整回滚。不会自动重试；其它操作可继续。')
+        : null;
+      const single={...nativePlan.steps[0],id:'native_edit_1',status:completed?'completed':'failed',
+        operationId:outcome.execution?.operationId||null,params:outcome.executedParams||nativePlan.steps[0].params,
+        result:{ok:completed,guid:outcome.data?.elementGuid||null,data:outcome.data,execution:outcome.execution},
+        error:outcome.detail?.message||outcome.error||null,diagnostic:outcome.detail||null};
+      return res.json({ok:true,executedInline:true,chainId:null,status:completed?'completed':'failed',
+        userIntent:message,summary:nativePlan.title,fastPath:outcome.fastPath||nativePlan.fastPath,
+        execution:outcome.execution,result:outcome.data,detail:outcome.detail,errorType:outcome.errorType,
+        stats:{completed:completed?1:0,failed:completed?0:1},steps:[single],target,
+        message:completed?(english?'Native edit completed and read back.':'原生编辑已完成并回读。'):
+          (nativeFailureMessage||outcome.detail?.actionableSuggestion||outcome.error||'Native edit failed; inspect the receipt.')});
+    }
+
     // ── Phase 1: LLM 生成计划 ──
     const context = {
       language: locale,
       locale,
+      userIntent: message,
+      knowledgeSnapshot: knowledgeBase.createSnapshot(),
+      target
     };
     // 注入模型快照上下文
-    const { getArchicadEndpoint } = require('../services/archicad-endpoint');
-    const ARCHICAD_ENDPOINT = getArchicadEndpoint();
+    const ARCHICAD_ENDPOINT = frozenTarget?.endpoint || getArchicadEndpoint();
     const [modelSnapshot] = await Promise.all([
       aiAdapter.getModelSnapshot(ARCHICAD_ENDPOINT)
     ]);
@@ -117,7 +169,8 @@ router.post('/execute', async (req, res) => {
           ? `No template with code ${parsedCode.code}. Available: ${available || 'none'}`
           : `未找到模板编号 ${parsedCode.code}。可用编号：${available || '（暂无）'}`,
         chainId: null,
-        steps: []
+        steps: [],
+        target
       });
     }
 
@@ -137,15 +190,18 @@ router.post('/execute', async (req, res) => {
         status: 'unsupported',
         message: plan.message || (english ? 'The request was not recognized.' : '无法识别意图'),
         chainId: null,
-        steps: []
+        steps: [],
+        target
       });
     }
 
     // V2 H8.6: 知识库校验钩子 — 检查计划是否符合建筑/MEP规范
     // 默认关闭（环境变量 KB_VALIDATION=on 开启），避免误拦截合法操作
-    const kbValidationEnabled = process.env.KB_VALIDATION === 'on';
+    plan.knowledgeContext = { activeLibraryId: context.knowledgeSnapshot.activeLibraryId, revision: context.knowledgeSnapshot.revision,
+      aliasVersion: context.knowledgeSnapshot.aliasVersion, injection: plan.knowledgeContext?.injection || 'NOT_USED_TEMPLATE_OR_FALLBACK' };
+    const kbValidationEnabled = context.knowledgeSnapshot.automaticPlanValidation === 'ON';
     if (kbValidationEnabled) {
-      const validation = knowledgeBase.validatePlan(plan);
+      const validation = knowledgeBase.validatePlan(plan, context.knowledgeSnapshot);
       if (!validation.passed) {
         // 有 error 级别违规 → 返回校验失败，不执行
         console.log(`[PlanChain][H8.6] Plan validation failed: ${validation.errorCount} errors, ${validation.warningCount} warnings`);
@@ -157,7 +213,8 @@ router.post('/execute', async (req, res) => {
             : '计划违反建筑规范，已拦截',
           validation,
           plan,
-          chainId: null
+          chainId: null,
+          target
         });
       }
       // 有 warning 级别 → 注入 warningText 但继续执行
@@ -181,10 +238,14 @@ router.post('/execute', async (req, res) => {
 
     // ── Phase 2: 创建编排链 ──
     activeChain = new PlanChain({
+      useDurableExecution: true,
       mode: mode || 'copilot-auto',
       approvalPolicy,
       locale,
       llm: aiAdapter.llm,
+      knowledgeSnapshot: context.knowledgeSnapshot,
+      receiptTarget: targetEnvelope,
+      target,
       aiAdapter: aiAdapter,               // H4.2: 视觉验证需要 aiAdapter.visualVerifyStep
       onProgress: (event) => {
         console.log(`[PlanChain] Progress: ${event.type}`, event.stepIndex !== undefined ? `step ${event.stepIndex + 1}` : '');
@@ -192,7 +253,8 @@ router.post('/execute', async (req, res) => {
       onGateRequired: autoConfirm === false ? async () => false : undefined
     });
 
-    const chain = activeChain.create(plan);
+    const executingChain = activeChain;
+    const chain = executingChain.create(plan);
 
     // ── Phase 3: 立即返回响应，异步执行 ──
     const initialResponse = {
@@ -200,9 +262,11 @@ router.post('/execute', async (req, res) => {
       chainId: chain.id,
       status: chain.status,
       userIntent: chain.userIntent,
+      knowledgeContext: chain.knowledgeContext,
       reasoning: chain.reasoning,
       summary: chain.summary,
       stats: chain.stats,
+      target,
       steps: chain.steps.map(s => ({
         id: s.id,
         action: s.action,
@@ -211,6 +275,7 @@ router.post('/execute', async (req, res) => {
         riskLevel: s.riskLevel,
         behavior: activeChain._resolveStepBehavior(s),
         status: s.status,
+        operationId: s.durableOperationId || null,
         params: s.params
       })),
       approvalPolicy: chain.approvalPolicy.mode,
@@ -222,7 +287,7 @@ router.post('/execute', async (req, res) => {
     // 异步执行
     (async () => {
       try {
-        const result = await activeChain.execute();
+        const result = await executingChain.execute();
         console.log(`[PlanChain API] Chain ${chain.id} finished: ${result.status}, stats=`, result.stats);
       } catch (execError) {
         console.error(`[PlanChain API] Chain ${chain.id} error:`, execError.message);
@@ -233,7 +298,7 @@ router.post('/execute', async (req, res) => {
 
   } catch (error) {
     console.error('[PlanChain API] Error:', error.message);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(error.statusCode || 500).json({ ok: false, error: error.message, errorType: error.code || error.message });
   }
 });
 
@@ -246,13 +311,20 @@ router.post('/create', async (req, res) => {
     const { message, mode } = req.body;
     const locale = normalizeUiLocale(req.body?.locale);
 
-    if (!message) {
+    if (!message || typeof message !== 'string') {
       return res.status(400).json({ ok: false, error: 'Missing message' });
     }
+
+    const frozenTarget = await freezeRequestTarget(req.body, { requireExplicit: false });
+    const targetEnvelope = executionTarget(frozenTarget);
+    const target = publicTarget(frozenTarget);
 
     const context = {
       language: locale,
       locale,
+      userIntent: message,
+      knowledgeSnapshot: knowledgeBase.createSnapshot(),
+      target
     };
     // 编号直达（与 /execute 同规则）：① 用户模板 TPL-0NN ② 出厂模板 SYS-0NN
     const codeTemplates = userAssets.templateCodes.loadVisibleTemplates(locale);
@@ -273,7 +345,8 @@ router.post('/create', async (req, res) => {
         ok: true,
         status: 'unsupported',
         message: `未找到模板编号 ${parsedCode.code}。可用编号：${availableCodes || '（暂无）'}`,
-        chain: null
+        chain: null,
+        target
       });
     }
     if (!plan) {
@@ -284,10 +357,17 @@ router.post('/create', async (req, res) => {
     }
 
     if (plan.unsupported || !plan.steps || plan.steps.length === 0) {
-      return res.json({ ok: true, status: 'unsupported', message: plan.message, chain: null });
+      return res.json({ ok: true, status: 'unsupported', message: plan.message, chain: null, target });
     }
 
-    const chainInstance = new PlanChain({ mode: mode || 'manual-strict', locale });
+    plan.knowledgeContext ||= { activeLibraryId: context.knowledgeSnapshot.activeLibraryId, revision: context.knowledgeSnapshot.revision, aliasVersion: context.knowledgeSnapshot.aliasVersion, injection: 'NOT_USED_TEMPLATE_OR_FALLBACK' };
+    const chainInstance = new PlanChain({
+      mode: mode || 'manual-strict',
+      locale,
+      knowledgeSnapshot: context.knowledgeSnapshot,
+      receiptTarget: targetEnvelope,
+      target
+    });
     const chain = chainInstance.create(plan);
 
     res.json({
@@ -296,8 +376,10 @@ router.post('/create', async (req, res) => {
       status: 'preview',
       summary: chain.summary,
       userIntent: chain.userIntent,
+      knowledgeContext: chain.knowledgeContext,
       reasoning: chain.reasoning,
       stats: chain.stats,
+      target,
       approvalPolicy: chain.approvalPolicy.mode,
       steps: chain.steps.map(s => ({
         id: s.id,
@@ -313,7 +395,7 @@ router.post('/create', async (req, res) => {
     });
 
   } catch (error) {
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(error.statusCode || 500).json({ ok: false, error: error.message, errorType: error.code || error.message });
   }
 });
 
@@ -333,6 +415,7 @@ router.get('/status', (req, res) => {
     ok: true,
     hasActiveChain: true,
     ...status,
+    target: chain.target || null,
     userIntent: chain.userIntent,
     reasoning: chain.reasoning,
     steps: chain.steps.map((s, i) => ({
@@ -426,74 +509,21 @@ router.get('/audit/:chainId', (req, res) => {
   res.json({ ok: true, ...log });
 });
 
-/**
- * GET /api/plan-chain/capture
- * 主动触发 ViewportCapture 截图，返回 base64 PNG（供 UI 显示当前视口）
- * 查询参数:
- *   - includeImage=true|false (默认 true)
- *   - maxElements=100
- *   - storyIndex=integer (可选) — 切换到指定楼层后再截图（需 SwitchStory 命令支持）
- */
-router.get('/capture', async (req, res) => {
-  try {
-    const includeImage = req.query.includeImage !== 'false';
-    const maxElements = parseInt(req.query.maxElements) || 100;
-    const targetStoryIndex = req.query.storyIndex ? parseInt(req.query.storyIndex) : null;
-    const { getArchicadEndpoint: _getEp } = require('../services/archicad-endpoint');
-    const ARCHICAD_ENDPOINT = _getEp();
-
-    // 如果指定了楼层，先调用 SwitchStory 切换楼层
-    if (targetStoryIndex !== null && !isNaN(targetStoryIndex)) {
-      try {
-        await axios.post(ARCHICAD_ENDPOINT, {
-          command: 'API.ExecuteAddOnCommand',
-          parameters: {
-            addOnCommandId: { commandNamespace: 'MEPBridge', commandName: 'SwitchStory' },
-            addOnCommandParameters: { storyIndex: targetStoryIndex }
-          }
-        }, { timeout: 5000 });
-      } catch (switchErr) {
-        // 楼层切换失败不阻断截图，返回当前楼层截图 + warning
-        console.warn('[PlanChain][capture] SwitchStory failed:', switchErr.message);
-      }
+// Current capture is read-only. Story changes require preview + confirmation + durable ID.
+function viewportService() { return router._viewportCapture || require('../services/viewport-capture').getViewportCaptureService(); }
+function captureHandler(method) {
+  return async (req, res) => {
+    try {
+      const result = await viewportService()[method](method === 'current' ? req.query : req.body);
+      return res.status(result.ok ? 200 : result.httpStatus || 409).json(result);
+    } catch (error) {
+      return res.status(error.httpStatus || 409).json({ok:false,error:error.message,errorType:error.errorType || error.message});
     }
-
-    // 等一小段时间让 Archicad 完成视图刷新
-    if (targetStoryIndex !== null) {
-      await new Promise(resolve => setTimeout(resolve, 300));
-    }
-
-    const captureRes = await axios.post(ARCHICAD_ENDPOINT, {
-      command: 'API.ExecuteAddOnCommand',
-      parameters: {
-        addOnCommandId: { commandNamespace: 'MEPBridge', commandName: 'ViewportCapture' },
-        addOnCommandParameters: { maxElements, includeAabb: true, includeImage }
-      }
-    }, { timeout: 20000 });
-
-    const snapshot = captureRes.data?.result?.addOnCommandResponse;
-    if (!snapshot || snapshot.status !== 'ok') {
-      return res.json({ ok: false, error: 'ViewportCapture failed' });
-    }
-
-    res.json({
-      ok: true,
-      viewType: snapshot.viewType,
-      storyName: snapshot.storyName,
-      storyIndex: snapshot.storyIndex,
-      storyLevel: snapshot.storyLevel,
-      elementCount: snapshot.elementCount,
-      bounds: snapshot.bounds,
-      summary: snapshot.summary,
-      imageBase64: snapshot.imageBase64 || null,
-      imageFormat: snapshot.imageFormat || null,
-      imageSize: snapshot.imageSize || 0,
-      switchedStory: targetStoryIndex !== null ? targetStoryIndex : undefined
-    });
-  } catch (error) {
-    res.json({ ok: false, error: error.message });
-  }
-});
+  };
+}
+router.get('/capture', captureHandler('current'));
+router.post('/capture/preview', captureHandler('preview'));
+router.post('/capture', captureHandler('capture'));
 
 /**
  * GET /api/plan-chain/audit/:chainId/diff

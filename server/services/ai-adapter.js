@@ -95,9 +95,9 @@ class AIAdapter {
     this.executionHistory.push({
       action: step.action,
       commandNamespace: step.commandNamespace || 'MEPBridge',
-      success: step.success !== false,
+      success: step.success !== false && !require('./bounded-result-summary').hasResultFailure(step.result),
       timestamp: new Date().toISOString(),
-      result: step.result ? JSON.stringify(step.result).slice(0, 200) : null
+      result: step.result == null ? null : JSON.stringify(require('./bounded-result-summary').summarizeReadResult(step.action, step.result))
     });
     // 保持最近 MAX_HISTORY 条
     if (this.executionHistory.length > this.MAX_HISTORY) {
@@ -226,8 +226,13 @@ class AIAdapter {
   //   [无 LLM]   descriptor nlTriggers → fallback 硬编码 → 友好回复（跳过 LLM）
   // BASE 模式不经此链路（UI 端直接调 /api/execute）
   async generatePlan(text, context = {}) {
+    // Absolute native edits need no model snapshot, semantic inventory or LLM.
+    const nativePlan = require('./native-edit-fast-path').recognizeNativeEdit(text, context);
+    if (nativePlan) return nativePlan;
     const hasLLM = !!this.llm;
-    const planContext = { ...context };
+    const planContext = { ...context, userIntent: text,
+      knowledgeSnapshot: context.knowledgeSnapshot || require('./knowledge-base').createSnapshot() };
+    require('./knowledge-base').verifySnapshot(planContext.knowledgeSnapshot);
 
     try {
       planContext.semanticIndex = await semanticIndex.createContext(text, {
@@ -249,15 +254,32 @@ class AIAdapter {
     if (hasLLM) {
       // ─── LLM 优先路径 ───
       // L1: LLM 语义理解（systemPrompt 已从 descriptors 自动生成）
+      // V19-DISC-01: Profile 智能路由与确定性回退兜底（对齐 R-07 裁定）
+      const profileRegistry = require('./tool-profile-registry');
+      const requestedProfile = planContext.profile || 'full';
+      planContext.profile = requestedProfile;
+
       let llmFailure = null;
       try {
-        const plan = await this.llm.generatePlan(text, planContext);
+        let plan = await this.llm.generatePlan(text, planContext);
+
+        // Profiles are discovery hints, not authorization. A restricted refusal,
+        // empty plan or envelope mismatch gets one full retry, never the old plan.
+        let validation = profileRegistry.validatePlanAgainstProfile(plan,
+          profileRegistry.getProfileDescriptors(requestedProfile, this.descriptors));
+        if (!validation.valid && requestedProfile !== 'full') {
+          plan = await this.llm.generatePlan(text, { ...planContext, profile: 'full' });
+          validation = profileRegistry.validatePlanAgainstProfile(plan,
+            profileRegistry.getProfileDescriptors('full', this.descriptors));
+        }
+        if (!validation.valid) plan = null;
+
         if (plan && plan.steps && plan.steps.length > 0) {
           // LLM 命中：低置信度时仍降级到本地匹配（避免幻觉）
           if (plan.confidence !== undefined && plan.confidence < 0.5) {
             console.log(`[AI Adapter] LLM low confidence (${plan.confidence}), falling back to descriptor matching`);
           } else {
-            console.log('[AI Adapter] LLM generated plan successfully');
+            console.log(`[AI Adapter] LLM generated plan successfully (profile: ${planContext.profile})`);
             return this.enrichPlan(plan, text, planContext);
           }
         }
@@ -810,6 +832,9 @@ class AIAdapter {
 
     return {
       ...plan,
+      ...(context.knowledgeSnapshot ? { knowledgeContext: { activeLibraryId: context.knowledgeSnapshot.activeLibraryId,
+        revision: context.knowledgeSnapshot.revision, aliasVersion: context.knowledgeSnapshot.aliasVersion,
+        injection: plan.knowledgeContext?.injection || 'NOT_USED_TEMPLATE_OR_FALLBACK' } } : {}),
       steps: enrichedSteps,
       isMutation: hasMutation,
       warningText: plan.warningText || (hasMutation
@@ -887,7 +912,11 @@ class AIAdapter {
   }
 
   buildCommandJson(commandName, commandNamespace, params, desc) {
-    const baseCommand = desc?.commandJson
+    // APX resolves this explicit late-bound target. Legacy examples carry a GUID
+    // placeholder and dry-run flags: merging them would conflict or silently preview.
+    // Keep explicit caller flags/IDs untouched so native validation remains authoritative.
+    const nativeSelectionEdit = commandName === 'EditBuildingElement' && params?.target === 'currentSelection';
+    const baseCommand = !nativeSelectionEdit && desc?.commandJson
       ? clone(desc.commandJson)
       : {
           command: 'API.ExecuteAddOnCommand',

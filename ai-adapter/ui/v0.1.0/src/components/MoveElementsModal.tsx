@@ -1,3 +1,4 @@
+import { workbenchFetch as fetch } from "../execution-recovery";
 // MoveElementsModal.tsx
 // 移动构件交互式对话框组件
 

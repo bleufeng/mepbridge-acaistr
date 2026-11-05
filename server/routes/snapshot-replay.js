@@ -64,6 +64,7 @@ async function resolveInstance (spec) {
 
 const service = createSnapshotReplayService({
   callCommand,
+  durableExecution: require('../services/snapshot-execution').getSnapshotExecution(),
   resolveInstance,
   getEndpoint: () => getArchicadEndpoint()
 });
@@ -71,13 +72,13 @@ const service = createSnapshotReplayService({
 function sendResult (res, result) {
   if (result.ok) {
     const body = result.snapshot ? { snapshot: result.snapshot, warnings: result.warnings } : { preview: result.preview };
-    return res.json({ ok: true, ...body, ...(result.result ? { result: result.result } : {}) });
+    return res.json({ ok: true, ...body, ...(result.execution ? {execution:result.execution} : {}), ...(result.result ? { result: result.result } : {}) });
   }
   return res.status(result.httpStatus || 400).json({
     ok: false,
     error: result.message,
     errorType: result.errorType,
-    detail: result.detail
+    detail: result.detail, execution: result.execution, operationMayBeCommitted: result.operationMayBeCommitted
   });
 }
 
@@ -115,7 +116,7 @@ router.post('/apply', async (req, res) => {
     sendResult(res, result);
   } catch (error) {
     console.error('[SnapshotReplay][apply] error:', error.message);
-    res.status(500).json({ ok: false, error: error.message, errorType: 'INTERNAL_ERROR' });
+    res.status(409).json({ ok: false, error: error.message, errorType: error.message, blockingOperationId: error.blockingOperationId });
   }
 });
 

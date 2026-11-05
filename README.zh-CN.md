@@ -4,8 +4,8 @@
 >
 > 探索方向：依托 MCP 双向数据交互，逐步形成“任务规划 → 执行建模 → 读取模型反馈 → 修正迭代”的 AI Loop。当前初始版本重点是建立可靠的模型读写、风险确认与结果回读基础；图纸解析、合规校验和建筑设计全流程、全专业智能化期望持续扩展方向。
 
-[![Archicad](https://img.shields.io/badge/Archicad-28%20%7C%2029-blue.svg)]()
-[![Version](https://img.shields.io/badge/version-0.1.8-orange.svg)]()
+[![Archicad](https://img.shields.io/badge/Archicad-28%20%7C%2029%20%7C%2030-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.1.9-orange.svg)]()
 [![OPENBIM](https://img.shields.io/badge/OPENBIM-Workflow-0F766E.svg)]()
 [![Archicad JSON API](https://img.shields.io/badge/ARCHICAD-JSON%20API-2563EB.svg)]()
 [![C++ Add-On](https://img.shields.io/badge/C%2B%2B-Add--On-00599C.svg)]()
@@ -25,27 +25,33 @@
 
 ## 发布范围
 
-- 版本：`v0.1.8`
+- 版本：`v0.1.9`
 - 91 个注册 C++ 命令
 - 91 个 Add-On descriptor/MCP 工具
 - 4 个本地 Workbench Server 工具
 - 仅直接调用的 C++ 命令：无
-- 支持 Archicad 28 和 Archicad 29 Windows 版本
+- 支持 Archicad 28、29 和 30 Windows 版本
 - Server 默认地址：`127.0.0.1:19780`
 - Archicad JSON API 本机检测范围：`127.0.0.1:19723-19743`
 
 公开更新记录：[CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)。
 
-请从 GitHub Releases 按界面语言下载完整安装包：
+v0.1.9 首次安装和跨组件升级统一下载唯一的双语完整包：
 
-- `MEPbridge-ACAIstr-v0.1.8-win64-zh-CN.zip`：中文完整安装包。
-- `MEPbridge-ACAIstr-v0.1.8-win64-en-US.zip`：英文完整安装包。
+- `MACAI-Workbench-v0.1.9-win64.zip`
 
-不要下载 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`，它们不是安装包，不包含完整 APX 和运行依赖。每个完整 ZIP 均包含 AC28/AC29 APX、Workbench Server、编译后的 UI、MCP Server、生产依赖、法律文件、发布清单和 SHA256 校验和。单独的 AC28/AC29 APX 仅供已安装完整运行环境的用户更新插件。
+完整包包含 AC28/AC29/AC30 APX、Workbench Server、双语 UI、MCP Server、生产依赖和包内 Node 便携运行时，用户无需另装 Node.js/npm。三版 APX ZIP 仅供已有完整安装用户按 Release 说明做单件更新。GitHub 源码归档不是安装包。
 
 公开仓库提供 C2 Workbench 开放协作能力，包括 React Workbench、Node.js Server、MCP Server、核心 descriptor、审核模块 SDK 与 schema、示例和公开文档。开发者可以新增审核模块、组合现有 Archicad 命令形成新工作流、扩展 UI 面板与 Server 服务、完善 MCP 集成，并贡献示例或文档。
 
 本仓库面向 Workbench 开发与功能扩展，不以独立构建 APX 为目标，最终用户应下载经过验收的发布 ZIP，不需要克隆源码。支持第三方 API 自定义接入，项目还未扩展深度能力，建议搭配支持 MCP 协议的主流 AI 大模型宿主平台使用。
+
+## 开发构成与 DevKit／C++ 边界
+
+- **两层实现**：原生 Add-On 层为 `MEPBridge.apx`，以 C++ 编写，基于 Graphisoft 发布的 Archicad API 与 Archicad API Development Kit（DevKit）构建，宿主内通过 Archicad JSON API 交互；Workbench 层为 React UI、Node.js Server 与 MCP Server，使用 TypeScript／JavaScript，不经 DevKit 构建。
+- **公开仓库范围**：只提供可公开协作的 Workbench 层及其命令描述符、模块、示例与文档；**不含**原生 C++ 源码、Archicad 资源文件、Graphisoft DevKit／SDK 示例、APX 二进制及构建产物。因此**公开仓库不是可复现的 APX 构建源**。
+- **参与门槛**：扩展 Workbench／Server／UI／MCP 与新增审核模块**不需要 DevKit，也不需要 C++ 工具链**；原生层由维护者团队在内部环境使用对应版本的 DevKit 与 MSVC 构建，按 Archicad 28／29／30 分版本产出，并随发布 ZIP 提供。
+- **DevKit 来源**：DevKit 是 Graphisoft 独立发布并受其许可约束的组件，本项目不代下载、不再分发；内部参与原生层开发须自行从 Graphisoft 获取对应版本并遵守其许可。
 
 ## 示例预览
 
@@ -120,7 +126,7 @@ UI 和 MCP 的模型操作统一通过 `/api/execute`。用户模板、学习记
 
 ## 安装
 
-1. 从 Releases 下载完整的 `win64-zh-CN.zip` 或 `win64-en-US.zip`，不要把独立 APX 更新文件或自动生成的 `Source code.zip` / `Source code.tar.gz` 当作完整安装包。
+1. 从 GitHub Release 下载 `MACAI-Workbench-v0.1.9-win64.zip`；不要把 APX 更新 ZIP 或源码归档当作完整安装包。包内 `RELEASE_MANIFEST.json` 与 `SHA256SUMS.txt` 用于载荷校验。
 2. 解压到普通可写目录（Windows 会创建同名文件夹，属预期行为）。
 3. 关闭 Archicad，进入解压出的文件夹，双击其中的 `Install-MEPBridge.cmd`（该文件夹是 Workbench 运行目录，装完勿删）。
 4. 重新启动 Archicad。
@@ -129,12 +135,14 @@ UI 和 MCP 的模型操作统一通过 `/api/execute`。用户模板、学习记
 也可以在发布包根目录打开命令提示符或 PowerShell，手动启动 Server：
 
 ```powershell
-node server\server.js
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\Start-BaseWorkbench.ps1 -Action Serve
 ```
 
 然后打开 `http://127.0.0.1:19780/`。
 
 完整步骤参见[安装说明](docs/user/INSTALL.zh-CN.md)。
+
+**v0.1.9限制：** 不支持既有幕墙高度编辑，写入前拒绝；新建时设置高度与已验证分格能力保留，详见[安装说明](docs/user/INSTALL.zh-CN.md)。
 
 ## 公开源码目录
 

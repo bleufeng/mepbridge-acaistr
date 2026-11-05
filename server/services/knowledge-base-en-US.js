@@ -129,15 +129,15 @@ module.exports = {
       'Slab: Cast-in-Place Reinforced Concrete 120mm',
       'Door: Wood Flush 40mm / Window: Aluminum Clad 70mm'
     ],
-    // Task type inference keywords (English)
+    // Task type inference keywords (supports controlled bilingual aliases)
     intentKeywords: {
-      pipe: ['pipe', 'duct', 'cable tray', 'conduit'],
-      building: ['wall', 'slab', 'roof', 'column', 'beam'],
-      doorWindow: ['door', 'window'],
-      drainage: ['drainage', 'drain', 'sewer'],
-      water: ['water', 'supply'],
-      duct: ['duct', 'ventilation', 'air'],
-      electrical: ['cable', 'tray', 'electrical']
+      pipe: ['pipe', 'piping', 'plumbing', 'conduit', 'routing', '管', '管道', '布管'],
+      building: ['wall', 'slab', 'roof', 'column', 'beam', '墙', '柱', '梁', '楼板', '板', '屋顶'],
+      doorWindow: ['door', 'window', '门', '窗'],
+      drainage: ['drainage', 'drain', 'sewer', 'sewage', 'waste', 'storm', '排水', '废水', '污水', '雨水'],
+      water: ['water', 'supply', 'potable', 'cold', 'hot', 'circulation', '给水', '冷水', '热水', '供水'],
+      duct: ['duct', 'ventilation', 'exhaust', 'air', '风', '风管', '排风', '送风', '换气'],
+      electrical: ['cable', 'tray', 'cable tray', 'cable carrier', 'conduit', 'electrical', '桥架', '电缆桥架', '线槽']
     }
   }
 };

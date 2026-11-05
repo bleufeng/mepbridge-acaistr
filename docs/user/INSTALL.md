@@ -1,45 +1,47 @@
-# MEPbridge ACAIstr v0.1.8 Installation
+# MEPbridge ACAIstr v0.1.9 Installation
 
-This guide applies to the Windows release packages for Archicad 28 and Archicad 29.
+> This guide covers v0.1.9. Download the approved ZIP from the GitHub Release. The complete package carries `RELEASE_MANIFEST.json` and `SHA256SUMS.txt` for payload verification.
 
-Download `MEPbridge-ACAIstr-v<version>-win64-en-US.zip` for an English-first installation or `MEPbridge-ACAIstr-v<version>-win64-zh-CN.zip` for a Chinese-first installation (`<version>` = the latest release listed on the Releases page). Do not use an APX-only update or GitHub's automatically generated `Source code.zip` / `Source code.tar.gz` for first-time installation.
+This guide applies to Archicad 28, 29, and 30 on Windows x64.
+
+For a first installation or cross-component upgrade, download the single bilingual `MACAI-Workbench-v0.1.9-win64.zip`. Do not use an APX update ZIP or GitHub-generated source archive as a full installer.
 
 ## Requirements
 
 - Windows x64
-- Archicad 28 or Archicad 29
-- Node.js 18 or later
+- Archicad 28, 29, or 30
 - A writable extraction directory
+- Permission to approve installer elevation
 
-The Server listens on `127.0.0.1:19780` by default. Archicad's local JSON API is detected in the `127.0.0.1:19723-19743` range.
+**No separate Node.js or npm installation is required.** The full package includes a pinned Windows x64 Node portable runtime and Server production dependencies. Workbench components use only the bundled runtime and do not fall back to system Node.
 
-### Node.js requirement
+The Server listens on `127.0.0.1:19780`; Archicad JSON API is detected in `127.0.0.1:19723-19743`.
 
-The native Add-On (`MEPBridge.apx`) works without Node.js, but the **Workbench Server, UI, and MCP Server all require Node.js 18 or later**. If Node.js is missing, the installer still installs the APX and prints a warning; the Archicad commands remain usable, but the Workbench will not start until Node.js is installed.
+### Portable runtime requirement
 
-Verify Node.js is available before or after installation:
+Keep the complete extraction directory, including `runtime`. If the runtime is missing, invalid, or cannot start, download and fully extract the package again; do not install system Node as a workaround. Environment-free means no separate Node.js/npm install; supported Windows, matching Archicad, and normal permissions are still required.
 
-```powershell
-node --version
-```
+## Release Asset Selection
 
-If the command is not found, download and install the LTS release from <https://nodejs.org/>, then reopen the MEPbridge ACAIstr menu to start the Workbench.
-
-## Package Selection
-
-Both full language packages contain:
+The full package contains:
 
 ```text
 Archicad-28\MEPBridge.apx
 Archicad-29\MEPBridge.apx
+Archicad-30\MEPBridge.apx
+runtime\node\node.exe
+runtime\runtime-manifest.json
 ```
 
-Use only the APX matching the installed Archicad major version.
+The installer deploys the matching APX. Existing complete installations may use these APX update ZIPs only when the Release explicitly allows an APX-only update:
 
-The standalone `MEPbridge-ACAIstr-v<version>-AC28-win64.apx` and
-`MEPbridge-ACAIstr-v<version>-AC29-win64.apx` assets update only the native Add-On.
-They do not include the Server, UI, MCP Server, production dependencies, or
-installer and are intended only for an existing complete installation.
+```text
+MEPbridge-apx-AC28-v0.1.9-win64.zip
+MEPbridge-apx-AC29-v0.1.9-win64.zip
+MEPbridge-apx-AC30-v0.1.9-win64.zip
+```
+
+Each update ZIP contains one root-level `MEPBridge.apx` and no Workbench, runtime, dependencies, or installer. First installations must use the full package.
 
 ## Choosing Between an APX-Only Update and a Full Package Update
 
@@ -72,8 +74,7 @@ Two rules apply to both types:
 1. Save your work and exit Archicad completely. A running Archicad locks the APX
    file and the copy silently fails or has no effect.
 2. Back up the existing `MEPBridge.apx` in the Add-On folder.
-3. Copy the standalone APX matching your Archicad major version over it, keeping
-   the file name `MEPBridge.apx`.
+3. Extract the matching APX update ZIP and copy its `MEPBridge.apx` over the installed file.
 4. Confirm the folder contains exactly one active `.apx` file.
 5. Start Archicad and run Ping. The reported version must equal the new release
    version, and the command and descriptor counts must match the release notes.
@@ -124,7 +125,7 @@ Use this when the automatic installer fails, or when you want full control over 
 
 ### Step 1: Confirm your Archicad major version
 
-In Archicad, open Help → About Archicad; the title states either Archicad 28 or Archicad 29. The install folder name works too (Step 2 uses it). **You must install the APX matching your major version** — Archicad refuses to load an Add-On built for the other version.
+In Archicad, open Help → About Archicad; the title states Archicad 28, 29, or 30. **Install the matching APX** — another major version will not load.
 
 ### Step 2: Locate the Archicad install folder
 
@@ -135,6 +136,7 @@ Typical paths:
 ```text
 C:\Program Files\GRAPHISOFT\Archicad 28
 D:\Program Files\GRAPHISOFT\Archicad 29
+D:\Program Files\GRAPHISOFT\Archicad 30
 ```
 
 The folder is correct when `Archicad.exe` sits directly inside it.
@@ -163,6 +165,7 @@ From the extracted release package, pick the source file for your major version:
 ```text
 Archicad-28\MEPBridge.apx   → for Archicad 28
 Archicad-29\MEPBridge.apx   → for Archicad 29
+Archicad-30\MEPBridge.apx   → for Archicad 30
 ```
 
 Copy it into the Step 4 folder. Choose Continue if Windows asks for administrator permission, and "Replace the file in the destination" if a file with the same name already exists.
@@ -189,7 +192,7 @@ Check in order:
 
 Passing these three means the native Add-On is installed and Archicad JSON commands are available.
 
-Using the Workbench (Server / UI / MCP Server) additionally requires Node.js plus the local menu configuration. Manual installation does not write that configuration, so run this once from the release package root:
+To use the Workbench, keep the portable runtime in place and create the local menu configuration. Manual APX copying does not write it, so run this once from the package root:
 
 ```powershell
 powershell -File tools\Start-BaseWorkbench.ps1 -Action InstallConfig
@@ -224,7 +227,7 @@ Manual fallback:
 3. Run:
 
 ```powershell
-node server\server.js
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\Start-BaseWorkbench.ps1 -Action Serve
 ```
 
 4. Keep the terminal open and browse to `http://127.0.0.1:19780/`.
@@ -232,11 +235,13 @@ node server\server.js
 
 ## MCP Configuration
 
-Start the Workbench Server first. Configure the MCP host to run:
+Start the Workbench Server first. Configure the MCP host to run the bundled executable:
 
 ```text
-node <package-root>\tools\mepbridge-mcp-server.js
+<package-root>\runtime\node\node.exe <package-root>\tools\mepbridge-mcp-server.js
 ```
+
+Do not configure system `node`.
 
 Example:
 
@@ -244,8 +249,8 @@ Example:
 {
   "mcpServers": {
     "mepbridge-acaistr": {
-      "command": "node",
-      "args": ["D:\\MEPbridge-ACAIstr\\tools\\mepbridge-mcp-server.js"],
+      "command": "D:\\MACAI-Workbench-v0.1.9-win64\\runtime\\node\\node.exe",
+      "args": ["D:\\MACAI-Workbench-v0.1.9-win64\\tools\\mepbridge-mcp-server.js"],
       "env": {
         "MEPBRIDGE_ENDPOINT": "http://127.0.0.1:19780"
       }
@@ -258,7 +263,7 @@ Example:
 
 `D:\MEPbridge-ACAIstr\` in the example is a placeholder. Replace it with your own extraction
 directory, for example
-`D:\\MEPbridge-ACAIstr-v<version>-win64-en-US\\tools\\mepbridge-mcp-server.js` (use the actual
+`D:\\MACAI-Workbench-v0.1.9-win64\\tools\\mepbridge-mcp-server.js` (use the actual
 extracted folder name). Note that Windows
 backslashes inside JSON must be escaped as `\\`.
 
@@ -266,11 +271,11 @@ backslashes inside JSON must be escaped as `\\`.
 
 | Client | How to configure |
 | --- | --- |
-| Doubao (desktop) | In Doubao desktop's MCP / extensions settings, add a custom MCP server: paste the JSON above, or fill the form with command `node`, the full script path as argument, and the `MEPBRIDGE_ENDPOINT` environment variable |
+| Doubao (desktop) | In Doubao desktop's MCP / extensions settings, add a custom MCP server: paste the JSON above, or fill the form with the bundled `runtime\node\node.exe` absolute path as command and the script absolute path as argument, and the `MEPBRIDGE_ENDPOINT` environment variable |
 | Cursor | Write the JSON into `%USERPROFILE%\.cursor\mcp.json` (project scope: `<project>\.cursor\mcp.json`), then restart Cursor |
 | Claude Desktop | Merge the JSON into `%APPDATA%\Claude\claude_desktop_config.json`, then restart Claude Desktop |
 | CodeBuddy | Write the JSON into the project `.codebuddy\.mcp.json` or the user-level `~\.codebuddy\.mcp.json`, then restart the IDE |
-| Codex CLI | Append to `%USERPROFILE%\.codex\config.toml` (TOML format): `[mcp_servers.mepbridge]`, `command = "node"`, `args = ["<extraction-dir>/tools/mepbridge-mcp-server.js"]`, `env = { MEPBRIDGE_ENDPOINT = "http://127.0.0.1:19780" }` |
+| Codex CLI | Append to `%USERPROFILE%\.codex\config.toml` (TOML format): `[mcp_servers.mepbridge]`, `command = "<extraction-dir>/runtime/node/node.exe"`, `args = ["<extraction-dir>/tools/mepbridge-mcp-server.js"]`, `env = { MEPBRIDGE_ENDPOINT = "http://127.0.0.1:19780" }` |
 | Antigravity CLI (formerly Gemini CLI) | Merge the JSON into the top-level `mcpServers` object of `%USERPROFILE%\.gemini\settings.json`, then start a new session |
 | Google Antigravity | Write the JSON into `%USERPROFILE%\.gemini\config\mcp_config.json`, then restart Antigravity |
 
@@ -292,7 +297,7 @@ configured host, refreshed every 10 seconds. It distinguishes two states:
 Any host that supports **stdio-transport MCP** can be connected. Provide the same three
 elements in its MCP settings:
 
-1. Command: `node`
+1. Command: `<your-extraction-dir>\runtime\node\node.exe`
 2. Argument: `<your-extraction-dir>\tools\mepbridge-mcp-server.js`
 3. Environment variable: `MEPBRIDGE_ENDPOINT=http://127.0.0.1:19780`
 
@@ -321,13 +326,15 @@ The default uninstall removes the APX but preserves user data. Workbench menu co
 
 ## Version Update
 
+**Upgrading from v0.1.8 or earlier to v0.1.9 requires a full-package update.** v0.1.9 introduces the single bilingual package, bundled runtime, and AC30 asset. Do not update only the APX or overwrite an old extraction directory.
+
 Users with a previous version installed can update as follows:
 
 ### Option 1: Full Package Update (Recommended)
 
 Use this when the Server, UI, MCP Server, or dependencies have changed.
 
-1. Download the new full ZIP (`win64-zh-CN.zip` or `win64-en-US.zip`) from GitHub Releases.
+1. Download `MACAI-Workbench-v0.1.9-win64.zip` from the GitHub Release. After extraction, retain and use the included `RELEASE_MANIFEST.json` and `SHA256SUMS.txt` for payload verification.
 2. Save your work and close Archicad.
 3. Extract the new ZIP to a fresh directory (keep the old directory for rollback).
 4. Double-click `Install-MEPBridge.cmd` in the new directory.
@@ -340,7 +347,7 @@ The installer backs up the old APX if its hash differs and replaces it with the 
 
 Use this for minor updates that fix only the native Add-On without changing the Server, UI, or dependencies.
 
-1. Download the standalone `MEPbridge-ACAIstr-vX.Y.Z-AC28-win64.apx` or `MEPbridge-ACAIstr-vX.Y.Z-AC29-win64.apx` (matching the installed Archicad major version) from GitHub Releases.
+1. Only when the Release explicitly says “APX-only update,” download and extract the matching `MEPbridge-apx-AC<host>-vX.Y.Z-win64.zip`.
 2. Save your work and close Archicad.
 3. Copy the new APX to `<Archicad folder>\Add-Ons\MEPBridge\`, overwriting the old `MEPBridge.apx` (back up the old file first).
 4. Restart Archicad.
@@ -374,3 +381,7 @@ User data is generally compatible across versions; if a data format incompatibil
   release notes of the installed version.
 
 Use a test or backed-up PLN before running write, delete, batch, or geometry-changing commands.
+
+## v0.1.9 capability limitation
+
+v0.1.9 does **not support height edits of existing curtain walls**. Height-only or combined height/grid requests are rejected before writing, with no automatic delete/recreate fallback. **Creation height and verified grid edits remain available.** Installing a separate Node.js runtime or DevKit does not enable this capability.

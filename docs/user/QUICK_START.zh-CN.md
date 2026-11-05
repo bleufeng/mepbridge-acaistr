@@ -1,12 +1,14 @@
-# MEPbridge ACAIstr v0.1.8 快速开始
+# MEPbridge ACAIstr v0.1.9 快速开始
+
+> 本文适用于 v0.1.9。
 
 ## 1. 安装
 
-请下载中文 `win64-zh-CN.zip` 或英文 `win64-en-US.zip` 完整安装包。独立 APX 仅用于已有完整安装的更新，GitHub 自动生成的源码归档不是安装包。
+从 GitHub Release 下载唯一的双语 `MACAI-Workbench-v0.1.9-win64.zip`。完整包内置 Node 便携运行时、生产依赖、`RELEASE_MANIFEST.json` 与 `SHA256SUMS.txt`，**无需另装 Node.js 或 npm**。首次安装不要使用 APX 更新 ZIP 或源码归档。
 
 1. 从 Releases 下载并解压最新版本的完整发布 ZIP（Windows 会创建同名文件夹，属预期行为）。
 2. 关闭 Archicad，进入解压出的文件夹，双击其中的 `Install-MEPBridge.cmd`（该文件夹是 Workbench 运行目录，装完勿删）。
-3. 重新启动 Archicad。
+3. 按提示选择 Archicad 28、29 或 30，重新启动 Archicad。
 4. 点击“MEPbridge ACAIstr → 打开 MEPbridge ACAIstr”。
 
 手动安装和 MCP 配置参见[安装说明](INSTALL.zh-CN.md)。
