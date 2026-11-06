@@ -14,11 +14,17 @@
 // 环境变量：
 //   MEPBRIDGE_ENDPOINT — Node.js Server 地址，默认 http://127.0.0.1:19780
 //   MEPBRIDGE_DESCRIPTORS — tool-descriptors.json 路径（可选，默认自动查找）
+//   MEPBRIDGE_TARGET_PORT — 目标 Archicad 实例端口（可选，19723-19743）。
+//     多实例并存时，用于让 MCP 独立于 Workbench 当前主实例进行显式定向。
+//     设置本变量后，
+//     每次工具调用都在请求体顶层附带 targetPort，由 instance-targeting (D-1)
+//     显式寻址到指定实例；未设置时行为与旧版完全一致。
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+const crypto = require('crypto');
 const {
   getCommandSafetyCapabilities,
   normalizeCommandSafetyParameters,
@@ -28,6 +34,18 @@ const { APP_VERSION } = require('../server/services/app-version');
 // ── 配置 ──
 const SERVER_ENDPOINT = process.env.MEPBRIDGE_ENDPOINT || 'http://127.0.0.1:19780';
 const SERVER_URL = new URL(SERVER_ENDPOINT);
+
+// 可选：把后续所有工具调用固定到指定 Archicad 实例端口（多实例场景）
+function resolveTargetPort(rawValue = process.env.MEPBRIDGE_TARGET_PORT) {
+  const raw = String(rawValue || '').trim();
+  if (!raw) return null;
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 19723 || port > 19743) {
+    throw new Error(`INVALID_TARGET_PORT: MEPBRIDGE_TARGET_PORT must be an integer from 19723 to 19743; received ${raw}`);
+  }
+  return port;
+}
+const TARGET_PORT = resolveTargetPort();
 
 // 自动查找 tool-descriptors.json
 function findDescriptorsPath() {
@@ -209,6 +227,30 @@ function inferRawSchema(defaultValue, description) {
 function extractorSpecToJsonSchema(key, spec = {}, defaultValue) {
   const type = spec.type || 'string';
   const description = spec.description || key;
+
+  // `type` describes legacy extraction; an explicit jsonSchema is the public
+  // input contract. Union schemas must not inherit a narrowing extractor type.
+  if (Object.prototype.hasOwnProperty.call(spec, 'jsonSchema')) {
+    if (!spec.jsonSchema || typeof spec.jsonSchema !== 'object' || Array.isArray(spec.jsonSchema)) {
+      throw new TypeError(`Invalid jsonSchema override for ${key}`);
+    }
+    return { description, ...JSON.parse(JSON.stringify(spec.jsonSchema)) };
+  }
+
+  // Native JSON Schema fields must survive discovery (FQ-11). Legacy extractor
+  // kinds still use the conversion below; boolean `required` is descriptor-only.
+  if (['object', 'array', 'number', 'integer', 'string', 'boolean'].includes(type)) {
+    const schemaKeys = ['properties', 'items', 'enum', 'oneOf', 'anyOf', 'allOf',
+      'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum',
+      'minItems', 'maxItems', 'minLength', 'maxLength', 'additionalProperties'];
+    if (schemaKeys.some(k => Object.prototype.hasOwnProperty.call(spec, k))) {
+      const schema = { type, description };
+      for (const k of schemaKeys) if (Object.prototype.hasOwnProperty.call(spec, k))
+        schema[k] = JSON.parse(JSON.stringify(spec[k]));
+      if (Array.isArray(spec.required)) schema.required = [...spec.required];
+      return schema;
+    }
+  }
 
   switch (type) {
     case 'number':
@@ -469,18 +511,44 @@ function buildCommandJson(desc, args = {}) {
   return commandJson;
 }
 
-// 获取所有 MCP 工具
+// 获取所有 MCP 工具（V19-DISC-01: 支持 MEPBRIDGE_PROFILE 静态过滤，严格维持 94 可见上限）
 function getMcpTools() {
   if (_toolsCache) return _toolsCache;
   const { descriptors } = loadDescriptors();
-  _toolsCache = (descriptors || []).filter(d => d.mcpExposure?.enabled !== false).map(descriptorToMcpTool).filter(t => t.name);
+  // Explicit config path only: do not search/migrate user credential files.
+  const configPath = process.env.MEPBRIDGE_CONFIG;
+  const config = configPath ? JSON.parse(fs.readFileSync(configPath, 'utf8')) : {};
+  const profileEnv = String(process.env.MEPBRIDGE_PROFILE || config.mcpProfile || 'full').toLowerCase();
+
+  let targetDescs = descriptors || [];
+  if (profileEnv !== 'full') {
+    try {
+      const toolProfileRegistry = require('../server/services/tool-profile-registry');
+      targetDescs = toolProfileRegistry.getProfileDescriptors(profileEnv, descriptors);
+    } catch (e) {
+      console.error(`[MCP] Failed to filter profile "${profileEnv}", falling back to full:`, e.message);
+      targetDescs = descriptors || [];
+    }
+  }
+
+  _toolsCache = targetDescs
+    .filter(d => d.mcpExposure?.enabled !== false)
+    .map(descriptorToMcpTool)
+    .filter(t => t.name);
   return _toolsCache;
 }
 
 // ── HTTP 调用 /api/execute ──
-function callExecute(commandJson) {
+function callExecute(commandJson, durable = false) {
+  const operationId = durable ? crypto.randomBytes(32).toString('hex') : null;
   return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ command: commandJson });
+    const body = JSON.stringify({
+      command: commandJson,
+      autoMode: true,
+      source: 'ui-copilot',
+      ...(TARGET_PORT ? { targetPort: TARGET_PORT } : {}),
+      ...(operationId ? {execution:{operationId}} : {})
+    });
     const req = http.request(
       {
         hostname: SERVER_URL.hostname,
@@ -505,8 +573,9 @@ function callExecute(commandJson) {
         });
       }
     );
-    req.on('error', (e) => reject(e));
-    req.on('timeout', () => { req.destroy(); reject(new Error('Request timeout (30s)')); });
+    const uncertain = error => { if (operationId) { error.operationId=operationId; error.message += `; operationId=${operationId}; result UNKNOWN, query /api/execute/operations/${operationId} before any new write`; } reject(error); };
+    req.on('error', uncertain);
+    req.on('timeout', () => { req.destroy(); uncertain(new Error('Request timeout (30s)')); });
     req.write(body);
     req.end();
   });
@@ -656,13 +725,12 @@ async function executeTool(toolName, args = {}) {
   }
 
   try {
-    const result = await callExecute(commandJson);
-    const resultText = JSON.stringify(result, null, 2);
+    const result = await callExecute(commandJson, desc.riskLevel !== 'read' && commandJson.command === 'API.ExecuteAddOnCommand' && commandJson.parameters?.addOnCommandParameters?.dryRun !== true);
+    const presentation = require('../server/services/bounded-result-summary').summarizeReadResult(desc.commandName, result);
+    const resultText = JSON.stringify(presentation);
 
     // 检查执行结果
-    const isSuccess = result.ok !== false &&
-      result.response?.result?.addOnCommandResponse?.status !== 'error' &&
-      !result.error;
+    const isSuccess = !require('../server/services/bounded-result-summary').hasResultFailure(result);
 
     return {
       content: [{
@@ -913,6 +981,7 @@ module.exports = {
   loadCommandBoundary,
   loadDescriptors,
   normalizeToolArguments,
+  resolveTargetPort,
   startStdioServer,
   validateCommandContractAndBoundary,
 };

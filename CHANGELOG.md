@@ -4,6 +4,32 @@ Public user-facing changes. Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-06
+
+### Added
+
+- One bilingual Windows x64 Workbench package now includes Archicad 28, 29 and 30 Add-Ons, production Server dependencies, and a provenance-checked portable Node runtime; users do not install Node.js or npm separately.
+- Curtain-wall grid subdivision can be edited in place while preserving the parent GUID. Creation height remains supported, while height edits of existing curtain walls are rejected before writing.
+- Atomic batch editing supports mixed wall and curtain-wall requests; batch creation includes slabs, roofs and extruded morphs alongside custom-height walls.
+- Slab thickness and elevation can be changed in place; wall/slab solid subtraction and roof/wall trimming include relationship readback verification.
+- Workbench, Copilot, PlanChain and the optional MCP target-port setting now use the selected live Archicad instance consistently, including Archicad 30.
+
+### Fixed
+
+- Curtain-wall grid input accepts mixed integer and floating-point spacing arrays; targeted memo masks avoid invalid-parameter failures during in-place changes.
+- Extruded morph creation uses outward-facing topology and isolated memo storage; custom-height walls detach the top-story link.
+- Archicad instance selection no longer falls back to a stale fixed endpoint, and an active task keeps its frozen host identity when the UI selection changes.
+
+### Changed
+
+- The registered release boundary remains 91 native commands / 91 descriptor tools / 4 local Server tools (95 tools total).
+- Upgrading from v0.1.8 or earlier requires the complete Workbench package; APX update ZIPs are for explicitly approved existing-installation updates only.
+
+### Known limitations
+
+- Height edits of existing curtain walls are unsupported and fail closed; there is no delete-and-recreate fallback. Creation height and verified grid edits remain available.
+- This is a limited-scope acceptance, not a full P0 claim. Undo/Redo and typed batch failure strategies were not run; the historical old-beam request remains unresolved.
+
 ## [0.1.8] - 2026-10-19
 
 ### Added

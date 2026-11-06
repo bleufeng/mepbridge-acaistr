@@ -4,8 +4,8 @@
 >
 > The exploration path uses two-way MCP data exchange to progressively form an AI Loop of task planning, model execution, model-feedback readback, and corrective iteration. Design instructions connect with AI algorithms through data, driving Archicad execution via the local Workbench / MCP layer and reading back structured results to close the loop. The initial version focuses on reliable model read/write access, risk confirmation, and result readback. Drawing interpretation, compliance checking, and multidisciplinary end-to-end design automation are expected to continue expanding.
 
-[![Archicad](https://img.shields.io/badge/Archicad-28%20%7C%2029-blue.svg)]()
-[![Version](https://img.shields.io/badge/version-0.1.8-orange.svg)]()
+[![Archicad](https://img.shields.io/badge/Archicad-28%20%7C%2029%20%7C%2030-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.1.9-orange.svg)]()
 [![OPENBIM](https://img.shields.io/badge/OPENBIM-Workflow-0F766E.svg)]()
 [![Archicad JSON API](https://img.shields.io/badge/ARCHICAD-JSON%20API-2563EB.svg)]()
 [![C++ Add-On](https://img.shields.io/badge/C%2B%2B-Add--On-00599C.svg)]()
@@ -46,27 +46,33 @@ Natural-language tasks and extensible user templates pass through planning and r
 
 ## Release Scope
 
-- Version: `v0.1.8`
+- Version: `v0.1.9`
 - 91 registered C++ commands
 - 91 Add-On descriptor/MCP tools
 - 4 local Workbench Server tools
 - Direct-only C++ commands: None
-- Archicad 28 and Archicad 29 Windows builds
+- Archicad 28, 29, and 30 Windows builds
 - Server default: `127.0.0.1:19780`
 - Archicad JSON API discovery: local `127.0.0.1:19723-19743`
 
 Public update history: [CHANGELOG.md](CHANGELOG.md).
 
-Download the full package for your language from GitHub Releases:
+First installations and cross-component upgrades for v0.1.9 use the single bilingual package:
 
-- `MEPbridge-ACAIstr-v0.1.8-win64-en-US.zip`: English full package.
-- `MEPbridge-ACAIstr-v0.1.8-win64-zh-CN.zip`: Chinese full package.
+- `MACAI-Workbench-v0.1.9-win64.zip`
 
-Do not use GitHub's automatically generated `Source code.zip` or `Source code.tar.gz`; they are not installation packages and do not contain the complete APX and runtime dependencies. Each full ZIP contains both AC28 and AC29 APXs, the Workbench Server, compiled UI, MCP Server, production dependencies, legal files, manifest, and checksums. The standalone AC28/AC29 APX assets are update-only files for users who already have a complete package installed.
+It contains AC28/AC29/AC30 APXs, Workbench, bilingual UI, MCP Server, dependencies, and a bundled Node runtime; users do not install Node.js/npm separately. The three APX ZIPs are only for Release-approved updates to an existing complete installation. Generated source archives are not installers.
 
 The public repository provides the C2 Workbench collaboration surface: React Workbench, Node.js Server, MCP Server, core descriptors, reviewed module SDK and schema, examples, and public documentation. Contributors can build reviewed modules, compose existing Archicad commands into new workflows, extend UI panels and Server services, improve MCP integrations, and contribute examples or documentation.
 
 The repository focuses on Workbench development and extension rather than independent APX builds. End users should install the signed-off release ZIP instead of cloning source.
+
+## Development Layers and the DevKit / C++ Boundary
+
+- **Two layers**: the native Add-On layer is `MEPBridge.apx`, written in C++ and built against the Archicad API and the Archicad API Development Kit (DevKit) published by Graphisoft, communicating with the host through the Archicad JSON API. The Workbench layer is the React UI, Node.js Server, and MCP Server, written in TypeScript/JavaScript and built without the DevKit.
+- **Public repository scope**: only the collaboratively open Workbench layer plus its command descriptors, modules, examples, and documentation. It does **not** contain native C++ sources, Archicad resource files, Graphisoft DevKit/SDK samples, APX binaries, or build output. The public repository is therefore **not a reproducible APX build source**.
+- **Contribution threshold**: extending the Workbench, Server, UI, MCP surface, or reviewed modules requires **neither the DevKit nor a C++ toolchain**. The native layer is built by the maintainers in an internal environment with the matching DevKit and MSVC, produced separately for Archicad 28/29/30, and shipped in the release ZIP.
+- **DevKit provenance**: the DevKit is a Graphisoft release governed by its own license. This project does not download or redistribute it; internal native-layer work requires obtaining the matching DevKit from Graphisoft and complying with its license.
 
 ## Main Capabilities
 
@@ -120,7 +126,7 @@ UI and MCP model operations pass through `/api/execute`. Runtime data such as us
 
 ## Install
 
-1. Download the complete `win64-en-US.zip` or `win64-zh-CN.zip` package from Releases, not an APX-only update or the automatically generated `Source code.zip` / `Source code.tar.gz`.
+1. Download `MACAI-Workbench-v0.1.9-win64.zip` from the GitHub Release; do not use an APX update ZIP or generated source archive as the full installer. The package contains `RELEASE_MANIFEST.json` and `SHA256SUMS.txt` for payload verification.
 2. Extract it to a normal writable directory (Windows creates a folder named after the ZIP — this is expected).
 3. Close Archicad, open the extracted folder and run `Install-MEPBridge.cmd` inside it (this folder is the Workbench runtime home — do not delete it after installation).
 4. Restart Archicad.
@@ -129,12 +135,14 @@ UI and MCP model operations pass through `/api/execute`. Runtime data such as us
 Manual Server startup is also available from a Command Prompt or PowerShell window opened in the extracted package root:
 
 ```powershell
-node server\server.js
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\Start-BaseWorkbench.ps1 -Action Serve
 ```
 
 Then open `http://127.0.0.1:19780/`.
 
 See [INSTALL.md](docs/user/INSTALL.md) for complete installation and MCP instructions.
+
+**v0.1.9 limitation:** Height edits of existing curtain walls are unsupported and rejected before writing. Creation height and verified grid edits remain available; see [installation limitations](docs/user/INSTALL.md#v019-capability-limitation).
 
 ## Public Source Layout
 

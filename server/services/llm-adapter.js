@@ -56,6 +56,10 @@ class LLMAdapter {
 
   // 生成操作计划
   async generatePlan(text, context = {}) {
+    const knowledgeBase = require('./knowledge-base');
+    // Capture before the first asynchronous generation; do not mutate the caller's context.
+    context = { ...context, userIntent: text, knowledgeSnapshot: context.knowledgeSnapshot || knowledgeBase.createSnapshot() };
+    knowledgeBase.verifySnapshot(context.knowledgeSnapshot);
     const language = context.language || 'zh-CN';
     const systemPrompt = this.getSystemPrompt(language, context);
     const userPrompt = this.getUserPrompt(text, context);
@@ -76,7 +80,10 @@ class LLMAdapter {
         throw new Error(`Unsupported provider: ${this.provider}`);
     }
 
-    return this.parseResponse(response);
+    const plan = this.parseResponse(response);
+    plan.knowledgeContext = { activeLibraryId: context.knowledgeSnapshot.activeLibraryId, revision: context.knowledgeSnapshot.revision,
+      aliasVersion: context.knowledgeSnapshot.aliasVersion, injection: this.descriptors.length ? 'INCLUDED' : 'NOT_IMPLEMENTED_FALLBACK' };
+    return plan;
   }
 
   // V2 H4.2: 视觉验证 — 真 PNG 截图 + 多模态 vision API
@@ -162,7 +169,19 @@ ${hasImage ? `\n**附真 PNG 截图（请仔细看图判断）**: 视口截图�
     }
   }
   // FO-3 (2026-06-26): 新增 context 参数，注入当前选择集信息
-  getSystemPrompt(context = {}) {
+  // E04 修复 (2026-10-27): 支持双参数 (language, context) 与单参数 (context) 兼容签名
+  getSystemPrompt(arg1, arg2) {
+    let language = 'zh-CN';
+    let context = {};
+    if (typeof arg1 === 'string') {
+      language = arg1;
+      context = (arg2 && typeof arg2 === 'object') ? arg2 : {};
+    } else if (arg1 && typeof arg1 === 'object') {
+      context = arg1;
+      language = context.language || 'zh-CN';
+    }
+    context = { ...context, language };
+
     // D5: 优先从 descriptors 动态生成（覆盖所有 23+ 命令）
     if (this.descriptors && this.descriptors.length > 0) {
       const dynamicPrompt = this.buildSystemPromptFromDescriptors(context);
@@ -174,18 +193,27 @@ ${hasImage ? `\n**附真 PNG 截图（请仔细看图判断）**: 视口截图�
 
   // D5: 从 descriptors 自动生成 system prompt
   // FO-3 (2026-06-26): 新增 context 参数，注入选择集上下文
-  // 优势：新增命令只需更新 tool-descriptors.json，无需手动维护 prompt
+  // V19-DISC-01: 集成 Profile 场景过滤与 Safe Schema Compaction（默认开启，节约 >50% Token）
   buildSystemPromptFromDescriptors(context = {}) {
     if (!this.descriptors || this.descriptors.length === 0) return null;
+
+    // Profile 过滤与依赖闭包支持
+    const profileRegistry = require('./tool-profile-registry');
+    const profileName = context?.profile || 'full';
+    const targetDescriptors = profileRegistry.getProfileDescriptors(profileName, this.descriptors);
+    const useCompact = context?.compact !== false;
 
     // 按 riskLevel 分组
     const readCmds = [];
     const mutationCmds = [];
 
-    for (const desc of this.descriptors) {
-      if (!desc.commandName) continue;
+    for (const desc of targetDescriptors) {
+      if (!desc.commandName && !desc.name) continue;
+      // 隔离命令防护
+      if (desc.mcpExposure?.enabled === false) continue;
+
       const isMutation = ['low-mutation', 'high-mutation', 'mutation', 'create-element', 'medium-mutation', 'batch-create'].includes(desc.riskLevel);
-      const entry = this.formatDescriptorForPrompt(desc);
+      const entry = this.formatDescriptorForPrompt(desc, { compact: useCompact });
       if (isMutation) mutationCmds.push(entry);
       else readCmds.push(entry);
     }
@@ -231,7 +259,7 @@ ${hasImage ? `\n**附真 PNG 截图（请仔细看图判断）**: 视口截图�
       const knowledgeBase = require('./knowledge-base');
       knowledgeSection = knowledgeBase.buildKnowledgeSection(context);
     } catch (e) {
-      console.log('[LLM][H8.4] Knowledge base injection skipped:', e.message);
+      throw new Error('KB_INJECTION_FAILED: ' + e.message);
     }
 
     // V2 H9.2 + H9.3: 注入学习记忆段落（用户纠正记录 + 模式学习）
@@ -248,7 +276,8 @@ ${hasImage ? `\n**附真 PNG 截图（请仔细看图判断）**: 视口截图�
     return `你是 MEPBridge AI 建模助手，负责解析用户的建筑/MEP 操作需求，通过 CAD-CoT（建模思维链）推理生成结构化操作计划。
 
 ${selectionSection}${historySection}${modelSection}${projectSection}${knowledgeSection}${learningSection}
-## 可用命令（自动从 tool-descriptors.json 生成，共 ${this.descriptors.length} 个）
+## 可用命令（共 ${readCmds.length + mutationCmds.length} 个，Profile: ${profileName}）
+${useCompact ? 'Parameter prose is authoritative: field-specific units; examples are not defaults.\n' : ''}
 
 ### 查询类命令（read，不修改模型）
 ${readCmds.join('\n')}
@@ -528,35 +557,47 @@ ${mutationCmds.join('\n')}
   }
 
   // D5: 格式化单个 descriptor 为 prompt 条目
-  formatDescriptorForPrompt(desc) {
-    const cmdName = desc.commandName;
+  // V19-DISC-01: 支持紧凑函数签名格式化 (options.compact)，保留 enum 枚举与安全门禁约束
+  formatDescriptorForPrompt(desc, options = {}) {
+    const isCompact = options.compact !== false;
+    const cmdName = desc.commandName || (desc.name ? desc.name.replace(/^mepbridge\./, '') : 'Unknown');
     const ns = desc.commandNamespace || 'MEPBridge';
     const risk = desc.riskLevel || 'read';
     const title = desc.title || cmdName;
-    const description = (desc.description || '').slice(0, 120);
 
-    // 提取参数信息
-    let paramInfo = '无参数';
-    if (desc.paramExtractors && Object.keys(desc.paramExtractors).length > 0) {
-      const params = Object.entries(desc.paramExtractors).map(([key, spec]) => {
-        const type = spec.type || 'any';
-        const desc2 = (spec.description || '').slice(0, 60);
-        return `    ${key} (${type}): ${desc2}`;
-      });
-      paramInfo = params.join('\n');
-    }
+    if (!isCompact) {
+      const description = (desc.description || '').slice(0, 120);
 
-    // commandJson 示例参数
-    let exampleParams = '{}';
-    if (desc.commandJson && desc.commandJson.parameters && desc.commandJson.parameters.addOnCommandParameters) {
-      exampleParams = JSON.stringify(desc.commandJson.parameters.addOnCommandParameters);
-    }
+      // 提取参数信息
+      let paramInfo = '无参数';
+      if (desc.paramExtractors && Object.keys(desc.paramExtractors).length > 0) {
+        const params = Object.entries(desc.paramExtractors).map(([key, spec]) => {
+          const type = spec.type || 'any';
+          const desc2 = (spec.description || '').slice(0, 60);
+          return `    ${key} (${type}): ${desc2}`;
+        });
+        paramInfo = params.join('\n');
+      }
 
-    return `- **${cmdName}** (namespace: ${ns}, risk: ${risk}): ${title}
+      // commandJson 示例参数
+      let exampleParams = '{}';
+      if (desc.commandJson && desc.commandJson.parameters && desc.commandJson.parameters.addOnCommandParameters) {
+        exampleParams = JSON.stringify(desc.commandJson.parameters.addOnCommandParameters);
+      }
+
+      return `- **${cmdName}** (namespace: ${ns}, risk: ${risk}): ${title}
   ${description}
   参数:
 ${paramInfo}
   示例: ${exampleParams}`;
+    }
+
+    // Conservative compaction: formatting only. Never infer units, optionality,
+    // enums or defaults from examples. Field prose carries native constraints.
+    const specs = Object.entries(desc.paramExtractors || {})
+      .map(([key, spec]) => `${key}:${JSON.stringify(spec)}`).join('; ');
+    const example = desc.commandJson?.parameters?.addOnCommandParameters;
+    return `- \`${cmdName}\` [namespace=${ns};risk=${risk}] ${title}: ${desc.description || ''}\n  params={${specs}}${example ? `\n  example (not defaults): ${JSON.stringify(example)}` : ''}`;
   }
 
   // 旧版硬编码 prompt（兜底用，不再推荐）
@@ -1011,6 +1052,10 @@ ${context.history ? context.history : '无执行历史'}
   // V2 H2.4: 执行结果回灌（参数精细化）
   // 每步执行后，将结果回灌给 LLM，让 LLM 精细化下一步参数
   async refineStepWithResult(currentStep, executionResult, remainingSteps, context = {}) {
+    const knowledgeBase = require('./knowledge-base');
+    context = { ...context, knowledgeSnapshot: context.knowledgeSnapshot || knowledgeBase.createSnapshot() };
+    knowledgeBase.verifySnapshot(context.knowledgeSnapshot);
+    const knowledgeSection = knowledgeBase.buildKnowledgeSection({ ...context, steps: remainingSteps });
     const systemPrompt = `你是 MEPBridge AI 执行精炼器。上一步命令已执行完毕，请根据执行结果精细化下一步的参数。
 
 ## 任务
@@ -1037,16 +1082,17 @@ ${context.history ? context.history : '无执行历史'}
   "skip": false
 }`;
 
+    const refinedSystemPrompt = systemPrompt + "\n" + knowledgeSection;
     const userPrompt = `请精细化下一步执行参数。`;
 
     let response;
     try {
       switch (this.provider) {
         case 'anthropic':
-          response = await this.callAnthropicAPI(systemPrompt, userPrompt);
+          response = await this.callAnthropicAPI(refinedSystemPrompt, userPrompt);
           break;
         default:
-          response = await this.callOpenAICompatibleAPI(systemPrompt, userPrompt);
+          response = await this.callOpenAICompatibleAPI(refinedSystemPrompt, userPrompt);
       }
       return this.parseRefinement(response, remainingSteps[0]);
     } catch (error) {

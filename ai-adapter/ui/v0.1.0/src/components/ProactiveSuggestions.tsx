@@ -31,6 +31,7 @@ interface Suggestion {
 interface ProactiveSuggestionsProps {
   lang?: "zh-CN" | "en-US";
   embedded?: boolean;
+  active?: boolean;
   onSuggestionClick?: (action: string, params?: Record<string, unknown>) => void;
 }
 
@@ -53,103 +54,43 @@ const TYPE_ICONS: Record<string, string> = {
   prediction: "🔮",
 };
 
-export default function ProactiveSuggestions({ lang = "zh-CN", embedded = false, onSuggestionClick }: ProactiveSuggestionsProps) {
+export default function ProactiveSuggestions({ lang = "zh-CN", embedded = false, active = true, onSuggestionClick }: ProactiveSuggestionsProps) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [sensitivity, setSensitivity] = useState<SensitivityLevel>("medium");
+  const [sensitivity, setSensitivity] = useState<SensitivityLevel>("off");
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [autoPoll, setAutoPoll] = useState(true);
+  const [autoPoll, setAutoPoll] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string>("");
-  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [configurationKnown, setConfigurationKnown] = useState(false);
+  const configEpoch = useRef(0);
+  const configGate = useRef(false);
+  // Model refresh is deliberately unavailable until server instance identity is qualified.
+  const modelRefreshQualified = false;
 
-  // 加载灵敏度
   const loadSensitivity = useCallback(async () => {
+    setConfigurationKnown(false);
+    const revision=++configEpoch.current;
     try {
-      const res = await fetch("/api/proactive/sensitivity");
-      const data = await res.json();
-      if (data.ok && data.level) {
-        setSensitivity(data.level as SensitivityLevel);
-      }
-    } catch (e) {
-      console.error("[Proactive] Load sensitivity failed:", e);
-    }
-  }, []);
-
-  // 加载建议
-  const loadSuggestions = useCallback(async () => {
-    if (sensitivity === "off") {
-      setSuggestions([]);
-      return;
-    }
-    setLoading(true);
+      const res=await fetch('/api/proactive/sensitivity'); const data=await res.json();
+      if(!res.ok || !data.ok || !Object.hasOwn(SENSITIVITY_LABELS,data.level)) throw Error(data.error||'PROACTIVE_CONFIGURATION_UNKNOWN');
+      if(revision===configEpoch.current){setSensitivity(data.level);setConfigurationKnown(true);setStatusMsg('');}
+    } catch(e:any){if(revision===configEpoch.current){setConfigurationKnown(false);setStatusMsg(e.message);}}
+  },[]);
+  useEffect(()=>{if(active) void loadSensitivity(); else setAutoPoll(false);return()=>{configEpoch.current++;};},[active,loadSensitivity]);
+  const loadSuggestions=useCallback(async()=>{
+    setStatusMsg(lang==='zh-CN'?'模型刷新暂不可用：服务端实例身份尚未资格化。':'Model refresh is unavailable: server instance identity is not yet qualified.');
+  },[lang]);
+  const handleSensitivityChange=async(level:SensitivityLevel)=>{
+    if(!active || !configurationKnown || configGate.current) return;
+    configGate.current=true; const revision=configEpoch.current;
     try {
-      const res = await fetch("/api/proactive/suggestions");
-      const data = await res.json();
-      if (data.ok) {
-        if (data.enabled === false) {
-          setSuggestions([]);
-        } else {
-          setSuggestions(data.suggestions || []);
-        }
-        setLastUpdated(new Date().toLocaleTimeString(lang === "zh-CN" ? "zh-CN" : "en-US"));
-      }
-    } catch (e) {
-      // 静默失败，不打扰用户
-      console.error("[Proactive] Load suggestions failed:", e);
-    } finally {
-      setLoading(false);
-    }
-  }, [sensitivity, lang]);
-
-  useEffect(() => {
-    loadSensitivity();
-  }, [loadSensitivity]);
-
-  useEffect(() => {
-    loadSuggestions();
-  }, [loadSuggestions]);
-
-  // 自动轮询（medium/aggressive 档 15s）
-  useEffect(() => {
-    if (pollTimer.current) {
-      clearInterval(pollTimer.current);
-      pollTimer.current = null;
-    }
-    if (autoPoll && (sensitivity === "medium" || sensitivity === "aggressive")) {
-      pollTimer.current = setInterval(() => {
-        loadSuggestions();
-      }, 15000);
-    }
-    return () => {
-      if (pollTimer.current) clearInterval(pollTimer.current);
-    };
-  }, [autoPoll, sensitivity, loadSuggestions]);
-
-  // 切换灵敏度
-  const handleSensitivityChange = async (level: SensitivityLevel) => {
-    try {
-      const res = await fetch("/api/proactive/sensitivity", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ level }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setSensitivity(level);
-        setStatusMsg(`✅ ${lang === "zh-CN" ? "灵敏度已设为" : "Sensitivity set to"} ${SENSITIVITY_LABELS[level][lang === "zh-CN" ? "zh" : "en"]}`);
-        if (level === "off") {
-          setSuggestions([]);
-        } else {
-          loadSuggestions();
-        }
-      } else {
-        setStatusMsg(`❌ ${data.error}`);
-      }
-    } catch (e: any) {
-      setStatusMsg(`❌ ${e.message}`);
-    }
+      const res=await fetch('/api/proactive/sensitivity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({level})});
+      const data=await res.json();
+      if(!res.ok || !data.ok) throw Error(data.error||'PROACTIVE_CONFIGURATION_SAVE_FAILED');
+      if(revision===configEpoch.current){setSensitivity(level);setStatusMsg(lang==='zh-CN'?'灵敏度已更新（当前服务内存状态）':'Sensitivity updated (current service memory state)');if(level==='off')setSuggestions([]);}
+    }catch(e:any){if(revision===configEpoch.current)setStatusMsg(e.message);}
+    finally{configGate.current=false;}
   };
-
   useEffect(() => {
     if (statusMsg) {
       const timer = setTimeout(() => setStatusMsg(""), 3000);
@@ -185,7 +126,7 @@ export default function ProactiveSuggestions({ lang = "zh-CN", embedded = false,
           </div>
           <button
             onClick={loadSuggestions}
-            disabled={isOff || loading}
+            disabled={!configurationKnown || !modelRefreshQualified || isOff || loading}
             className="px-2 py-0.5 text-[10px] rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {loading ? "..." : (lang === "zh-CN" ? "刷新" : "Refresh")}
@@ -199,6 +140,7 @@ export default function ProactiveSuggestions({ lang = "zh-CN", embedded = false,
             <button
               key={lvl}
               onClick={() => handleSensitivityChange(lvl)}
+              disabled={!configurationKnown || !active}
               className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold transition-all ${
                 sensitivity === lvl
                   ? `${SENSITIVITY_LABELS[lvl].color} bg-zinc-800 border border-zinc-700`
@@ -217,6 +159,7 @@ export default function ProactiveSuggestions({ lang = "zh-CN", embedded = false,
             <input
               type="checkbox"
               checked={autoPoll}
+              disabled={!modelRefreshQualified}
               onChange={(e) => setAutoPoll(e.target.checked)}
               className="w-3 h-3 accent-indigo-500"
             />
@@ -231,6 +174,7 @@ export default function ProactiveSuggestions({ lang = "zh-CN", embedded = false,
         </div>
       )}
 
+      <p className="p-3 text-xs text-amber-400">{lang === "zh-CN" ? "配置可用；模型刷新与自动轮询暂不可用，需独立完成实例身份资格。配置仅在当前服务内存中生效。" : "Configuration is available; model refresh and polling await independent instance identity qualification. Configuration applies to current service memory only."}</p>
       {/* 建议列表 */}
       <div className="flex-1 overflow-y-auto px-4 py-3">
         {isOff ? (

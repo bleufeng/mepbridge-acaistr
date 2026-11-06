@@ -12,6 +12,8 @@ const archicadClient = require('../services/archicad-client');
 const taskTemplates = require('../services/task-templates');   // V2 H5.5 任务模板库
 const userAssets = require('./user-assets');                   // 用户模板（含 TPL-0NN 编号）
 const { normalizeUiLocale, isEnglishUiLocale } = require('../services/ui-locale');
+const { freezeRequestTarget, publicTarget } = require('../services/request-target');
+const { getArchicadEndpoint } = require('../services/archicad-endpoint');
 
 /**
  * 「编号直达」：用户直接输入模板编号时，不经过 LLM 直接回放。
@@ -34,13 +36,13 @@ function resolveUserTemplateCode(message, locale) {
  * 返回 { count, types, guids } 或 null（获取失败/无选中）
  * @returns {Promise<{count: number, types: Array<{type:string,count:number}>, guids: string[]} | null>}
  */
-async function fetchSelectionContext() {
+async function fetchSelectionContext(targetOptions = {}) {
   try {
     const result = await archicadClient.executeCommand('GetSelectedElements', {
       onlyEditable: false,
       includeAabb: false,
       includeMepInfo: true
-    });
+    }, targetOptions);
 
     if (!result.success || !result.data) return null;
 
@@ -137,71 +139,106 @@ router.post('/', async (req, res) => {
 
   try {
     const { message } = req.body;
-
     if (!message || typeof message !== 'string') {
-      return res.status(400).json({
-        message: 'Missing required field: message',
-        isMepAction: false,
-        action: null
-      });
+      return res.status(400).json({ message: 'Missing required field: message', isMepAction: false, action: null });
     }
+    const frozenTarget = await freezeRequestTarget(req.body, { requireExplicit: false });
+    const target = publicTarget(frozenTarget);
+    const targetOptions = frozenTarget ? { targetPort: frozenTarget.port } : {};
+    const withTarget = (payload) => ({ ...payload, target });
+
 
     console.log(`[Copilot] NL input: ${message}`);
+    const nativePlan = require('../services/native-edit-fast-path').recognizeNativeEdit(message, req.body?.context || {});
+    if (nativePlan) return res.json(withTarget({
+      message: english ? 'Native edit ready; no LLM or geometry discovery needed.' : '已识别明确参数，使用原生快捷编辑，无需多轮分析。',
+      isMepAction: true, fastPath: nativePlan.fastPath,
+      action: {title:nativePlan.title,isMutation:true,warning:'',mepCode:'EditBuildingElement',steps:nativePlan.steps,parameters:[]}
+    }));
 
-    // FO-3: 并行获取选择集上下文 + V2 H3.1 模型快照 + V2 H3.2/H3.4 项目上下文
-    // 选择集/快照/项目上下文获取失败不阻断主流程（降级为无上下文模式）
-    const { getArchicadEndpoint } = require('../services/archicad-endpoint');
-    const ARCHICAD_ENDPOINT = getArchicadEndpoint();
-    const [selectionContext, modelSnapshot, projectContext] = await Promise.all([
-      fetchSelectionContext(),
-      aiAdapter.getModelSnapshot(ARCHICAD_ENDPOINT),
-      aiAdapter.getProjectContext(ARCHICAD_ENDPOINT)
-    ]);
 
-    const context = {
-      language: locale,
-      locale,
-    };
-    if (selectionContext && selectionContext.count > 0) {
-      context.selection = selectionContext;
-      console.log(`[Copilot][FO-3] Selection injected: ${selectionContext.count} elements, types=[${selectionContext.types.map(t => `${t.type}(${t.count})`).join(', ')}]`);
-    }
-    // V2 H3.1: 注入模型快照摘要
-    if (modelSnapshot) {
-      context.modelSnapshot = modelSnapshot.summary;
-      console.log(`[Copilot][H3.1] Model snapshot: ${modelSnapshot.summary}`);
-    }
-    // V2 H3.2 + H3.4: 注入项目上下文（楼层/视图/项目设置）
-    if (projectContext) {
-      context.projectContext = projectContext.summary;
-      if (projectContext.stories) context.stories = projectContext.stories;
-      console.log(`[Copilot][H3.2] Project context: ${projectContext.summary}`);
-    }
-
+    // E03 优化 (2026-10-27 / R-06): 将模板编号与直达识别前移，彻底消除无条件网络盲读等待
     // 编号直达（优先于关键词匹配）：
     //   ① 用户模板编号 TPL-0NN（assets.json，步骤为采集时固化）——未命中 = 未找到，不回落内置
     //   ② 出厂模板编号 SYS-0NN（内置任务模板 TPL-001..020，代码生成；聊天专用通道）
     const codeRequest = resolveUserTemplateCode(message, locale);
+    const context = { language: locale, locale, target };
     let templatePlan = codeRequest.plan;
-    let matchedBy = templatePlan ? `code ${codeRequest.code}` : 'keywords';
     if (!templatePlan && codeRequest.builtinId) {
       templatePlan = taskTemplates.generateById(codeRequest.builtinId, message, context);
-      if (templatePlan) matchedBy = `factory code ${codeRequest.code}`;
     }
+    let matchedBy = templatePlan ? `code ${codeRequest.code}` : 'keywords';
+
+    // 快速拦截 1: 未知模板编号，立即返回提示，完全不调用远端 Archicad
     const unknownCode = !templatePlan && Boolean(codeRequest.builtinId || (codeRequest.code && !codeRequest.found));
     if (unknownCode) {
       const available = userAssets.templateCodes.listTemplateCodes(codeRequest.templates)
         .slice(0, 12)
         .map((item) => `${item.code} ${item.name}`)
         .join('；');
-      console.log(`[Copilot][TPL-code] Code ${codeRequest.code || codeRequest.builtinId} not found`);
-      return res.json({
+      console.log(`[Copilot][TPL-code][E03-fast] Code ${codeRequest.code || codeRequest.builtinId} not found`);
+      return res.json(withTarget({
         message: english
           ? `No template with code ${codeRequest.code || codeRequest.builtinId}. Available: ${available || 'none'}`
           : `未找到模板编号 ${codeRequest.code || codeRequest.builtinId}。可用编号：${available || '（暂无）'}`,
         isMepAction: false,
         action: null
+      }));
+    }
+
+    // 尝试按用户模板名称匹配（除编号外的名称直达）
+    if (!templatePlan) {
+      const userTemplates = codeRequest.templates || userAssets.templateCodes.loadVisibleTemplates(locale);
+      const lower = message.trim().toLowerCase();
+      const matchedUserTpl = userTemplates.find(t => {
+        if (!t || !t.name) return false;
+        const nameLower = t.name.toLowerCase();
+        return lower === nameLower || lower.includes(nameLower) || (nameLower.length >= 4 && lower.includes(nameLower));
       });
+      if (matchedUserTpl) {
+        templatePlan = userAssets.templateCodes.buildPlanFromTemplate(matchedUserTpl);
+        if (templatePlan) {
+          codeRequest.kind = 'user';
+          codeRequest.code = matchedUserTpl.code || matchedUserTpl.id;
+          matchedBy = `user template "${matchedUserTpl.name}"`;
+        }
+      }
+    }
+
+    // 快速拦截 2: 用户固化模板（已在 assets.json 中持久化完整步骤），直接回放，跳过远端盲读
+    if (templatePlan && codeRequest.kind === 'user') {
+      console.log(`[Copilot][TPL-code][E03-fast] User template ${codeRequest.code} matched directly without remote I/O`);
+      const missing = findMissingRequiredParams(templatePlan.steps);
+      if (missing) {
+        return res.json(withTarget({
+          message: describeMissingParam(missing, english),
+          isMepAction: false,
+          action: null,
+          needsMoreInput: {
+            templateId: templatePlan.templateId,
+            action: missing.action,
+            param: missing.param
+          }
+        }));
+      }
+      return res.json(withTarget({
+        message: english
+          ? `Loaded plan from template ${codeRequest.code}: ${templatePlan.userIntent}`
+          : `已加载模板 ${codeRequest.code} 方案：${templatePlan.userIntent}`,
+        isMepAction: true,
+        action: {
+          title: templatePlan.title || templatePlan.userIntent,
+          warning: (templatePlan.isMutation !== false)
+            ? (english
+              ? 'This operation will create or modify building elements. Confirm before execution.'
+              : '此操作将创建或修改建筑构件，请确认后执行。')
+            : '',
+          isMutation: templatePlan.isMutation !== false,
+          mepCode: templatePlan.mepCode || templatePlan.steps[0]?.action || '',
+          steps: templatePlan.steps,
+          parameters: []
+        }
+      }));
     }
 
     // V2 H5.5: 再尝试关键词匹配（<200ms 精确匹配，避免不必要的 LLM 调用）
@@ -220,7 +257,7 @@ router.post('/', async (req, res) => {
       const missing = findMissingRequiredParams(templatePlan.steps);
       if (missing) {
         console.log(`[Copilot][H5.5] Template ${templatePlan.templateId} missing param: ${missing.param} (action=${missing.action})`);
-        return res.json({
+        return res.json(withTarget({
           message: describeMissingParam(missing, english),
           isMepAction: false,
           action: null,
@@ -229,7 +266,7 @@ router.post('/', async (req, res) => {
             action: missing.action,
             param: missing.param
           }
-        });
+        }));
       }
 
       // 转换模板计划为 UI 期望的 Copilot 响应格式
@@ -251,7 +288,7 @@ router.post('/', async (req, res) => {
       const isMutation = steps.some(s => s.riskLevel && (s.riskLevel.includes('mutation') || s.riskLevel.includes('create')));
       const mepCode = steps[0]?.action || '';
 
-      return res.json({
+      return res.json(withTarget({
         message: english
           ? `Matched template: ${templatePlan.userIntent}. Generated a ${steps.length}-step operation plan.`
           : `已匹配模板：${templatePlan.userIntent}，生成 ${steps.length} 步操作计划。`,
@@ -268,10 +305,36 @@ router.post('/', async (req, res) => {
           steps,
           parameters: []
         }
-      });
+      }));
     }
 
     // 调用 AI 适配器生成计划（双模式架构：有 LLM 走 LLM 优先，无 LLM 走纯本地）
+    // FO-3: 并行获取选择集上下文 + V2 H3.1 模型快照 + V2 H3.2/H3.4 项目上下文
+    // 选择集/快照/项目上下文获取失败不阻断主流程（降级为无上下文模式）
+    const ARCHICAD_ENDPOINT = frozenTarget?.endpoint || getArchicadEndpoint();
+    const [selectionContext, modelSnapshot, projectContext] = await Promise.all([
+      fetchSelectionContext(targetOptions),
+      aiAdapter.getModelSnapshot(ARCHICAD_ENDPOINT),
+      aiAdapter.getProjectContext(ARCHICAD_ENDPOINT)
+    ]);
+
+    if (selectionContext && selectionContext.count > 0) {
+      context.selection = selectionContext;
+      console.log(`[Copilot][FO-3] Selection injected: ${selectionContext.count} elements, types=[${selectionContext.types.map(t => `${t.type}(${t.count})`).join(', ')}]`);
+    }
+    // V2 H3.1: 注入模型快照摘要
+    if (modelSnapshot) {
+      context.modelSnapshot = modelSnapshot.summary;
+      console.log(`[Copilot][H3.1] Model snapshot: ${modelSnapshot.summary}`);
+    }
+    // V2 H3.2 + H3.4: 注入项目上下文（楼层/视图/项目设置）
+    if (projectContext) {
+      context.projectContext = projectContext.summary;
+      if (projectContext.stories) context.stories = projectContext.stories;
+      console.log(`[Copilot][H3.2] Project context: ${projectContext.summary}`);
+    }
+
+
     const plan = await aiAdapter.generatePlan(message, context);
 
     // LLM 配置不可用时，即使本地降级成功也要把原因告诉用户。
@@ -290,12 +353,12 @@ router.post('/', async (req, res) => {
       const baseMessage = plan.message || (english
         ? 'Sorry, I could not understand the request. Please describe it more specifically.'
         : '抱歉，我未能理解您的意图。请尝试更具体的描述。');
-      return res.json({
+      return res.json(withTarget({
         message: llmNotice ? `${llmNotice}\n\n${baseMessage}` : baseMessage,
         isMepAction: false,
         action: null,
         ...(plan.llmFailure ? { llmFailure: plan.llmFailure } : {})
-      });
+      }));
     }
 
     // 转换为 UI 期望的 Copilot 响应格式
@@ -320,13 +383,13 @@ router.post('/', async (req, res) => {
     if (missingFromPlan) {
       console.log(`[Copilot] Plan missing param: ${missingFromPlan.param} (action=${missingFromPlan.action})`);
       const hint = describeMissingParam(missingFromPlan, english);
-      return res.json({
+      return res.json(withTarget({
         message: llmNotice ? `${llmNotice}\n\n${hint}` : hint,
         isMepAction: false,
         action: null,
         needsMoreInput: { action: missingFromPlan.action, param: missingFromPlan.param },
         ...(plan.llmFailure ? { llmFailure: plan.llmFailure } : {})
-      });
+      }));
     }
 
     const planMessage = plan.userIntent
@@ -355,12 +418,13 @@ router.post('/', async (req, res) => {
     };
 
     console.log(`[Copilot] Generated ${steps.length} steps, isMutation=${response.action.isMutation}`);
-    res.json(response);
+    res.json(withTarget(response));
   } catch (error) {
     console.error('[Copilot] Error:', error.message);
-    res.status(500).json({
+    res.status(error.statusCode || 500).json({
       message: `${english ? 'Processing failed' : '处理失败'}: ${error.message}`,
       isMepAction: false,
+      errorType: error.code || error.message,
       action: null
     });
   }

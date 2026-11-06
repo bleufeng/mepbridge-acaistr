@@ -10,6 +10,7 @@ interface SelectionInfo {
 }
 
 interface SimpleInputDialogProps {
+  lang?: "zh-CN" | "en-US";
   isOpen: boolean;
   title: string;
   label: string;
@@ -25,14 +26,15 @@ interface SimpleInputDialogProps {
 }
 
 export const SimpleInputDialog: React.FC<SimpleInputDialogProps> = ({
+  lang = "zh-CN",
   isOpen,
   title,
   label,
   defaultValue = "",
   placeholder = "",
   options,
-  confirmText = "确认",
-  cancelText = "取消",
+  confirmText,
+  cancelText,
   isConfirm = false,
   selectionInfo,
   onConfirm,
@@ -63,8 +65,8 @@ export const SimpleInputDialog: React.FC<SimpleInputDialogProps> = ({
             <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-2.5">
               <div className="text-xs font-semibold text-zinc-300 mb-1">
                 📊 {selectionInfo.count > 0
-                  ? `已选中 ${selectionInfo.count} 个构件`
-                  : "未选中任何构件"}
+                  ? (lang === "zh-CN" ? `已选中 ${selectionInfo.count} 个构件` : `${selectionInfo.count} elements selected`)
+                  : (lang === "zh-CN" ? "未选中任何构件" : "No elements selected")}
               </div>
               {selectionInfo.count > 0 && Object.keys(selectionInfo.types).length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
@@ -116,14 +118,14 @@ export const SimpleInputDialog: React.FC<SimpleInputDialogProps> = ({
             onClick={onCancel}
             className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-xs text-zinc-300 transition-colors"
           >
-            {cancelText}
+            {cancelText ?? (lang === "zh-CN" ? "取消" : "Cancel")}
           </button>
           <button
             onClick={() => onConfirm(value)}
             disabled={selectionInfo && selectionInfo.count === 0}
             className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded text-xs text-white font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {confirmText}
+            {confirmText ?? (lang === "zh-CN" ? "确认" : "Confirm")}
           </button>
         </div>
       </div>

@@ -33,10 +33,18 @@ class ExtensionManager {
     this.registry = { schemaVersion: 'mepbridge-module-registry-1', modules: [] };
     this.archicadCommandCatalog = new Map();
     this.initialized = false;
+    this.activeExecutions = new Map();
+    this.lifecycleEpoch = 0;
+    this.stopped = false;
+    this.closedModules = new Set();
+    this.moduleEpochs = new Map();
     this.ready = Promise.resolve();
   }
 
   async initialize() {
+    if ([...this.activeExecutions.values()].some(count => count > 0)) throw new Error("MODULE_EXECUTION_IN_PROGRESS");
+    this.shutdown();
+    this.stopped = false;
     this.extensions.clear();
     this.commandRegistry.clear();
     this.statusCache.clear();
@@ -61,7 +69,7 @@ class ExtensionManager {
 
     this.initialized = true;
     this.notifyStatusChange();
-    if (this.startTimers) this.startBackgroundRefresh();
+    if (this.startTimers && this.extensions.size > 0) this.startBackgroundRefresh();
 
     console.log(
       `[ExtensionManager] Loaded ${this.extensions.size} reviewed module(s), ` +
@@ -82,6 +90,11 @@ class ExtensionManager {
   }
 
   async loadExtension(entry) {
+    if (!entry.enabled) throw new Error("MODULE_DISABLED_BY_REGISTRY");
+    if ((this.activeExecutions.get(entry.id) || 0) > 0) throw new Error("MODULE_EXECUTION_IN_PROGRESS");
+    this.closedModules.delete(entry.id);
+    this.moduleEpochs.set(entry.id, (this.moduleEpochs.get(entry.id) || 0) + 1);
+    const loadEpoch = this.lifecycleEpoch;
     const moduleRoot = resolveInside(this.modulesRoot, entry.path, `module path for ${entry.id}`);
     const manifestPath = path.join(moduleRoot, 'manifest.json');
     const manifest = readJsonFile(manifestPath);
@@ -118,6 +131,10 @@ class ExtensionManager {
       `availability check timed out for ${entry.id}`
     );
 
+    if (this.stopped || loadEpoch !== this.lifecycleEpoch || this.closedModules.has(entry.id)) {
+      if (typeof instance.dispose === 'function') await instance.dispose();
+      throw new Error('MODULE_LOAD_CANCELLED');
+    }
     const status = available ? 'online' : 'offline';
     const extensionData = {
       id: entry.id,
@@ -152,9 +169,11 @@ class ExtensionManager {
   createExecutionContext(manifest) {
     const allowedCommands = new Set(manifest.permissions.archicad.commands);
     const access = manifest.permissions.archicad.access;
+    const contextEpoch = this.moduleEpochs.get(manifest.id) || 0;
 
     return Object.freeze({
-      executeArchicad: async (commandName, parameters = {}) => {
+      executeArchicad: async (commandName, parameters = {}, executionOptions = {}) => {
+        if (this.stopped || this.closedModules.has(manifest.id) || (this.moduleEpochs.get(manifest.id) || 0) !== contextEpoch) return { success: false, errorType: "MODULE_DISABLED", error: "Module is closed" };
         if (!allowedCommands.has(commandName)) {
           return {
             success: false,
@@ -179,7 +198,7 @@ class ExtensionManager {
           };
         }
 
-        return this.archicadClient.executeCommand(commandName, parameters);
+        return this.archicadClient.executeCommand(commandName, parameters, executionOptions);
       },
     });
   }
@@ -245,6 +264,24 @@ class ExtensionManager {
     return status;
   }
 
+  getApxCommands() {
+    const registry = readJsonFile(this.descriptorRegistryPath);
+    const descriptors = Array.isArray(registry.descriptors) ? registry.descriptors : [];
+    return descriptors
+      .map((d) => ({
+        name: d.name,
+        commandName: d.commandName || (d.name ? d.name.replace(/^mepbridge\./, '') : ''),
+        commandNamespace: d.commandNamespace || (d.executionKind === 'server-endpoint' ? null : 'MEPBridge'),
+        title: d.title,
+        description: d.description,
+        featureArea: d.featureArea || (d.executionKind === 'server-endpoint' ? 'Workbench Server' : 'Architecture'),
+        executionKind: d.executionKind || 'mepbridge-addon-command',
+        riskLevel: d.riskLevel || 'read',
+        nlTriggers: d.nlTriggers || { zh: [], en: [] },
+        parameters: d.commandJson?.parameters?.addOnCommandParameters || {}
+      }));
+  }
+
   getCatalog() {
     return Array.from(this.extensions.values()).map((extensionData) => ({
       id: extensionData.id,
@@ -298,6 +335,7 @@ class ExtensionManager {
   }
 
   async executeCommand(commandName, parameters = {}, expectedExtension = null) {
+    if (this.stopped) return { success: false, errorType: "MODULE_MANAGER_STOPPED", error: "Module manager is stopped" };
     const commandInfo = this.commandRegistry.get(commandName);
     if (!commandInfo) {
       return {
@@ -366,8 +404,13 @@ class ExtensionManager {
     }
 
     try {
+      const active = this.activeExecutions.get(extensionData.id) || 0;
+      this.activeExecutions.set(extensionData.id, active + 1);
+      // Track the actual module promise, not merely the timeout wrapper. A timed-out write can still be active.
+      const actual = Promise.resolve().then(() => extensionData.instance.execute(commandName, parameters || {}));
+      actual.then(() => this.releaseExecution(extensionData.id), () => this.releaseExecution(extensionData.id));
       const result = await this.withTimeout(
-        Promise.resolve(extensionData.instance.execute(commandName, parameters || {})),
+        actual,
         this.timeoutMs,
         `Module command timed out: ${commandName}`
       );
@@ -392,6 +435,7 @@ class ExtensionManager {
 
   async reloadExtension(name) {
     const id = this.resolveExtensionId(name) || String(name || '');
+    if ((this.activeExecutions.get(id) || 0) > 0) throw new Error("MODULE_EXECUTION_IN_PROGRESS");
     const entry = this.registry.modules.find((candidate) => candidate.id === id);
     if (!entry) throw new Error(`Module registry entry not found: ${name}`);
 
@@ -446,8 +490,34 @@ class ExtensionManager {
     }
   }
 
+  releaseExecution(id) {
+    this.activeExecutions.set(id, Math.max(0, (this.activeExecutions.get(id) || 0) - 1));
+  }
+
+  // Explicit process-local close only; persistent settings and lazy-load activation are separate gates.
+  async disableModule(id) {
+    if (!this.statusCache.has(id)) throw new Error('MODULE_NOT_FOUND');
+    if ((this.activeExecutions.get(id) || 0) > 0) throw new Error('MODULE_EXECUTION_IN_PROGRESS');
+    this.lifecycleEpoch++;
+    this.closedModules.add(id);
+    this.moduleEpochs.set(id, (this.moduleEpochs.get(id) || 0) + 1);
+    this.removeModuleCommands(id);
+    const extension = this.extensions.get(id);
+    this.extensions.delete(id);
+    this.statusCache.set(id, this.makeStatus(id, 'disabled'));
+    if (this.extensions.size === 0 && this.refreshInterval) {
+      clearInterval(this.refreshInterval); this.refreshInterval = null;
+    }
+    this.notifyStatusChange();
+    if (this.startTimers && this.extensions.size > 0) this.startBackgroundRefresh();
+    if (typeof extension?.instance?.dispose === 'function') await extension.instance.dispose();
+    return this.statusCache.get(id);
+  }
+
   startBackgroundRefresh() {
     if (this.refreshInterval) clearInterval(this.refreshInterval);
+    if (this.stopped || this.extensions.size === 0) { this.refreshInterval = null; return; }
+    const epoch = this.lifecycleEpoch;
     this.refreshInterval = setInterval(async () => {
       for (const extensionData of this.extensions.values()) {
         try {
@@ -456,6 +526,7 @@ class ExtensionManager {
             Math.min(this.timeoutMs, 5000),
             `availability check timed out for ${extensionData.id}`
           );
+          if (this.stopped || epoch !== this.lifecycleEpoch || this.extensions.get(extensionData.id) !== extensionData) continue;
           const nextStatus = available ? 'online' : 'offline';
           if (nextStatus !== extensionData.status) {
             extensionData.status = nextStatus;
@@ -469,6 +540,7 @@ class ExtensionManager {
             this.notifyStatusChange();
           }
         } catch (error) {
+          if (this.stopped || epoch !== this.lifecycleEpoch || this.extensions.get(extensionData.id) !== extensionData) continue;
           extensionData.status = 'offline';
           this.removeModuleCommands(extensionData.id);
           this.statusCache.set(
@@ -482,6 +554,9 @@ class ExtensionManager {
   }
 
   shutdown() {
+    for (const [id, epoch] of this.moduleEpochs) this.moduleEpochs.set(id, epoch + 1);
+    this.stopped = true;
+    this.lifecycleEpoch++;
     if (this.refreshInterval) clearInterval(this.refreshInterval);
     this.refreshInterval = null;
   }

@@ -1,44 +1,49 @@
-# MEPbridge ACAIstr v0.1.8 安装说明
+# MEPbridge ACAIstr v0.1.9 安装说明
 
-本说明适用于 Archicad 28 和 Archicad 29 的 Windows 发布包。
+> 本文适用于 v0.1.9。请从 GitHub Release 下载获批 ZIP。完整包内含 `RELEASE_MANIFEST.json` 与 `SHA256SUMS.txt`，用于载荷校验。
 
-中文优先界面请下载 `MEPbridge-ACAIstr-v<版本号>-win64-zh-CN.zip`，英文优先界面请下载 `MEPbridge-ACAIstr-v<版本号>-win64-en-US.zip`（`<版本号>` 以 Releases 页最新发布为准）。首次安装不要使用独立 APX 更新文件，也不要使用 GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz`。
+本说明适用于 Windows x64 上的 Archicad 28、29 和 30。
+
+首次安装或涉及 Workbench 组件的升级，请下载唯一的双语完整包 `MACAI-Workbench-v0.1.9-win64.zip`。不要把 APX 更新 ZIP、GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz` 当作完整安装包。
 
 ## 环境要求
 
 - Windows x64
-- Archicad 28 或 Archicad 29
-- Node.js 18 或更高版本
+- Archicad 28、29 或 30
 - 普通可写的解压目录
+- 安装 Add-On 时可授予 Windows 管理员权限
+
+**无需另外安装 Node.js 或 npm。** 完整包自带经过版本、来源和 SHA256 校验的 Windows x64 Node 便携运行时，以及 Server 所需的生产依赖。Workbench Server、UI 和 MCP Server 统一使用包内运行时，不回退到系统 `PATH` 中的 Node.js。
 
 Server 默认只监听 `127.0.0.1:19780`。Archicad JSON API 在本机 `127.0.0.1:19723-19743` 范围动态检测。
 
-### Node.js 要求
+### 便携运行时要求
 
-原生 Add-On（`MEPBridge.apx`）本身不依赖 Node.js 也能工作，但 **Workbench Server、UI、MCP Server 都需要 Node.js 18 或更高版本**。若电脑未安装 Node.js，安装程序仍会正常安装 APX 并打印警告：Archicad 命令仍可使用，但 Workbench 在装好 Node.js 之前无法启动。
+请保留完整解压目录及其中的 `runtime` 文件夹。若安装器或启动器报告便携运行时缺失、损坏或无法启动，请重新下载并完整解压完整包；**不要通过另装系统 Node.js 绕过该错误**。“免环境”仅表示无需另装 Node.js/npm；仍需受支持的 Windows x64、匹配版本的 Archicad 和正常系统权限。
 
-安装前或安装后用以下命令确认 Node.js 可用：
+## 发布资产选择
 
-```powershell
-node --version
-```
-
-如果命令找不到，请从 <https://nodejs.org/> 下载并安装 LTS 版本，然后重新打开 MEPbridge ACAIstr 菜单启动 Workbench。
-
-## 版本选择
-
-两个完整语言包均包含：
+完整包同时包含：
 
 ```text
 Archicad-28\MEPBridge.apx
 Archicad-29\MEPBridge.apx
+Archicad-30\MEPBridge.apx
+runtime\node\node.exe
+runtime\runtime-manifest.json
 ```
 
-只能安装与 Archicad 主版本一致的 APX。
+安装程序会按所选 Archicad 主版本部署匹配的 APX。
 
-`MEPbridge-ACAIstr-v<版本号>-AC28-win64.apx` 和
-`MEPbridge-ACAIstr-v<版本号>-AC29-win64.apx` 只更新原生 Add-On，不包含
-Server、UI、MCP Server、生产依赖和安装脚本，仅适用于已经完成完整安装的用户。
+以下 APX 单件更新包仅适用于已有完整安装、且 Release 明确允许只更新 APX 的用户：
+
+```text
+MEPbridge-apx-AC28-v0.1.9-win64.zip
+MEPbridge-apx-AC29-v0.1.9-win64.zip
+MEPbridge-apx-AC30-v0.1.9-win64.zip
+```
+
+每个更新 ZIP 根目录只包含一个 `MEPBridge.apx`，不包含 Server、UI、MCP Server、便携运行时、生产依赖或安装脚本。首次安装必须使用完整包。
 
 ## 如何判断该只换 APX 还是重装完整包
 
@@ -57,7 +62,7 @@ Server、UI、MCP Server、生产依赖和安装脚本，仅适用于已经完�
 
 1. 保存工作并**完全退出 Archicad**。Archicad 运行时会锁定 APX 文件，复制会失败或不生效。
 2. 备份 Add-On 目录中现有的 `MEPBridge.apx`。
-3. 把与你的 Archicad 主版本对应的独立 APX 覆盖过去，文件名保持 `MEPBridge.apx`。
+3. 解压匹配宿主版本的 APX 更新 ZIP，把其中的 `MEPBridge.apx` 覆盖到 Add-On 目录。
 4. 确认该目录内只有一个有效的 `.apx` 文件。
 5. 启动 Archicad 并执行 Ping：回报的版本必须等于新版本号，命令数与 descriptor 数必须与发布说明一致。若版本仍显示旧值，说明 Archicad 加载了旧副本或复制时文件被锁定 —— 从第 1 步重做。
 
@@ -103,7 +108,7 @@ powershell -File tools\Install-MEPBridgePackage.ps1 -ArchicadRoot "E:\GRAPHISOFT
 
 ### 第 1 步：确认自己的 Archicad 主版本
 
-在 Archicad 中打开「帮助 → 关于 Archicad」，标题里会写 Archicad 28 或 Archicad 29。也可以看安装目录名（下一步会用到）。**必须安装与主版本一致的 APX**，装错版本 Archicad 会拒绝加载 Add-On。
+在 Archicad 中打开「帮助 → 关于 Archicad」，标题里会写 Archicad 28、29 或 30。也可以看安装目录名（下一步会用到）。**必须安装与主版本一致的 APX**，装错版本 Archicad 会拒绝加载 Add-On。
 
 ### 第 2 步：找到 Archicad 安装目录
 
@@ -114,6 +119,7 @@ powershell -File tools\Install-MEPBridgePackage.ps1 -ArchicadRoot "E:\GRAPHISOFT
 ```text
 C:\Program Files\GRAPHISOFT\Archicad 28
 D:\Program Files\GRAPHISOFT\Archicad 29
+D:\Program Files\GRAPHISOFT\Archicad 30
 ```
 
 判断标准是该目录下直接存在 `Archicad.exe`。
@@ -142,6 +148,7 @@ D:\Program Files\GRAPHISOFT\Archicad 29
 ```text
 Archicad-28\MEPBridge.apx   → 用于 Archicad 28
 Archicad-29\MEPBridge.apx   → 用于 Archicad 29
+Archicad-30\MEPBridge.apx   → 用于 Archicad 30
 ```
 
 复制到第 4 步的目录。若提示需要管理员权限，点击「继续」。若提示「目标已包含同名文件」，选择「替换目标中的文件」。
@@ -168,7 +175,7 @@ Archicad-29\MEPBridge.apx   → 用于 Archicad 29
 
 前三项通过即说明原生 Add-On 安装成功，Archicad JSON 命令已可用。
 
-如需使用 Workbench（Server / UI / MCP Server），还要满足 Node.js 要求，并完成本机菜单配置。手动安装不会自动写入该配置，请在发布包根目录执行一次：
+如需使用 Workbench，请确认完整包中的便携运行时仍在原位，并完成本机菜单配置。手动复制 APX 不会自动写入该配置，请在发布包根目录执行一次：
 
 ```powershell
 powershell -File tools\Start-BaseWorkbench.ps1 -Action InstallConfig
@@ -203,7 +210,7 @@ powershell -File tools\Start-BaseWorkbench.ps1 -Action InstallConfig
 3. 输入：
 
 ```powershell
-node server\server.js
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\Start-BaseWorkbench.ps1 -Action Serve
 ```
 
 4. 保持窗口开启，在浏览器打开 `http://127.0.0.1:19780/`。
@@ -211,11 +218,13 @@ node server\server.js
 
 ## MCP 配置
 
-先启动 Workbench Server，再让 MCP 客户端执行：
+先启动 Workbench Server。MCP 客户端必须调用完整包内的便携运行时：
 
 ```text
-node <发布包根目录>\tools\mepbridge-mcp-server.js
+<发布包根目录>\runtime\node\node.exe <发布包根目录>\tools\mepbridge-mcp-server.js
 ```
+
+不要把命令填写为系统 `node`。
 
 示例：
 
@@ -223,8 +232,8 @@ node <发布包根目录>\tools\mepbridge-mcp-server.js
 {
   "mcpServers": {
     "mepbridge-acaistr": {
-      "command": "node",
-      "args": ["D:\\MEPbridge-ACAIstr\\tools\\mepbridge-mcp-server.js"],
+      "command": "D:\\MACAI-Workbench-v0.1.9-win64\\runtime\\node\\node.exe",
+      "args": ["D:\\MACAI-Workbench-v0.1.9-win64\\tools\\mepbridge-mcp-server.js"],
       "env": {
         "MEPBRIDGE_ENDPOINT": "http://127.0.0.1:19780"
       }
@@ -236,18 +245,18 @@ node <发布包根目录>\tools\mepbridge-mcp-server.js
 ### 把路径换成自己的解压目录
 
 示例中的 `D:\MEPbridge-ACAIstr\` 仅是占位写法。请替换为你自己的解压目录，例如
-`D:\\MEPbridge-ACAIstr-v<版本号>-win64-zh-CN\\tools\\mepbridge-mcp-server.js`（文件夹名以实际解压结果为准）。注意：JSON 里的
+`D:\\MACAI-Workbench-v0.1.9-win64\\tools\\mepbridge-mcp-server.js`（文件夹名以实际解压结果为准）。注意：JSON 里的
 Windows 反斜杠必须写成 `\\`。
 
 ### 常见 MCP 客户端的配置位置
 
 | 客户端 | 配置方式 |
 | --- | --- |
-| 豆包（桌面版） | 在豆包桌面版的「MCP / 扩展」设置中添加自定义 MCP 服务器：粘贴上方 JSON，或按表单填写命令 `node`、参数为脚本完整路径、环境变量 `MEPBRIDGE_ENDPOINT` |
+| 豆包（桌面版） | 在豆包桌面版的「MCP / 扩展」设置中添加自定义 MCP 服务器：粘贴上方 JSON，或按表单填写命令为包内 `runtime\node\node.exe` 的绝对路径、参数为脚本绝对路径、环境变量 `MEPBRIDGE_ENDPOINT` |
 | Cursor | 将 JSON 写入 `%USERPROFILE%\.cursor\mcp.json`（项目级为 `<项目>\.cursor\mcp.json`），重启 Cursor |
 | Claude Desktop | 将 JSON 合并进 `%APPDATA%\Claude\claude_desktop_config.json`，重启 Claude Desktop |
 | CodeBuddy | 将 JSON 写入项目 `.codebuddy\.mcp.json` 或用户级 `~\.codebuddy\.mcp.json`，重启 IDE |
-| Codex CLI | 在 `%USERPROFILE%\.codex\config.toml` 追加（TOML 格式）：`[mcp_servers.mepbridge]`、`command = "node"`、`args = ["<解压目录>/tools/mepbridge-mcp-server.js"]`、`env = { MEPBRIDGE_ENDPOINT = "http://127.0.0.1:19780" }` |
+| Codex CLI | 在 `%USERPROFILE%\.codex\config.toml` 追加（TOML 格式）：`[mcp_servers.mepbridge]`、`command = "<解压目录>/runtime/node/node.exe"`、`args = ["<解压目录>/tools/mepbridge-mcp-server.js"]`、`env = { MEPBRIDGE_ENDPOINT = "http://127.0.0.1:19780" }` |
 | Antigravity CLI（原 Gemini CLI） | 将 JSON 合并进 `%USERPROFILE%\.gemini\settings.json` 顶层的 `mcpServers` 对象，然后新开一个会话 |
 | Google Antigravity | 将 JSON 写入 `%USERPROFILE%\.gemini\config\mcp_config.json`，重启 Antigravity |
 
@@ -267,7 +276,7 @@ Windows 反斜杠必须写成 `\\`。
 
 任何支持 **stdio 传输 MCP** 的宿主端都可接入，在它的 MCP 设置里提供同样三要素即可：
 
-1. 命令：`node`
+1. 命令：`<你的解压目录>\runtime\node\node.exe`
 2. 参数：`<你的解压目录>\tools\mepbridge-mcp-server.js`
 3. 环境变量：`MEPBRIDGE_ENDPOINT=http://127.0.0.1:19780`
 
@@ -295,13 +304,15 @@ MCP 能力为准。
 
 ## 版本更新
 
-已安装旧版本的用户，按以下方式更新到新版本：
+**从 v0.1.8 或更早版本升级到 v0.1.9 必须使用完整包更新。** v0.1.9 引入单一双语包、包内便携运行时和 AC30 资产；不要只换 APX，也不要把新文件覆盖进旧版本解压目录。
+
+已安装旧版本的用户，按以下方式更新：
 
 ### 方式一：完整包更新（推荐）
 
 适用于 Server、UI、MCP Server 或依赖有改动的版本。
 
-1. 从 GitHub Releases 下载新版本的完整 ZIP（`win64-zh-CN.zip` 或 `win64-en-US.zip`）。
+1. 从 GitHub Release 下载 `MACAI-Workbench-v0.1.9-win64.zip`。解压后保留并使用包内 `RELEASE_MANIFEST.json` 与 `SHA256SUMS.txt` 校验载荷。
 2. 保存工作并关闭 Archicad。
 3. 将新 ZIP 解压到一个新目录（建议保留旧目录以便回滚）。
 4. 双击新目录中的 `Install-MEPBridge.cmd`。
@@ -314,7 +325,7 @@ MCP 能力为准。
 
 适用于仅修复原生 Add-On、未改动 Server/UI/依赖的小版本更新。
 
-1. 从 GitHub Releases 下载独立的 `MEPbridge-ACAIstr-vX.Y.Z-AC28-win64.apx` 或 `MEPbridge-ACAIstr-vX.Y.Z-AC29-win64.apx`（与已安装的 Archicad 主版本一致）。
+1. 仅当 Release 明确标注“仅 APX 更新”时，下载匹配宿主版本的 `MEPbridge-apx-AC<版本>-vX.Y.Z-win64.zip` 并解压。
 2. 保存工作并关闭 Archicad。
 3. 将新 APX 复制到 `<Archicad 安装目录>\Add-Ons\MEPBridge\`，覆盖旧 `MEPBridge.apx`（建议先备份旧文件）。
 4. 重新启动 Archicad。
@@ -347,3 +358,7 @@ MCP 能力为准。
 - Ping 显示的注册 C++ 命令数与 Add-On descriptor/MCP 工具数，与该版本发布说明标注的数量一致。
 
 执行写入、删除、批量或几何修改前，应使用测试或已备份的 PLN。
+
+## v0.1.9 已知能力限制
+
+v0.1.9不支持**既有幕墙高度编辑**；高度或高度＋分格组合请求会在写入前拒绝，不会自动删除重建。**新建幕墙时设置高度、已验证的分格编辑仍保留**。这与安装环境无关，另装Node.js或DevKit不会启用该能力。

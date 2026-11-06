@@ -1,3 +1,4 @@
+import { workbenchFetch as fetch } from "../execution-recovery";
 // EditPropertiesModal.tsx
 // 编辑构件属性交互式对话框组件（简化版）
 // 只针对建筑构件（墙/楼板/梁/柱/门窗等）的核心属性（尺寸/高度/图层/元素ID等）

@@ -249,10 +249,10 @@ export default function BuildingJsonPanel({ lang }: { lang: "zh-CN" | "en-US" })
               </dl>
               <div className="mt-2 space-y-1 text-[10px] text-zinc-500">
                 <div className="truncate" title={formatEntries(buildingJson.summary?.byType, "--")}>
-                  byType: {formatEntries(buildingJson.summary?.byType, "--")}
+                  {lang === "zh-CN" ? "按类型:" : "By type:"} {formatEntries(buildingJson.summary?.byType, "--")}
                 </div>
                 <div className="truncate" title={formatEntries(buildingJson.summary?.byFloor, "--")}>
-                  byFloor: {formatEntries(buildingJson.summary?.byFloor, "--")}
+                  {lang === "zh-CN" ? "按楼层:" : "By floor:"} {formatEntries(buildingJson.summary?.byFloor, "--")}
                 </div>
               </div>
             </section>
@@ -261,13 +261,13 @@ export default function BuildingJsonPanel({ lang }: { lang: "zh-CN" | "en-US" })
               <h4 className="text-[11px] font-semibold text-zinc-300">{zh ? "采集与完整性" : "Capture & Integrity"}</h4>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 <div className="bg-zinc-900/50 px-2.5 py-2">
-                  <div className="font-mono text-[9px] text-zinc-500">capture failed / skipped</div>
+                  <div className="font-mono text-[9px] text-zinc-500">{lang === "zh-CN" ? "采集失败／跳过" : "Capture failed / skipped"}</div>
                   <div className="font-mono text-sm text-zinc-100">
                     {buildingJson.capture?.failed?.length ?? 0} / {buildingJson.capture?.skipped?.length ?? 0}
                   </div>
                 </div>
                 <div className="min-w-0 bg-zinc-900/50 px-2.5 py-2">
-                  <div className="font-mono text-[9px] text-zinc-500">integrity</div>
+                  <div className="font-mono text-[9px] text-zinc-500">{lang === "zh-CN" ? "完整性" : "Integrity"}</div>
                   <div className="flex items-center gap-1 font-mono text-[10px] text-zinc-200">
                     <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-400" />
                     <span className="truncate" title={buildingJson.integrity?.sha256}>
@@ -275,7 +275,7 @@ export default function BuildingJsonPanel({ lang }: { lang: "zh-CN" | "en-US" })
                     </span>
                   </div>
                   <div className="mt-1 font-mono text-[9px] text-zinc-500">
-                    {buildingJson.integrity?.algorithm ?? "--"} · {buildingJson.integrity?.byteCount ?? 0} bytes
+                    {buildingJson.integrity?.algorithm ?? "--"} · {buildingJson.integrity?.byteCount ?? 0} {lang === "zh-CN" ? "字节" : "bytes"}
                   </div>
                 </div>
               </div>

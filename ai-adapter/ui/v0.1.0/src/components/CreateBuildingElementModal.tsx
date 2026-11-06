@@ -1,3 +1,5 @@
+import { workbenchFetch as fetch } from "../execution-recovery";
+import { useUiLanguage } from "../ui-language";
 // CreateBuildingElementModal.tsx
 // 通用建筑元素创建对话框 — BASE 模式 BUILDING 模块
 // 支持 12 种元素: Wall/Column/Beam/Slab/Door/Window/Roof/Stair/Object/Lamp/Mesh/Zone
@@ -109,6 +111,7 @@ const PointInput: React.FC<{ label: string; point: Point2D | undefined; onChange
 const PolygonInput: React.FC<{ label: string; points: Point2D[] | undefined; onChange: (pts: Point2D[]) => void; minPoints?: number }> = ({
   label, points = [], onChange, minPoints = 3
 }) => {
+  const inputLang = useUiLanguage();
   const updatePoint = (idx: number, axis: 'x' | 'y', val: number) => {
     const newPts = [...points];
     while (newPts.length <= idx) newPts.push({ x: 0, y: 0 });
@@ -117,7 +120,7 @@ const PolygonInput: React.FC<{ label: string; points: Point2D[] | undefined; onC
   };
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-[10px] text-zinc-500 font-mono uppercase">{label} ({points.length} {points.length >= minPoints ? '✓' : `需≥${minPoints}`})</label>
+      <label className="text-[10px] text-zinc-500 font-mono uppercase">{label} ({points.length} {points.length >= minPoints ? '✓' : `${inputLang === "zh-CN" ? "需" : "Need"}≥${minPoints}`})</label>
       <div className="max-h-32 overflow-y-auto space-y-1 custom-scrollbar">
         {points.map((p, i) => (
           <div key={i} className="flex items-center gap-1.5">
@@ -142,7 +145,7 @@ const PolygonInput: React.FC<{ label: string; points: Point2D[] | undefined; onC
               <button
                 onClick={() => onChange(points.filter((_, j) => j !== i))}
                 className="text-zinc-500 hover:text-red-400 text-xs px-1"
-                title="Remove"
+                title={inputLang === "zh-CN" ? "移除" : "Remove"}
               >✕</button>
             )}
           </div>
@@ -151,7 +154,7 @@ const PolygonInput: React.FC<{ label: string; points: Point2D[] | undefined; onC
       <button
         onClick={() => onChange([...points, { x: 0, y: 0 }])}
         className="text-[10px] text-amber-400 hover:text-amber-300 border border-amber-500/30 rounded py-1 hover:bg-amber-500/10 transition-colors"
-      >+ {label === 'vertices' ? 'Add Vertex' : 'Add Point'}</button>
+      >+ {inputLang === 'zh-CN' ? '添加点' : 'Add point'}</button>
     </div>
   );
 };
@@ -372,7 +375,7 @@ export const CreateBuildingElementModal: React.FC<CreateBuildingElementModalProp
       case 'Roof':
         return (
           <div className="grid grid-cols-1 gap-3">
-            <PolygonInput label="vertices" points={params.vertices} onChange={pts => setParams({...params, vertices: pts})} minPoints={3} />
+            <PolygonInput label={zh ? "顶点" : "Vertices"} points={params.vertices} onChange={pts => setParams({...params, vertices: pts})} minPoints={3} />
             <div className="grid grid-cols-3 gap-3">
               <NumberInput label={zh ? '坡角(°)' : 'Pitch(°)'} value={params.pitchAngle} onChange={v => setParams({...params, pitchAngle: v})} placeholder="30" />
               <NumberInput label={zh ? '厚度(m)' : 'Thickness(m)'} value={params.thickness} onChange={v => setParams({...params, thickness: v})} placeholder="0.15" />
@@ -403,7 +406,7 @@ export const CreateBuildingElementModal: React.FC<CreateBuildingElementModalProp
                 type="text"
                 value={params.libPartName || ''}
                 onChange={e => setParams({...params, libPartName: e.target.value})}
-                placeholder="Table 01"
+                placeholder={zh ? "桌子01" : "Table 01"}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 font-mono outline-none focus:border-amber-500"
               />
             </div>
@@ -427,7 +430,7 @@ export const CreateBuildingElementModal: React.FC<CreateBuildingElementModalProp
                   type="text"
                   value={params.zoneName || ''}
                   onChange={e => setParams({...params, zoneName: e.target.value})}
-                  placeholder="Living Room"
+                  placeholder={zh ? "客厅" : "Living Room"}
                   className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 font-mono outline-none focus:border-amber-500"
                 />
               </div>

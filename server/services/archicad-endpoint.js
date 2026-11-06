@@ -50,7 +50,11 @@ function getArchicadPort() {
   if (global.archicadPort && typeof global.archicadPort === 'number') {
     return global.archicadPort;
   }
-  // 2. 环境变量
+  // 2. 环境变量（支持 ARCHICAD_ENDPOINT 或 ARCHICAD_PORT）
+  if (process.env.ARCHICAD_PORT) {
+    const p = parseInt(process.env.ARCHICAD_PORT, 10);
+    if (p > 0) return p;
+  }
   if (process.env.ARCHICAD_ENDPOINT) {
     try {
       const url = new URL(process.env.ARCHICAD_ENDPOINT);
@@ -68,12 +72,12 @@ function getArchicadPort() {
  * 获取当前 Archicad JSON API 完整端点 URL
  */
 function getArchicadEndpoint() {
-  // 如果环境变量显式设置了完整 URL，优先使用（保持向后兼容）
-  if (process.env.ARCHICAD_ENDPOINT) {
-    return process.env.ARCHICAD_ENDPOINT;
-  }
-  // 用 global.archicadPort 或默认端口构造
-  return `http://${DEFAULT_HOST}:${getArchicadPort()}`;
+  // The live, validated primary port must win over startup configuration.
+  // Start-BaseWorkbench sets ARCHICAD_ENDPOINT as an initial preference; treating
+  // it as permanently authoritative makes /api/ping and UI instance switching
+  // disagree with execution after Archicad moves to another dynamic port.
+  const host = process.env.ARCHICAD_HOST || DEFAULT_HOST;
+  return `http://${host}:${getArchicadPort()}`;
 }
 
 /**
@@ -104,6 +108,24 @@ async function refreshArchicadPort(axiosInstance) {
   return null;
 }
 
+/**
+ * V19-INST-01: 解析实例端点 URL。
+ * 若提供显式 port 或 endpoint，解析并验证；若未提供则返回动态默认端点。
+ */
+function resolveInstanceEndpoint(target) {
+  if (!target) return getArchicadEndpoint();
+  if (typeof target === 'number' || (typeof target === 'string' && /^\d+$/.test(target.trim()))) {
+    return endpointForPort(target);
+  }
+  if (typeof target === 'object') {
+    if (target.port !== undefined) return endpointForPort(target.port);
+    if (typeof target.endpoint === 'string' && target.endpoint.trim() !== '') {
+      return target.endpoint.trim();
+    }
+  }
+  return getArchicadEndpoint();
+}
+
 module.exports = {
   DEFAULT_PORT,
   DEFAULT_HOST,
@@ -112,5 +134,6 @@ module.exports = {
   getArchicadPort,
   getArchicadEndpoint,
   endpointForPort,
-  refreshArchicadPort
+  refreshArchicadPort,
+  resolveInstanceEndpoint
 };

@@ -1,3 +1,5 @@
+import { workbenchFetch as fetch } from "../execution-recovery";
+import ExecutionRecoveryPanel from "./ExecutionRecoveryPanel";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -308,7 +310,7 @@ export default function InstancesSnapshotsPanel({ lang }: PanelProps) {
           confirmRequired: true
         })
       });
-      setReplayResult(data.result);
+      setReplayResult({...data.result, execution:data.execution});
     } catch (error) {
       setActionError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -341,6 +343,7 @@ export default function InstancesSnapshotsPanel({ lang }: PanelProps) {
       </div>
 
       <div className="custom-scrollbar flex-1 overflow-y-auto px-4 py-3">
+        <ExecutionRecoveryPanel lang={lang} />
         {(instancesError || actionError) && (
           <div className="mb-3 border-l-2 border-red-500 bg-red-500/5 px-3 py-2 text-[11px] leading-relaxed text-red-300">
             {instancesError || actionError}
@@ -373,20 +376,60 @@ export default function InstancesSnapshotsPanel({ lang }: PanelProps) {
             </p>
           ) : (
             <div className="mt-2 space-y-1.5">
-              {instances.map((instance) => (
-                <div key={instance.port} className="flex items-center justify-between gap-2 bg-zinc-900/50 px-2.5 py-2">
-                  <div className="min-w-0">
-                    <div className="truncate text-[11px] text-zinc-200">{instanceLabel(instance)}</div>
-                    <div className="truncate font-mono text-[9px] text-zinc-600" title={instance.projectPath || undefined}>
+              {instances.map((instance) => {
+                const isPrimary = instancesMeta?.primaryPort === instance.port;
+                return (
+                <div
+                  key={instance.port}
+                  className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded transition-colors ${
+                    isPrimary ? "bg-emerald-950/40 border border-emerald-500/40" : "bg-zinc-900/50 hover:bg-zinc-900/80"
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="truncate text-[11px] font-medium text-zinc-200">{instanceLabel(instance)}</span>
+                      {isPrimary && (
+                        <span className="rounded bg-emerald-500/20 px-1 py-0.2 text-[8px] font-mono text-emerald-300">
+                          {zh ? "当前主实例" : "Primary"}
+                        </span>
+                      )}
+                    </div>
+                    <div className="truncate font-mono text-[9px] text-zinc-500 mt-0.5" title={instance.projectPath || undefined}>
                       {instance.projectPath || (zh ? "工程信息不可用" : "Project info unavailable")}
                     </div>
                   </div>
-                  <span className={`flex shrink-0 items-center gap-1 font-mono text-[9px] ${instance.mepbridge ? "text-emerald-400" : "text-red-400"}`}>
-                    {instance.mepbridge ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                    {instance.mepbridge ? "MEPBridge" : "missing"}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`flex items-center gap-1 font-mono text-[9px] ${instance.mepbridge ? "text-emerald-400" : "text-red-400"}`}>
+                      {instance.mepbridge ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                      {instance.mepbridge ? "MEPBridge" : "missing"}
+                    </span>
+                    {instance.mepbridge && !isPrimary && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const res = await fetch("/api/ping/primary", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ port: instance.port })
+                            });
+                            const data = await res.json();
+                            if (data.ok) {
+                              await loadInstances();
+                            }
+                          } catch (err: any) {
+                            setActionError(err.message);
+                          }
+                        }}
+                        className="rounded bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 px-1.5 py-0.5 text-[9px] font-mono transition-colors"
+                        title={zh ? "切换为当前主操作实例" : "Switch as primary active instance"}
+                      >
+                        {zh ? "切换" : "Switch"}
+                      </button>
+                    )}
+                  </div>
                 </div>
-              ))}
+              );})}
             </div>
           )}
         </section>
@@ -562,19 +605,19 @@ export default function InstancesSnapshotsPanel({ lang }: PanelProps) {
             <h4 className="text-[11px] font-semibold text-zinc-300">{zh ? "回放预览" : "Replay Preview"}</h4>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <div className="bg-zinc-900/50 px-2 py-1.5">
-                <div className="font-mono text-[9px] text-zinc-500">create</div>
+                <div className="font-mono text-[9px] text-zinc-500">{lang === "zh-CN" ? "创建" : "Create"}</div>
                 <div className="font-mono text-sm text-zinc-100">{preview.estimatedCreateCount ?? 0}</div>
               </div>
               <div className="bg-zinc-900/50 px-2 py-1.5">
-                <div className="font-mono text-[9px] text-zinc-500">unsupported</div>
+                <div className="font-mono text-[9px] text-zinc-500">{lang === "zh-CN" ? "不支持" : "Unsupported"}</div>
                 <div className="font-mono text-sm text-zinc-100">{preview.unsupportedElements?.length ?? 0}</div>
               </div>
               <div className="bg-zinc-900/50 px-2 py-1.5">
-                <div className="font-mono text-[9px] text-zinc-500">canApply</div>
+                <div className="font-mono text-[9px] text-zinc-500">{lang === "zh-CN" ? "可应用" : "Can apply"}</div>
                 <div className={`font-mono text-sm ${preview.canApply ? "text-emerald-400" : "text-red-400"}`}>{String(preview.canApply)}</div>
               </div>
               <div className="min-w-0 bg-zinc-900/50 px-2 py-1.5">
-                <div className="font-mono text-[9px] text-zinc-500">expires</div>
+                <div className="font-mono text-[9px] text-zinc-500">{lang === "zh-CN" ? "过期时间" : "Expires"}</div>
                 <div className="truncate font-mono text-[10px] text-zinc-200" title={preview.expiresAt}>
                   {preview.expiresAt ? new Date(preview.expiresAt).toLocaleTimeString() : "--"}
                 </div>

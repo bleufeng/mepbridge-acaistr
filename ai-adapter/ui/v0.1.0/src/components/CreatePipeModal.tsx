@@ -1,3 +1,4 @@
+import { workbenchFetch as fetch } from "../execution-recovery";
 // CreatePipeModal.tsx
 // 创建水管对话框组件 — D4 V2 MEP Water 模块
 
@@ -187,7 +188,7 @@ export const CreatePipeModal: React.FC<CreatePipeModalProps> = ({
               <select value={params.crossSectionShape}
                 onChange={e => setParams(p => ({ ...p, crossSectionShape: e.target.value }))}
                 className="w-full bg-zinc-700 border border-zinc-600 rounded px-2 py-1.5 text-sm text-zinc-200 outline-none focus:border-cyan-500">
-                <option value="Circular">Circular</option>
+                <option value="Circular">{lang === "zh-CN" ? "圆形" : "Circular"}</option>
               </select>
             </div>
           </div>

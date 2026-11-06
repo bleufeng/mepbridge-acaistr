@@ -1,3 +1,4 @@
+import { workbenchFetch as fetch } from "../execution-recovery";
 // CreatePipeSystemModal.tsx
 // 创建管道系统（主管+支管）对话框组件 — D4 V2 MEP Water 模块
 
@@ -266,7 +267,7 @@ export const CreatePipeSystemModal: React.FC<CreatePipeSystemModalProps> = ({
             {params.branches.map((branch, bIdx) => (
               <div key={`br-${bIdx}`} className="bg-zinc-800/50 border border-violet-500/15 rounded-lg p-3 space-y-2">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold text-violet-400">⌖ 支管 #{bIdx + 1}</span>
+                  <span className="text-xs font-bold text-violet-400">{lang === "zh-CN" ? "⌖ 支管 #" : "⌖ Branch #"}{bIdx + 1}</span>
                   <button onClick={() => removeBranch(bIdx)} className="p-1 hover:bg-red-900/30 rounded">
                     <Trash2 className="w-3 h-3 text-red-400" />
                   </button>

@@ -13,8 +13,10 @@
 //       → on failure: LLM 分析重试 / 回滚 / 暂停
 
 const axios = require('axios');
-const { getArchicadEndpoint } = require('./archicad-endpoint');
+const { isMutationStep, isUncertainExecution } = require('./execution-receipt-store');
+const { getArchicadEndpoint, endpointForPort } = require('./archicad-endpoint');
 const { normalizeUiLocale, isEnglishUiLocale } = require('./ui-locale');
+const { resolvePlanCommand, resolvePlanRequest, validatePlanStepSemanticFidelity } = require('./semantic-fidelity-gate');
 // ARCHICAD_ENDPOINT 改为动态解析（AC29 实测会用 19724，硬编码 19723 会导致 ARCHICAD_OFFLINE）
 // 优先级：global.archicadPort（status.js 探测） > ARCHICAD_ENDPOINT 环境变量 > 默认 19723
 function ARCHICAD_ENDPOINT() {
@@ -154,7 +156,13 @@ class PlanChain {
     this.onProgress = opts.onProgress || (() => {});
     this.onGateRequired = opts.onGateRequired || null;
     this.llm = opts.llm || null;
+    this.knowledgeSnapshot = opts.knowledgeSnapshot || null;
+    if (this.knowledgeSnapshot) require('./knowledge-base').verifySnapshot(this.knowledgeSnapshot);
     this.aiAdapter = opts.aiAdapter || null;
+    this.useDurableExecution = opts.useDurableExecution === true;
+    this.receiptStore = opts.receiptStore || require("./execution-receipt-store").receiptStore;
+    this.receiptTarget = opts.receiptTarget ? JSON.parse(JSON.stringify(opts.receiptTarget)) : null;
+    this.target = opts.target ? JSON.parse(JSON.stringify(opts.target)) : null;
     this.locale = normalizeUiLocale(opts.locale);
 
     // 运行时状态
@@ -205,12 +213,14 @@ class PlanChain {
       status: 'ready',
       createdAt: new Date().toISOString(),
       userIntent: draft.userIntent || '',
+      knowledgeContext: draft.knowledgeContext ? JSON.parse(JSON.stringify(draft.knowledgeContext)) : null,
       reasoning: draft.reasoning || '',
       confidence: draft.confidence || 0,
       isMutation: draft.isMutation || false,
       warningText: draft.warningText || null,
       source: draft.source || 'generated-plan',
       templateId: draft.templateId || null,
+      target: this.target ? JSON.parse(JSON.stringify(this.target)) : null,
       deterministic: !requiresStepRefinement,
       requiresStepRefinement,
       steps: normalizedSteps,
@@ -417,6 +427,22 @@ class PlanChain {
   async executeStep(stepIndex) {
     const step = this.chain.steps[stepIndex];
     if (!step) return { status: 'failed', error: `步骤 ${stepIndex} 不存在` };
+    const idToIndex = new Map(this.chain.steps.map((candidate, index) => [candidate.id || `step_${index}`, index]));
+    const failedDependency = (step.dependsOn || []).map(id => idToIndex.get(id)).find(index =>
+      Number.isInteger(index) && ['failed','cancelled','skipped'].includes(this.chain.steps[index]?.status));
+    if (failedDependency !== undefined) {
+      step.status = 'skipped';
+      step.skipReason = `dependency step ${failedDependency + 1} did not complete`;
+      this.chain.stats.skipped++;
+      this._logExecution(step, 'dependency_skipped');
+      this.onProgress({ type:'step_skipped', stepIndex, step, data:{dependencyIndex:failedDependency} });
+      return { status:'skipped', stepResult:step };
+    }
+    if (step.status === 'running') return { status: 'fatal', error: 'STEP_ALREADY_RUNNING' };
+    if (isMutationStep(step) && step.status === 'completed') return { status: 'skipped', stepResult: step.result };
+    if (!this.useDurableExecution && isMutationStep(step) && step._dispatchedOnce && !this.receiptStore.getLatestStepReceipt(this.chain.id, stepIndex)) {
+      return { status: 'fatal', error: 'RECEIPT_HISTORY_MISSING_UNKNOWN' };
+    }
 
     // 结果回灌可将后续步骤标记为跳过（refinement.skip）—— 例如其依赖的前一步失败。
     // 该字段此前从未被生产也从未被消费；现在生产了，必须在此尊重它，否则等于没跳。
@@ -443,6 +469,20 @@ class PlanChain {
       this.chain.stats.failed++;
       this._logExecution(step, 'gate1_failed');
       this.onProgress({ type: 'step_failed', stepIndex, totalSteps: this.chain.steps.length, step, data: gate1Result });
+      return { status: 'failed', error: step.error, fatal: false };
+    }
+
+    // 1️⃣.5 Gate 1.5: Semantic Fidelity 语义保真与防静默降级校验 (V19-SEM-01)
+    const fidelityCheck = validatePlanStepSemanticFidelity(step);
+    step.semanticFidelity = fidelityCheck;
+    if (!fidelityCheck.allowed) {
+      step.status = 'failed';
+      step.error = `Gate 1.5 语义保真拦截: ${fidelityCheck.message}`;
+      step.errorType = fidelityCheck.errorType;
+      step.completedAt = new Date().toISOString();
+      this.chain.stats.failed++;
+      this._logExecution(step, 'semantic_fidelity_failed');
+      this.onProgress({ type: 'step_failed', stepIndex, totalSteps: this.chain.steps.length, step, data: fidelityCheck });
       return { status: 'failed', error: step.error, fatal: false };
     }
 
@@ -495,12 +535,50 @@ class PlanChain {
     // 4️⃣ PreState 捕获（记录执行前的选择集/模型状态）
     const preState = await this._capturePreState(step);
 
-    // 5️⃣ 命令执行
+    // 5️⃣ 命令执行（V19-EXEC-01: 登记执行回执与状态机追踪）
+    const receiptStore = this.receiptStore;
+    const stepAttempt = step._retryCount || 0;
+    let currentReceipt;
+    if (!this.useDurableExecution) try {
+      currentReceipt = receiptStore.createReceipt(this.chain.id, stepIndex, stepAttempt, step);
+      if (!receiptStore.markDispatched(currentReceipt.receiptId)) throw new Error('RECEIPT_ALREADY_DISPATCHED_OR_TERMINAL');
+      step._dispatchedOnce = true;
+    } catch (error) {
+      step.status = 'failed'; step.error = error.message;
+      this.chain.stats.failed++;
+      return { status: 'fatal', error: error.message };
+    }
+
     let execResult;
     try {
       execResult = await this._executeCommand(step);
     } catch (execError) {
-      execResult = { ok: false, error: execError.message };
+      const body = execError.response?.data;
+      execResult = body && typeof body === 'object'
+        ? {
+            ok: false,
+            error: body.error || body.detail?.message || execError.message,
+            errorType: body.errorType || execError.code,
+            code: body.errorType || execError.code,
+            statusCode: execError.response?.status,
+            response: body.response || body,
+            execution: body.execution,
+            detail: body.detail || body.response?.result?.addOnCommandResponse?.error,
+            operationMayBeCommitted: body.operationMayBeCommitted === true
+          }
+        : { ok: false, error: execError.message, code: execError.code, statusCode: execError.response?.status };
+    }
+
+    const isTimeout = isUncertainExecution(execResult);
+    if (!this.useDurableExecution) try {
+      const updated = execResult.ok && execResult.response?.succeeded !== false
+        ? receiptStore.markCompleted(currentReceipt.receiptId, execResult)
+        : receiptStore.markFailed(currentReceipt.receiptId, execResult.error, isTimeout, execResult.noMutationDispatched === true);
+      if (!updated) throw new Error('RECEIPT_COMPLETION_UNCONFIRMED');
+    } catch (error) {
+      step.status = 'failed'; step.error = error.message; step.result = execResult;
+      this.chain.stats.failed++;
+      return { status: 'fatal', error: error.message, recoveryRequired: true, operationMayBeCommitted: true };
     }
 
     // 6️⃣ PostChecks 读回验证
@@ -539,7 +617,9 @@ class PlanChain {
 
       if (handled.fatal || this.failureCount >= this.approvalPolicy.failureThreshold) {
         // 致命失败或超阈值 → 尝试回滚
-        if (this.approvalPolicy.rollbackOnFailure) {
+        // An unresolved dispatch may still be running. Automatic compensation
+        // would introduce another write with unknown ordering. Stop for recovery.
+        if (this.approvalPolicy.rollbackOnFailure && !handled.unverifiedTimeout && !handled.recoveryRequired) {
           await this._rollbackTo(stepIndex);
         }
         this.onProgress({ type: 'step_failed', stepIndex, totalSteps: this.chain.steps.length, step, data: { fatal: true, failureCount: this.failureCount } });
@@ -614,7 +694,7 @@ class PlanChain {
       // H4.1 调用 ViewportCapture 获取视口快照（含真 PNG 截图）
       // includeImage:true → C++ 用 ACAPI_ProjectOperation_Save 保存 PNG → base64 返回
       // 超时从 8s 提升到 20s，因为截图+base64 编码耗时较长
-      const captureRes = await axios.post(ARCHICAD_ENDPOINT(), {
+      const captureRes = await axios.post(this._targetEndpoint(), {
         command: 'API.ExecuteAddOnCommand',
         parameters: {
           addOnCommandId: { commandNamespace: 'MEPBridge', commandName: 'ViewportCapture' },
@@ -632,7 +712,7 @@ class PlanChain {
       // H4.2 调用 LLM visualVerify（真多模态 vision，含 imageBase64 时走 vision API）
       if (this.aiAdapter && typeof this.aiAdapter.visualVerifyStep === 'function') {
         console.log('[PlanChain][H4] Calling aiAdapter.visualVerifyStep...');
-        const verifyResult = await this.aiAdapter.visualVerifyStep(step, snapshot, ARCHICAD_ENDPOINT());
+        const verifyResult = await this.aiAdapter.visualVerifyStep(step, snapshot, this._targetEndpoint());
         console.log('[PlanChain][H4] visualVerifyStep result:', verifyResult ? JSON.stringify(verifyResult).slice(0, 200) : 'null');
         return verifyResult;
       }
@@ -681,7 +761,9 @@ class PlanChain {
         ...this.chain.stats,
         completed: completedCount
       },
-      userIntent: this.chain.userIntent
+      userIntent: this.chain.userIntent,
+      knowledgeContext: this.chain.knowledgeContext,
+      operations: this.chain.steps.filter(step=>step.durableOperationId).map(step=>({operationId:step.durableOperationId,action:step.action,status:step.result?.execution?.status || "UNKNOWN"}))
     };
   }
 
@@ -816,17 +898,29 @@ class PlanChain {
 
   // ── 内部方法：执行 ──
 
+  _targetEndpoint() {
+    return Number.isInteger(this.target?.port) ? endpointForPort(this.target.port) : ARCHICAD_ENDPOINT();
+  }
+
   async _executeCommand(step) {
-    const payload = step.commandJson || {
-      command: 'API.ExecuteAddOnCommand',
-      parameters: {
-        addOnCommandId: {
-          commandNamespace: step.commandNamespace || 'MEPBridge',
-          commandName: step.action
-        },
-        addOnCommandParameters: step.params || {}
-      }
-    };
+    if (!this.useDurableExecution && this.receiptStore.requiresQualifiedHostBinding) {
+      return { ok: false, errorType: 'DURABLE_RECEIPT_HOST_BINDING_NOT_QUALIFIED',
+        error: 'Durable receipts require a separately qualified host/session binding adapter.', noMutationDispatched: true };
+    }
+
+    const payload = resolvePlanCommand(step);
+    // Recheck after any approval/refinement and before mutation safety injection.
+    const semanticFidelity = validatePlanStepSemanticFidelity({ ...step, commandJson: payload });
+    if (!semanticFidelity.allowed) return { ok: false, semanticFidelity, errorType: semanticFidelity.errorType };
+    step.semanticFidelity = semanticFidelity;
+    const schemaCheck = this._checkGate1Schema({ ...step, commandNamespace: step.commandNamespace || 'MEPBridge', commandJson: payload });
+    if (!schemaCheck.pass) return { ok: false, errorType: 'GATE1_EXECUTION_RECHECK_FAILED', error: schemaCheck.reason };
+
+    // Recheck refined parameters against the same request snapshot, never current mutable KB.
+    if (this.knowledgeSnapshot?.automaticPlanValidation === 'ON') {
+      const validation = require('./knowledge-base').validatePlan({steps:[{...step,params:payload?.parameters?.addOnCommandParameters || step.params}],userIntent:this.chain?.userIntent}, this.knowledgeSnapshot);
+      if (!validation.passed) return {ok:false,errorType:'KB_PLAN_VALIDATION_FAILED',validation,noMutationDispatched:true};
+    }
 
     // P1-05：安全参数注入由能力表派生，不再手工维护第三份 mutation 清单。
     //
@@ -851,7 +945,11 @@ class PlanChain {
     console.log(`[PlanChain] Executing step ${this.currentStepIndex + 1}/${this.chain.steps.length}: ${step.action}`);
     console.log(`[PlanChain] Payload addOnCommandParameters:`, JSON.stringify(payload.parameters?.addOnCommandParameters || payload.parameters));
     // V2 修复：通过 server /api/execute 执行（自动处理参数规范化）
-    const serverPayload = { command: payload.command, parameters: payload.parameters };
+    const serverPayload = resolvePlanRequest(step, payload);
+    if (this.useDurableExecution && isMutationStep(step)) {
+      step.durableOperationId ||= require('crypto').randomBytes(32).toString('hex');
+      serverPayload.execution = {operationId:step.durableOperationId};
+    }
     const response = await axios.post(EXECUTE_ENDPOINT, serverPayload, {
       headers: { 'Content-Type': 'application/json' },
       timeout: 30000
@@ -859,13 +957,15 @@ class PlanChain {
 
     const archicadResult = response.data?.response || response.data;
     const addOnResponse = archicadResult?.result?.addOnCommandResponse || archicadResult?.addOnCommandResponse;
-    const success = (archicadResult?.succeeded === true || response.data?.ok === true) && addOnResponse?.status !== 'error' && addOnResponse?.success !== false;
+    const success = (archicadResult?.succeeded === true || response.data?.ok === true) && !require('./bounded-result-summary').hasResultFailure(response.data);
 
     return {
       ok: success,
       response: archicadResult,
+      execution: response.data?.execution,
       addOnResponse,
-      command: payload
+      command: payload,
+      semanticFidelity
     };
   }
 
@@ -880,7 +980,7 @@ class PlanChain {
 
     // 记录当前选择集作为前置状态
     try {
-      const response = await axios.post(ARCHICAD_ENDPOINT(), {
+      const response = await axios.post(this._targetEndpoint(), {
         command: 'API.ExecuteAddOnCommand',
         parameters: {
           addOnCommandId: { commandNamespace: 'MEPBridge', commandName: 'GetSelectedElements' },
@@ -907,7 +1007,7 @@ class PlanChain {
       };
     }
     try {
-      const response = await axios.post(ARCHICAD_ENDPOINT(), {
+      const response = await axios.post(this._targetEndpoint(), {
         command: 'API.ExecuteAddOnCommand',
         parameters: {
           addOnCommandId: { commandNamespace: 'MEPBridge', commandName: 'GetSelectedElements' },
@@ -929,6 +1029,16 @@ class PlanChain {
   // ── 内部方法：失败处理 H2.5 + H6.1 智能重试增强 ──
 
   async _handleFailure(step, execResult, stepIndex) {
+    if (this.useDurableExecution && step.durableOperationId) {
+      const receipt = execResult.execution;
+      if (receipt?.status === 'FAILED_VERIFIED' && receipt.recoveryRequired === false) {
+        // Terminal no-effect / verified rollback: keep the diagnostic available to
+        // AI and continue only with dependency-safe work. No recovery wait and no
+        // replay of the rejected request are required.
+        return {fatal:false,recoveryRequired:false,verifiedNoEffect:true,reason:'DURABLE_FAILURE_VERIFIED_NO_EFFECT'};
+      }
+      return {fatal:true,recoveryRequired:true,unverifiedTimeout:true,reason:'DURABLE_OPERATION_REQUIRES_EXPLICIT_STATUS_QUERY'};
+    }
     const maxRetries = this.approvalPolicy.maxRetries || 0;
     const stepRetries = step._retryCount || 0;
 
@@ -938,7 +1048,59 @@ class PlanChain {
     if (errorCategory === 'fatal') {
       // 不可恢复错误（如 CONFIRM_REQUIRED_FALSE, INVALID_GUID）→ 不重试
       console.log(`[PlanChain][H6.1] Fatal error (${execResult.error}), no retry`);
-      return { fatal: true, reason: `不可恢复错误: ${execResult.error}` };
+      const receipt = this.receiptStore.getLatestStepReceipt(this.chain.id, stepIndex);
+      const recoveryRequired = isMutationStep(step) && (!receipt || ['UNKNOWN', 'TIMEOUT_UNVERIFIED', 'DISPATCHED'].includes(receipt.status));
+      return { fatal: true, recoveryRequired, reason: `不可恢复错误: ${execResult.error}` };
+    }
+
+    // V19-EXEC-01 (ACT-V19-08): 写入超时与网络故障时的三态核验与幂等防护
+    const isMutation = isMutationStep(step);
+    const isTimeout = isUncertainExecution(execResult);
+
+    if (isMutation && isTimeout) {
+      console.log(`[PlanChain][V19-EXEC-01] Mutation step ${stepIndex} (${step.action}) timed out. Running tri-state verification...`);
+      const { verifyMutationState } = require('./mutation-idempotency-verifier');
+      const verification = await verifyMutationState(step, null, {
+        preState: step.preState,
+        verifierHook: this._testVerifierHook
+      });
+
+      // 登记核验结论至回执
+      const receiptStore = this.receiptStore;
+      const latestReceipt = receiptStore.getLatestStepReceipt(this.chain.id, stepIndex);
+      if (latestReceipt) {
+        receiptStore.markVerified(latestReceipt.receiptId, verification.state, {
+          reason: verification.reason,
+          adoptedData: verification.adoptedData
+        });
+      }
+
+      if (verification.state === 'present') {
+        console.log(`[PlanChain][V19-EXEC-01] Mutation confirmed present despite timeout. Adopting result: ${verification.reason}`);
+        return {
+          retried: true,
+          retryResult: {
+            ok: true,
+            response: { succeeded: true, ...(verification.adoptedData || {}) },
+            verifiedPresent: true
+          },
+          errorCategory: 'timeout_adopted'
+        };
+      }
+
+      if (verification.state === 'unknown') {
+        console.warn(`[PlanChain][V19-EXEC-01] Mutation state UNKNOWN after timeout (${verification.reason}). Fail-closed: refusing blind retry.`);
+        step.status = 'failed';
+        step.error = `超时后状态未知 (UNKNOWN): ${verification.reason}，已按安全红线阻止盲目重发`;
+        return { fatal: true, unverifiedTimeout: true, reason: step.error };
+      }
+
+      console.log(`[PlanChain][V19-EXEC-01] Mutation confirmed absent (${verification.reason}). Safe to proceed with retry.`);
+    }
+
+    if (isMutation) {
+      const safety = this.receiptStore.evaluateRetrySafety(this.chain.id, stepIndex, true);
+      if (!safety.safe) return { fatal: true, recoveryRequired: true, reason: safety.reason };
     }
 
     if (stepRetries < maxRetries && this.llm) {
@@ -951,7 +1113,8 @@ class PlanChain {
         const refinement = await this.llm.refineStepWithResult(
           step,
           execResult.error || JSON.stringify(execResult.response).slice(0, 500),
-          remainingSteps
+          remainingSteps,
+          { knowledgeSnapshot: this.knowledgeSnapshot, userIntent: this.chain.userIntent }
         );
 
         if (refinement.refined && refinement.step && !refinement.skip) {
@@ -960,14 +1123,45 @@ class PlanChain {
           if (refinement.step.commandJson) step.commandJson = refinement.step.commandJson;
           step.description += ` [精炼重试#${step._retryCount}]`;
 
+          // V19-EXEC-01: 校验重发安全性与幂等凭据
+          const receiptStore = this.receiptStore;
+          const retrySafety = receiptStore.evaluateRetrySafety(this.chain.id, stepIndex, isMutation);
+          if (!retrySafety.safe) {
+            console.warn(`[PlanChain][V19-EXEC-01] Retry safety rejected: ${retrySafety.reason}`);
+            if (retrySafety.adopted) {
+              return { retried: true, retryResult: { ok: true, response: retrySafety.adoptedData } };
+            }
+            return { fatal: true, recoveryRequired: true, reason: retrySafety.reason };
+          }
+
+          const retryReceipt = receiptStore.createReceipt(this.chain.id, stepIndex, step._retryCount, step);
+          if (!receiptStore.markDispatched(retryReceipt.receiptId)) return { fatal: true, reason: 'RECEIPT_RETRY_ALREADY_DISPATCHED' };
+
           // 重试执行
-          const retryResult = await this._executeCommand(step);
-          if (retryResult.ok) {
+          let retryResult;
+          try { retryResult = await this._executeCommand(step); }
+          catch (error) {
+            const body = error.response?.data;
+            retryResult = body && typeof body === 'object'
+              ? { ok:false, error:body.error || error.message, errorType:body.errorType || error.code, code:body.errorType || error.code,
+                  statusCode:error.response?.status, response:body.response || body, execution:body.execution, detail:body.detail,
+                  operationMayBeCommitted:body.operationMayBeCommitted === true }
+              : { ok:false, error:error.message, code:error.code, statusCode:error.response?.status };
+          }
+          if (retryResult.ok && retryResult.response?.succeeded !== false) {
+            receiptStore.markCompleted(retryReceipt.receiptId, retryResult);
             return { retried: true, retryResult, errorCategory };
+          } else {
+            const isRetryTimeout = isUncertainExecution(retryResult);
+            receiptStore.markFailed(retryReceipt.receiptId, retryResult.error, isRetryTimeout, retryResult.noMutationDispatched === true);
+            if (isMutation && !receiptStore.evaluateRetrySafety(this.chain.id, stepIndex, true).safe) {
+              return { fatal: true, recoveryRequired: true, reason: '重试结果未确证，停止自动补偿与后续写入' };
+            }
           }
         }
       } catch (retryError) {
         console.error(`[PlanChain] Retry failed: ${retryError.message}`);
+        if (this.receiptStore.requiresQualifiedHostBinding) return { fatal: true, recoveryRequired: true, reason: retryError.message };
       }
     }
 
@@ -1138,7 +1332,7 @@ class PlanChain {
 
     let refinement;
     try {
-      refinement = await this.llm.refineStepWithResult(completedStep, execResult, remainingSteps);
+      refinement = await this.llm.refineStepWithResult(completedStep, execResult, remainingSteps, { knowledgeSnapshot: this.knowledgeSnapshot, userIntent: this.chain.userIntent });
     } catch (e) {
       // 回灌失败不中断链：下一步保留原参数继续，未解析占位符会在 Gate1 被拦截
       console.warn('[PlanChain] Refinement call failed:', e.message);
@@ -1202,6 +1396,10 @@ class PlanChain {
       ...step,                   // 无害元数据（title/description/dependsOn/expected…）
       id: `step_${idx + 1}`,
       action,
+      ...(this.receiptTarget ? {
+        ...JSON.parse(JSON.stringify(this.receiptTarget)),
+        receiptTarget: JSON.parse(JSON.stringify(this.receiptTarget))
+      } : {}),
       title: step.title || action || `Step ${idx + 1}`,
       description: step.description || '',
       expected: step.expected || '',
@@ -1218,6 +1416,8 @@ class PlanChain {
       startedAt: null,
       completedAt: null,
       _retryCount: 0,
+      _dispatchedOnce: false,
+      durableOperationId: this.useDurableExecution && isMutationStep(step) ? require('crypto').randomBytes(32).toString('hex') : null,
       _skipped: false,
       rollbackSuggested: false,
     };
@@ -1241,6 +1441,7 @@ class PlanChain {
       stepId: step.id,
       action: step.action,
       outcome,
+      semanticFidelity: step.semanticFidelity || null,
       timestamp: new Date().toISOString(),
       riskLevel: step.riskLevel
     };
@@ -1268,6 +1469,7 @@ class PlanChain {
       id: chain.id,
       status: chain.status,
       userIntent: chain.userIntent,
+      knowledgeContext: chain.knowledgeContext,
       reasoning: chain.reasoning,
       summary: chain.summary,
       stats: {

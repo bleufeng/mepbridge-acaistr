@@ -24,6 +24,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const roofGeometry = require('./roof-replay-geometry');
 
 const SCHEMA_VERSION = 'd2-1';
 const DISTANCE_TOLERANCE_M = 0.001;
@@ -79,9 +80,12 @@ const REPLAY_STRATEGIES = {
   },
   Roof: {
     createCommand: 'CreateRoof',
+    validateGeometry: g => roofGeometry.boundary(g),
     mapGeometry: (g) => {
+      const boundaries = roofGeometry.boundary(g);
       const params = {
         vertices: normalizePolygon(g.polygon),
+        holes: boundaries.holes.map(vertices=>({vertices})),
         thickness: g.thickness,
         baseLevel: g.baseLevel
       };
@@ -199,6 +203,63 @@ function pointsClose (a, b, tolerance = DISTANCE_TOLERANCE_M) {
 }
 
 // ---------------------------------------------------------------------------
+// V19-REC-01: 三态判定分类器 (absent / present / unknown)
+// ---------------------------------------------------------------------------
+
+/**
+ * 严格关闭「任意读取异常均判为 absent」的缺陷。
+ *
+ * 判定规则：
+ *   - 传输层/网络中断/超时/服务崩溃/HTTP 5xx：判定为 'unknown'，严禁伪报为清理成功
+ *   - 仅 GetElementGeometry + 非空 GUID 上下文中的结构化 ELEMENT_NOT_FOUND/APIERR_BADGUID/APIERR_DELETED：absent；通用读取失败、HTTP 404 和自由文本不能证明不存在
+ *   - 其余不可确证的异常：fail-closed 判定为 'unknown'
+ */
+function classifyAbsenceError (error, context = {}) {
+  if (!error) return { state: 'unknown', reason: '未提供错误对象' };
+
+  // 1. 明确的通道／传输／超时／服务崩溃异常 -> unknown，绝不冒充 absent
+  const code = String(error.code || '').toUpperCase();
+  const transportCodes = [
+    'ECONNREFUSED',
+    'ETIMEDOUT',
+    'ECONNRESET',
+    'EHOSTUNREACH',
+    'ENETUNREACH',
+    'ENOTFOUND',
+    'ESOCKETTIMEDOUT',
+    'ERR_BAD_RESPONSE',
+    'ECONNABORTED'
+  ];
+  if (transportCodes.includes(code)) {
+    return { state: 'unknown', reason: `网络/传输层异常 (${code})` };
+  }
+
+  const msg = String(error.message || '');
+  if (/timeout|timed\s*out|ECONNREFUSED|ECONNRESET|socket\s+hang\s+up|Network\s+Error|EHOSTUNREACH|ENOTFOUND/i.test(msg)) {
+    return { state: 'unknown', reason: `网络/超时异常: ${msg}` };
+  }
+
+  if (error.response && error.response.status >= 500) {
+    return { state: 'unknown', reason: `服务端 HTTP ${error.response.status} 错误` };
+  }
+
+  // 2. 明确的构件不存在信号 -> absent
+  const payload = error.payload || (error.response && error.response.data);
+  const errorCode = String((payload && payload.error && payload.error.code) || '');
+  // Only a structured, element-specific failure of this GUID read proves absence.
+  // Generic Get failures, HTTP 404, free text and BADID (invalid type) do not.
+  if (context.commandName === 'GetElementGeometry' && typeof context.guid === 'string' && context.guid &&
+      payload?.status === 'error' && payload.succeeded !== false &&
+      (payload.elementGuid === undefined || String(payload.elementGuid).replace(/[{}]/g, '').toUpperCase() === context.guid.replace(/[{}]/g, '').toUpperCase()) &&
+      ['ELEMENT_NOT_FOUND', 'APIERR_BADGUID', 'APIERR_DELETED'].includes(errorCode)) {
+    return { state: 'absent', reason: 'Element-specific absence: ' + errorCode };
+  }
+
+  // 3. 其余一切无法确证的异常 -> unknown (fail-closed)
+  return { state: 'unknown', reason: `未确证异常: ${msg || errorCode || '未知错误'}` };
+}
+
+// ---------------------------------------------------------------------------
 // 服务工厂
 // ---------------------------------------------------------------------------
 
@@ -223,6 +284,7 @@ function createSnapshotReplayService (deps = {}) {
   const getEndpoint = deps.getEndpoint || (() => '');
   const now = deps.now || (() => Date.now());
   const randomId = deps.randomId || (() => crypto.randomUUID());
+  const durableExecution = deps.durableExecution || null;
 
   // previewId -> { preview, snapshot, targetEndpoint, createdAt, expiresAtMs }
   const previewStore = new Map();
@@ -467,6 +529,11 @@ function createSnapshotReplayService (deps = {}) {
         ? { supported: true, strategy: `${elementType}->${strategy.createCommand}`, createCommand: strategy.createCommand }
         : { supported: false, strategy: 'unsupported-v1', unsupportedReason: `${elementType} 不在 v1 回放支持类型（${ALL_SUPPORTED_TYPES.join('/')}）内` };
 
+      if (strategy?.validateGeometry) {
+        try { strategy.validateGeometry(geometryPayload.geometry); }
+        catch(error) { replay.supported=false; replay.unsupportedReason=error.message; }
+      }
+
       const aabbBox = aabb && aabb.min && aabb.max
         ? {
             min: [aabb.min.x, aabb.min.y, aabb.min.z],
@@ -692,6 +759,14 @@ function createSnapshotReplayService (deps = {}) {
         continue;
       }
 
+      if (strategy.validateGeometry) {
+        try { strategy.validateGeometry(element.geometry?.payload); }
+        catch(error) {
+          unsupportedElements.push({sourceGuid:element.sourceGuid,elementType:element.elementType,reason:error.message});
+          continue;
+        }
+      }
+
       operations.push({
         sourceGuid: element.sourceGuid,
         elementType: element.elementType,
@@ -741,10 +816,12 @@ function createSnapshotReplayService (deps = {}) {
     };
     preview.planHash = computePlanHash(preview);
 
+    // Freeze the qualified host session at preview, not only its path/name.
+    const executionBinding = durableExecution ? await durableExecution.bindPreview(targetEndpoint, target) : null;
     previewStore.set(previewId, {
       preview,
       snapshot,
-      targetEndpoint,
+      targetEndpoint, executionBinding,
       createdAtMs: createdAt,
       expiresAtMs
     });
@@ -782,6 +859,7 @@ function createSnapshotReplayService (deps = {}) {
       return failure('CONFIRM_REQUIRED', '真实写入要求 dryRun=false 且 confirmRequired=true');
     }
 
+    if(durableExecution && request.dryRun === false){const recovered=durableExecution.recover(request);if(recovered)return recovered;}
     pruneExpiredPreviews();
     const entry = previewStore.get(request.previewId);
     if (!entry) {
@@ -844,6 +922,7 @@ function createSnapshotReplayService (deps = {}) {
       };
     }
 
+    const executeReplay = async ({command: applyCommand}) => {
     // —— 执行 ——
     const mappings = [];
     const createdStack = []; // 逆创建序清理的操作对象
@@ -852,11 +931,11 @@ function createSnapshotReplayService (deps = {}) {
     for (const operation of preview.operations) {
       const strategy = REPLAY_STRATEGIES[operation.elementType];
       try {
-        const createPayload = await callCommand(targetEndpoint, strategy.createCommand, {
+        const createPayload = await applyCommand(targetEndpoint, strategy.createCommand, {
           ...operation.createParameters,
           dryRun: false,
           confirmRequired: true
-        });
+        }, {phase:'create',sourceGuid:operation.sourceGuid});
         const targetGuid = extractCreatedGuid(createPayload);
         if (!targetGuid) {
           throw new Error(`创建响应缺少目标 GUID：${JSON.stringify(createPayload).slice(0, 200)}`);
@@ -864,8 +943,9 @@ function createSnapshotReplayService (deps = {}) {
         mappings.push({ sourceGuid: operation.sourceGuid, targetGuid });
         createdStack.push({ operation, targetGuid });
       } catch (error) {
+        if(durableExecution)throw error; // Do not compensate after an uncertain create/read.
         errors.push(`元素 ${operation.sourceGuid}（${operation.elementType}）写入失败：${error.message}`);
-        const cleanup = await executeCleanup(targetEndpoint, createdStack);
+        const cleanup = await executeCleanup(targetEndpoint, createdStack, applyCommand, !!durableExecution);
         return {
           ok: true,
           result: {
@@ -891,7 +971,7 @@ function createSnapshotReplayService (deps = {}) {
       const entry = { sourceGuid: operation.sourceGuid, targetGuid, verified: false, mismatches: [] };
 
       try {
-        const geometryPayload = await callCommand(targetEndpoint, 'GetElementGeometry', { elementGuid: targetGuid });
+        const geometryPayload = await applyCommand(targetEndpoint, 'GetElementGeometry', { elementGuid: targetGuid });
         const mismatches = await compareElement({
           sourceElement,
           geometryPayload,
@@ -905,6 +985,7 @@ function createSnapshotReplayService (deps = {}) {
           mismatchErrors.push(`元素 ${operation.sourceGuid} readback 不一致：${mismatches.map((m) => m.field).join('/')}`);
         }
       } catch (error) {
+        if(durableExecution)throw error; // Do not compensate after an uncertain create/read.
         mismatchErrors.push(`元素 ${operation.sourceGuid} readback 异常：${error.message}`);
       }
 
@@ -913,7 +994,7 @@ function createSnapshotReplayService (deps = {}) {
     }
 
     if (!allVerified) {
-      const cleanup = await executeCleanup(targetEndpoint, createdStack);
+      const cleanup = await executeCleanup(targetEndpoint, createdStack, applyCommand, !!durableExecution);
       return {
         ok: true,
         result: {
@@ -940,8 +1021,10 @@ function createSnapshotReplayService (deps = {}) {
         errors: []
       }
     };
+    };
+    if(durableExecution)return durableExecution.run({request,endpoint:targetEndpoint,binding:entry.executionBinding},executeReplay);
+    return executeReplay({command:callCommand}); // Explicit legacy dependency fixtures, not the production router.
   }
-
   function extractCreatedGuid (payload) {
     const containers = [payload, payload && payload.data];
     const guidKeys = ['elementGuid', 'guid', 'wallGuid', 'columnGuid', 'beamGuid', 'slabGuid', 'zoneGuid', 'meshGuid', 'morphGuid', 'stairGuid', 'objectGuid', 'roofGuid'];
@@ -954,7 +1037,7 @@ function createSnapshotReplayService (deps = {}) {
     return null;
   }
 
-  async function executeCleanup (targetEndpoint, createdStack) {
+  async function executeCleanup (targetEndpoint, createdStack, cleanupCommand = callCommand, stopOnFailure = false) {
     if (createdStack.length === 0) {
       // 没有任何成功创建的元素：无可清理对象，视为 vacuous 完成（空列表满足
       // failed-cleaned 要求 cleanup.status=deleted-and-verified 的契约形状）
@@ -976,35 +1059,56 @@ function createSnapshotReplayService (deps = {}) {
     const chunkErrors = [];
     for (const chunk of chunks) {
       try {
-        await callCommand(targetEndpoint, 'DeleteElements', {
+        await cleanupCommand(targetEndpoint, 'DeleteElements', {
           guids: chunk,
           dryRun: false,
           confirmRequired: true
-        });
+        }, {phase:'cleanup'});
         deleted.push(...chunk);
       } catch (error) {
+        if(stopOnFailure)throw error; // Production durable replay stops immediately on ambiguous cleanup.
         // 不中断：后续块仍尝试删除，避免一块失败就放弃整批清理
         chunkErrors.push(error.message);
       }
     }
 
     // 无论删除调用成败，都逐个核实实际现状，不以调用返回值代替证据
+    // V19-REC-01: 三态核验 (absent / present / unknown)。超时与网络异常决不记为 absent。
     const verifiedAbsent = [];
+    const stillPresent = [];
+    const unknownState = [];
+
     for (const guid of guids) {
-      if (await confirmAbsent(targetEndpoint, guid)) verifiedAbsent.push(guid);
+      const check = await confirmAbsent(targetEndpoint, guid, cleanupCommand);
+      if (check.state === 'absent') {
+        verifiedAbsent.push(guid);
+      } else if (check.state === 'present') {
+        stillPresent.push(guid);
+      } else {
+        unknownState.push({ guid, reason: check.reason, error: check.error });
+      }
     }
 
     if (verifiedAbsent.length !== guids.length) {
       const residualCount = guids.length - verifiedAbsent.length;
-      const detail = chunkErrors.length > 0
-        ? `DeleteElements 分块失败：${chunkErrors.join('; ')}`
-        : '部分已创建元素删除后仍可读取，无法确认清理完成';
+      let detail = '';
+      if (chunkErrors.length > 0) {
+        detail = `DeleteElements 分块失败：${chunkErrors.join('; ')}`;
+      } else if (unknownState.length > 0) {
+        detail = `清理核验存在未知状态元素（网络异常/超时/未确证）：${unknownState.map((u) => `${u.guid}(${u.reason})`).join(', ')}`;
+      } else {
+        detail = '部分已创建元素删除后仍可读取，无法确认清理完成';
+      }
       return {
         status: 'failed',
         deletedTargetGuids: deleted,
         verifiedAbsentTargetGuids: verifiedAbsent,
+        stillPresentTargetGuids: stillPresent,
+        unknownTargetGuids: unknownState.map((u) => u.guid),
+        unknownDetails: unknownState,
         chunkCount: chunks.length,
         residualCount,
+        unknownCount: unknownState.length,
         error: `${detail}（残留 ${residualCount} 个）`
       };
     }
@@ -1013,17 +1117,44 @@ function createSnapshotReplayService (deps = {}) {
       status: 'deleted-and-verified',
       deletedTargetGuids: deleted,
       verifiedAbsentTargetGuids: verifiedAbsent,
+      stillPresentTargetGuids: [],
+      unknownTargetGuids: [],
       chunkCount: chunks.length,
-      residualCount: 0
+      residualCount: 0,
+      unknownCount: 0
     };
   }
 
-  async function confirmAbsent (targetEndpoint, guid) {
+  async function confirmAbsent (targetEndpoint, guid, readCommand = callCommand) {
+    if (typeof guid !== 'string' || !guid.trim()) {
+      return { state: 'unknown', absent: false, guid, reason: '缺少有效的构件读取标识' };
+    }
     try {
-      await callCommand(targetEndpoint, 'GetElementGeometry', { elementGuid: guid });
-      return false; // 仍存在
-    } catch (_) {
-      return true; // 读取失败 → 不存在
+      const payload = await readCommand(targetEndpoint, 'GetElementGeometry', { elementGuid: guid });
+      if (payload?.status === 'error' || payload?.success === false) {
+        const error = new Error('GetElementGeometry returned an error payload');
+        error.payload = payload;
+        throw error;
+      }
+      // A resolved promise is not proof of existence (empty/error/wrong-GUID
+      // responses previously became present and could authorize a delete retry).
+      const normalizeGuid = value => typeof value === 'string' ? value.trim().replace(/^[{]|[}]$/g, '').toUpperCase() : '';
+      if (payload?.status !== 'ok' || payload.succeeded === false || payload.success === false || payload.error ||
+          normalizeGuid(payload.elementGuid) !== normalizeGuid(guid) ||
+          typeof payload.elementType !== 'string' || !payload.elementType ||
+          !payload.geometry || typeof payload.geometry !== 'object' || Array.isArray(payload.geometry)) {
+        return { state: 'unknown', absent: false, guid, reason: '读取响应缺失、失败或构件身份不一致' };
+      }
+      return { state: 'present', absent: false, guid, reason: '同一构件独立读取成功' };
+    } catch (error) {
+      const evaluation = classifyAbsenceError(error, { commandName: 'GetElementGeometry', guid });
+      return {
+        state: evaluation.state,
+        absent: evaluation.state === 'absent',
+        guid,
+        reason: evaluation.reason,
+        error: error.message
+      };
     }
   }
 
@@ -1052,7 +1183,7 @@ function createSnapshotReplayService (deps = {}) {
       Beam: [['point', 'start'], ['point', 'end']],
       Slab: [['polygon', 'polygon'], ['number', 'thickness'], ['number', 'level']],
       Zone: [['polygon', 'polygon'], ['number', 'height']],
-      Roof: [['polygon', 'polygon'], ['number', 'thickness'], ['number', 'baseLevel']]
+      Roof: [['number', 'thickness'], ['number', 'baseLevel']]
     }[type] || [];
 
     for (const [kind, field] of geometryChecks) {
@@ -1080,6 +1211,9 @@ function createSnapshotReplayService (deps = {}) {
     }
 
     if (type === 'Roof') {
+      if (!roofGeometry.sameBoundary(requested,actual)) {
+        mismatches.push({field:'roofBoundaries',requested:{holeCount:requested.holeCount},actual:{holeCount:actual.holeCount,status:actual.polygonCollectionStatus}});
+      }
       if (requested.pitchAngle !== undefined
         && (actual.pitchAngle === undefined || !numbersClose(requested.pitchAngle, actual.pitchAngle))) {
         mismatches.push({ field: 'pitchAngle', requested: requested.pitchAngle, actual: actual.pitchAngle });
@@ -1125,6 +1259,7 @@ function createSnapshotReplayService (deps = {}) {
     captureSnapshot,
     buildPreview,
     applyReplay,
+    confirmAbsent,
     // 暴露给测试：预览存储检视
     _previewStoreSize: () => previewStore.size
   };
@@ -1132,6 +1267,7 @@ function createSnapshotReplayService (deps = {}) {
 
 module.exports = {
   createSnapshotReplayService,
+  classifyAbsenceError,
   computeContentHash,
   computePlanHash,
   targetFingerprint,

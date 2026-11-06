@@ -1,6 +1,6 @@
 {
   "name": "mepbridge-acaistr-server",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "MEPBridge ACAIstr Backend Server",
   "main": "server.js",
   "scripts": {
@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "axios": "^1.18.1",
-    "body-parser": "^1.20.6",
+    "body-parser": "^1.20.9",
     "cors": "^2.8.5",
     "express": "^4.18.2"
   },
@@ -30,6 +30,7 @@
   },
   "overrides": {
     "brace-expansion": "5.0.9",
-    "qs": "6.16.0"
+    "follow-redirects": "1.16.2",
+    "qs": "6.16.2"
   }
 }

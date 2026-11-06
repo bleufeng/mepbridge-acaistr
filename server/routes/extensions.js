@@ -42,11 +42,23 @@ router.use(ensureReady);
 
 router.get('/catalog', (_req, res) => {
   const modules = extensionManager.getCatalog();
+  const apxCommands = extensionManager.getApxCommands ? extensionManager.getApxCommands() : [];
   res.json({
     ok: true,
     apiVersion: '1',
     modules,
     count: modules.length,
+    apxCommands,
+    apxCount: apxCommands.length,
+  });
+});
+
+router.get('/apx-commands', (_req, res) => {
+  const apxCommands = extensionManager.getApxCommands ? extensionManager.getApxCommands() : [];
+  res.json({
+    ok: true,
+    commands: apxCommands,
+    count: apxCommands.length,
   });
 });
 

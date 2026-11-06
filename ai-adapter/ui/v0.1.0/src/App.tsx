@@ -1,3 +1,6 @@
+import { workbenchFetch as fetch } from "./execution-recovery";
+import { fetchViewportSnapshot } from "./viewport-capture-client";
+import { UiLanguageContext } from "./ui-language";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -34,6 +37,7 @@ import {
   Eye,
   EyeOff,
   ChevronDown,
+  ChevronUp,
   Bookmark,
   Move,
   FileEdit,
@@ -59,7 +63,8 @@ import {
   Link,
   Minimize2,
   PanelRightOpen,
-  PanelRightClose
+  PanelRightClose,
+  Folder
 } from "lucide-react";
 import { MoveElementsModal } from "./components/MoveElementsModal";
 import { EditPropertiesModal } from "./components/EditPropertiesModal";
@@ -78,6 +83,7 @@ import KnowledgeBasePanel from "./components/KnowledgeBasePanel";
 import LearningMemoryPanel from "./components/LearningMemoryPanel";
 import AuditLogPanel from "./components/AuditLogPanel";
 import ProactiveSuggestions from "./components/ProactiveSuggestions";
+import { nextExtensionTab, type ExtensionTab } from "./central-navigation";
 import { ExtensionPanel } from "./components/ExtensionPanel";
 import { SimpleInputDialog } from "./components/SimpleInputDialog";
 import type { TaskTemplate, CustomNLCommand } from "./userAssets";
@@ -192,7 +198,7 @@ const t = {
     planTitle: "📋 概率层生成操作计划 (Gate 2/3)",
     planStepsCount: "步序列",
     warningTitle: "物理冲突与改动警告",
-    btnExecute: "物理写入并调平 (Gate 3)",
+    btnExecute: "写入 Archicad 并调平 (Gate 3)",
     btnCancelPlan: "驳回当前计划",
     resultTitle: "🔍 物理回验对照矩阵 (Gate 4 实测记录)",
     badgePass: "校验对齐成功",
@@ -209,7 +215,7 @@ const t = {
     emptyCADDesc: "请在右侧输入栏描述您的管线需要。协处理器将规划折弯避障角度并在上面实时显示管道。",
     modalLlmTitle: "安全 LLM API 配置中心",
     llmProv: "模型服务商",
-    apiKeyPlaceholder: "请输入用于生成高阶逻辑计划的 API 密钥",
+    apiKeyPlaceholder: "请输入用于生成高阶逻辑计划的 API密钥",
     endpointPlaceholder: "选填或自定义反向代理 API 地址",
     testConn: "测试物理连接",
     save: "应用配置",
@@ -217,10 +223,10 @@ const t = {
     okLlm: "模型配置已在内存保存，随时可以使用！",
     successTest: "连接测试通过！成功解析 ping 参数：42ms。Provider 安全校验通过。",
     failTest: "测试失败，未能连结至该端点，请检查 API 密钥。",
-    errConnTitle: "物理写入失败",
+    errConnTitle: "写入 Archicad 失败",
     errConnDesc: "无法执行操作计划。原因：Archicad 宿主环境处于离线状态，或安全阀门强行拦截。请检测左侧状态开关！",
     toastPlanGenerated: "成功根据需求解析并生成拟合旁路计划",
-    toastExecuted: "Gate 4 比对完毕：实际渲染坐标已成功比对并写入 CAD 零件树！",
+    toastExecuted: "Gate 4 比对完毕：实际构件已成功比对并写入 Archicad 模型树！",
     toastReset: "系统同步已完成重置",
     toastUndo: "已撤销最近一次实体创建偏移",
     mepCodeTitle: "编译生成的 MEP 执行代码",
@@ -239,8 +245,8 @@ const t = {
     statArchicad: "Archicad Parent Env",
     statMepbridge: "MEPBridge Add-On",
     configTitle: "System Controls (Gates)",
-    gate2: "Safety Gate Confirmation (Gate 2)",
-    gate4: "Telemetry Readback (Gate 4)",
+    gate2: "Approval Gate (Gate 2)",
+    gate4: "Verify Gate (Gate 4)",
     uiLang: "Language",
     granLabel: "Confirmation Granularity",
     granOverall: "Batch confirmation (Only 1 request)",
@@ -263,8 +269,8 @@ const t = {
     send: "Commit",
     planTitle: "📋 Logic Plan Proposal (Gate 2/3)",
     planStepsCount: "Steps",
-    warningTitle: "Physical Conflict / CAD Mutate Alert",
-    btnExecute: "Confirm and Write to CAD (Gate 3)",
+    warningTitle: "Physical Conflict / Archicad Model Mutate Alert",
+    btnExecute: "Confirm and Write to Archicad (Gate 3)",
     btnCancelPlan: "Decline and Refactor Plan",
     resultTitle: "🔍 Telemetry Comparison Matrix (Gate 4 Feedback)",
     badgePass: "Alignments Approved",
@@ -289,10 +295,10 @@ const t = {
     okLlm: "Model settings updated in runtime storage!",
     successTest: "Authentication test passed! Ping: 42ms. Security token accepted.",
     failTest: "Test failed. Unable to query target provider key. Double-check token string.",
-    errConnTitle: "CAD Mutation Rejected",
+    errConnTitle: "Archicad Mutation Rejected",
     errConnDesc: "Operation plan could not execute. Reason: Archicad host is offline or safety gates blocked permission. Check the left checkboxes!",
     toastPlanGenerated: "Dynamic collision-avoidance pipe routing plan compiled",
-    toastExecuted: "Gate 4 telemetry check complete: CAD assets parsed, matched and synchronized!",
+    toastExecuted: "Gate 4 telemetry check complete: Archicad model matched and synchronized!",
     toastReset: "Workspace nodes reset to original state",
     toastUndo: "Reverted last layout entity modification",
     mepCodeTitle: "Compiled MEP Command Script",
@@ -433,30 +439,34 @@ export default function App() {
   const [lang, setLang] = useState<UiLanguageType>("zh-CN");
   const currentT = t[lang];
 
+  const localeRevision = useRef(0);
+  const localeBusy = useRef(false);
+  const [localeReady, setLocaleReady] = useState(false);
+  const [localeError, setLocaleError] = useState("");
   useEffect(() => {
     let active = true;
-
-    fetch("/ui-config.json")
-      .then((response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json();
-      })
-      .then((config) => {
-        if (
-          active &&
-          (config?.language === "zh-CN" || config?.language === "en-US")
-        ) {
-          setLang(config.language);
-        }
-      })
-      .catch((error) => {
-        console.warn("[ui-config] Using the built-in language fallback:", error);
-      });
-
-    return () => {
-      active = false;
-    };
+    fetch("/api/ui-preferences").then(r => r.json()).then(async prefs => {
+      if (!prefs.ok) throw Error(prefs.code || prefs.error);
+      if (!prefs.initialized) {
+        const initialized = await fetch("/api/ui-preferences", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale: prefs.locale, source: prefs.source, expectedRevision: prefs.revision }) }).then(r => r.json());
+        if (!initialized.ok) throw Error(initialized.code || initialized.error);
+        prefs = initialized;
+      }
+      if (active) { setLang(prefs.locale); localeRevision.current = prefs.revision; }
+    }).catch(e => { if (active) setLocaleError(String(e.message)); }).finally(() => { if (active) setLocaleReady(true); });
+    return () => { active = false; };
   }, []);
+  const selectLanguage = async (locale: UiLanguageType) => {
+    if (!localeReady || localeBusy.current) return;
+    localeBusy.current = true;
+    setLocaleReady(false);
+    try {
+      const result = await fetch("/api/ui-preferences", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale, source: "explicit", expectedRevision: localeRevision.current }) }).then(r => r.json());
+      if (!result.ok) throw Error(result.code || result.error);
+      localeRevision.current = result.revision; setLang(result.locale); setLocaleError("");
+    } catch (e: any) { setLocaleError(String(e.message)); }
+    finally { localeBusy.current = false; setLocaleReady(true); }
+  };
 
   // Mode switch state (NEW: BASE vs AI Copilot)
   const [workbenchMode, setWorkbenchMode] = useState<"base" | "copilot">("copilot");
@@ -571,7 +581,11 @@ export default function App() {
   const [templateSearch, setTemplateSearch] = useState<string>("");
   const [templateCategoryFilter, setTemplateCategoryFilter] = useState<string>("all");
   // E.5: 自定义 NL 命令
-  const [showCustomCommandsPanel, setShowCustomCommandsPanel] = useState<boolean>(false);
+  const [activeExtensionTab, setActiveExtensionTab] = useState<ExtensionTab | null>(null);
+  const [knowledgeEditorDirty, setKnowledgeEditorDirty] = useState(false);
+  const [commandEditorDirty, setCommandEditorDirty] = useState(false);
+  const extensionReturnFocus = useRef<HTMLElement | null>(null);
+  const extensionReturnLayout = useRef(false);
   const [customCommands, setCustomCommands] = useState<CustomNLCommand[]>([]);
   const [templateDropdownOpen, setTemplateDropdownOpen] = useState<boolean>(false);
   const [customCommandDropdownOpen, setCustomCommandDropdownOpen] = useState<boolean>(false);
@@ -579,7 +593,16 @@ export default function App() {
   // Connection settings
   const [archicadConnected, setArchicadConnected] = useState<boolean>(true);
   const [mepbridgeConnected, setMepbridgeConnected] = useState<boolean>(true);
+  const [serverConnected, setServerConnected] = useState<boolean>(false);
   const [activeArchicadPort, setActiveArchicadPort] = useState<number | null>(null);
+  const [archicadVersion, setArchicadVersion] = useState<number | string | null>(null);
+  const [activeProjectName, setActiveProjectName] = useState<string | null>(null);
+  const [detectedInstances, setDetectedInstances] = useState<Array<{ port: number; version?: number | string | null }>>([]);
+  const [addOnVersion, setAddOnVersion] = useState<string>("0.1.9");
+  const [updateChecking, setUpdateChecking] = useState<boolean>(false);
+  const [updateInfo, setUpdateInfo] = useState<{ checked: boolean; hasUpdate: boolean; isAhead?: boolean; updateStatus?: string; latestVersion?: string; currentVersion?: string; releaseUrl?: string; text?: string } | null>(null);
+  const [showInstancePicker, setShowInstancePicker] = useState<boolean>(true);
+  const [showUpdateResult, setShowUpdateResult] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   // Flow & Gate logic config
@@ -631,6 +654,23 @@ export default function App() {
   const [centerViewMode, setCenterViewMode] = useState<"viewport" | "screenshot" | "json">("viewport");
   const centerViewportRef = useRef<HTMLDivElement>(null);
   const [centerViewportFullscreen, setCenterViewportFullscreen] = useState<boolean>(false);
+  const [centerViewportCollapsed, setCenterViewportCollapsed] = useState<boolean>(false);
+  const [planStepsCardCollapsed, setPlanStepsCardCollapsed] = useState<boolean>(false);
+  // 视口（实际读回/计划示意）、截图与 JSON 视图在任务栏折叠/展开变化时均保持适当固定的宽度比例居中显示
+  const centerViewportSizeClassName =
+    "w-full max-w-4xl mx-auto min-w-0 " + (centerViewportFullscreen
+      ? "h-[calc(100vh-140px)] max-w-none"
+      : "h-80 sm:h-[340px]");
+
+  // Auto scroll to active executing step in plan steps demonstration
+  useEffect(() => {
+    if (currentExecutingStepIndex >= 0) {
+      const el = document.getElementById(`plan-step-item-${currentExecutingStepIndex}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+  }, [currentExecutingStepIndex]);
 
   // Custom alerts
   const [systemError, setSystemError] = useState<string | null>(null);
@@ -689,60 +729,51 @@ export default function App() {
   const [stories, setStories] = useState<Array<{ index: number; name: string; level: number }>>([]);
   const [selectedStoryForCapture, setSelectedStoryForCapture] = useState<number | null>(null);
 
-  // 加载楼层列表
+  const viewportCaptureTargetRef = useRef(activeArchicadPort);
+  viewportCaptureTargetRef.current = activeArchicadPort;
+  // Read stories from the selected instance, not a default endpoint.
   useEffect(() => {
+    setStories([]);
+    setSelectedStoryForCapture(null);
+    setViewportCapture(prev => ({ ...prev, imageBase64: null, storyIndex: null, storyName: '', summary: '' }));
+    if (activeArchicadPort === null) return;
+    let canceled = false;
     fetch('/api/execute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        commandName: 'GetStories',
-        commandNamespace: 'MEPBridge'
-      })
-    })
-      .then(r => r.json())
-      .then(data => {
-        const resp = getResponsePayload(data);
-        if (data.response?.succeeded && resp?.status === 'ok') {
-          setStories(resp.stories || []);
-          // 默认选中当前活动楼层
-          setSelectedStoryForCapture(resp.actStory ?? null);
-        }
-      })
-      .catch(() => {});
-  }, []);
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commandName: 'GetStories', commandNamespace: 'MEPBridge', targetPort: activeArchicadPort })
+    }).then(r => r.json()).then(data => {
+      const resp = getResponsePayload(data);
+      if (!canceled && data.response?.succeeded && resp?.status === 'ok') setStories(resp.stories || []);
+    }).catch(() => {});
+    return () => { canceled = true; };
+  }, [activeArchicadPort]);
 
+  const viewportCaptureBusyRef = useRef(false);
   const fetchViewportCapture = async (storyIndex?: number | null) => {
+    if (viewportCaptureBusyRef.current) return;
+    viewportCaptureBusyRef.current = true;
+    const requestedPort = activeArchicadPort;
     setViewportCapture(prev => ({ ...prev, loading: true }));
     try {
-      const targetIdx = storyIndex !== undefined ? storyIndex : selectedStoryForCapture;
-      const url = targetIdx !== null
-        ? `/api/plan-chain/capture?includeImage=true&maxElements=100&storyIndex=${targetIdx}`
-        : '/api/plan-chain/capture?includeImage=true&maxElements=100';
-      const r = await fetch(url);
-      const data = await r.json();
-      if (data.ok) {
-        setViewportCapture({
-          imageBase64: data.imageBase64,
-          viewType: data.viewType || '',
-          storyName: data.storyName || '',
-          storyIndex: data.storyIndex ?? targetIdx,
-          summary: data.summary || '',
-          loading: false
-        });
-        // 同步选中状态为实际截图楼层
-        if (data.storyIndex !== undefined) {
-          setSelectedStoryForCapture(data.storyIndex);
-        }
-      } else {
-        const errorMessage = data.error || (lang === "zh-CN" ? "Archicad 视口截图失败" : "Archicad viewport capture failed");
-        setViewportCapture(prev => ({ ...prev, loading: false, summary: errorMessage }));
-        setSystemError(errorMessage);
+      // Refresh is read-only. A floor selection changes the story only after preview confirmation.
+      const data = await fetchViewportSnapshot(activeArchicadPort, storyIndex, preview => viewportCaptureTargetRef.current === requestedPort && window.confirm(lang === 'zh-CN'
+        ? '将实例 ' + preview.targetPort + ' 的活动楼层从 ' + preview.previousStoryIndex + ' 切换到 ' + preview.requestedStory.index + '（' + preview.requestedStory.name + '），打开平面视图并截图。不会自动切回原楼层或视图，是否继续？'
+        : 'Change instance ' + preview.targetPort + ' from story ' + preview.previousStoryIndex + ' to ' + preview.requestedStory.index + ' (' + preview.requestedStory.name + '), open Floor Plan and capture? The previous story or view will not be restored automatically.'));
+      if (viewportCaptureTargetRef.current !== requestedPort) {
+        setViewportCapture(prev => ({ ...prev, loading: false }));
+        return;
       }
+      if (data) {
+        setViewportCapture({ imageBase64: data.imageBase64 || null, viewType: data.viewType || '', storyName: data.storyName || '',
+          storyIndex: data.storyIndex ?? null, summary: data.summary || '', loading: false });
+        if (Number.isInteger(data.storyIndex)) setSelectedStoryForCapture(data.storyIndex);
+      } else setViewportCapture(prev => ({ ...prev, loading: false }));
     } catch (e: any) {
-      const errorMessage = e?.message || (lang === "zh-CN" ? "无法连接截图服务" : "Unable to reach capture service");
-      setViewportCapture(prev => ({ ...prev, loading: false, summary: errorMessage }));
+      if (viewportCaptureTargetRef.current !== requestedPort) { setViewportCapture(prev => ({ ...prev, loading: false })); return; }
+      const errorMessage = e?.message || (lang === 'zh-CN' ? '无法连接截图服务' : 'Unable to reach capture service');
+      setViewportCapture(prev => ({ ...prev, imageBase64: null, loading: false, summary: errorMessage }));
       setSystemError(errorMessage);
-    }
+    } finally { viewportCaptureBusyRef.current = false; }
   };
 
   const refreshLiveViewportFromSelection = async () => {
@@ -843,19 +874,27 @@ export default function App() {
         const data = await res.json();
 
         if (!isCancelled) {
+          setServerConnected(true);
           setArchicadConnected(data.archicad === true);
           setMepbridgeConnected(data.mepbridge === true);
           const hasResolvedTarget = data.archicad === true
             && data.mepbridge === true
             && Number.isInteger(data.port);
           setActiveArchicadPort(hasResolvedTarget ? data.port : null);
+          if (data.archicadVersion != null) setArchicadVersion(data.archicadVersion);
+          if (data.addOnVersion) setAddOnVersion(data.addOnVersion);
+          if (data.projectName !== undefined) setActiveProjectName(data.projectName);
+          if (Array.isArray(data.instances)) setDetectedInstances(data.instances);
         }
       } catch (err) {
         if (!isCancelled) {
           console.warn("[Connection Poll] Failed:", err);
+          setServerConnected(false);
           setArchicadConnected(false);
           setMepbridgeConnected(false);
           setActiveArchicadPort(null);
+          setArchicadVersion(null);
+          setActiveProjectName(null);
         }
       } finally {
         // 调度下一次检查（无论成功失败）
@@ -873,6 +912,87 @@ export default function App() {
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, []);
+
+  const handleSwitchInstance = async (port: number) => {
+    try {
+      const switchRes = await fetch("/api/ping/primary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ port })
+      });
+      const switchData = await switchRes.json();
+      if (!switchRes.ok || !switchData.ok) throw new Error(switchData.error || `HTTP ${switchRes.status}`);
+      const res = await fetch("/api/ping");
+      const data = await res.json();
+      setArchicadConnected(data.archicad === true);
+      setMepbridgeConnected(data.mepbridge === true);
+      setActiveArchicadPort(data.port || null);
+      if (data.archicadVersion != null) setArchicadVersion(data.archicadVersion);
+      if (data.addOnVersion) setAddOnVersion(data.addOnVersion);
+      if (data.projectName !== undefined) setActiveProjectName(data.projectName);
+      if (Array.isArray(data.instances)) setDetectedInstances(data.instances);
+
+      const targetVer = data.archicadVersion ? `AC${data.archicadVersion}` : `Port ${port}`;
+      triggerToast(lang === "zh-CN" ? `已切换至 Archicad ${targetVer}` : `Switched to Archicad ${targetVer}`);
+    } catch (e) {
+      console.error("Failed to switch instance:", e);
+    }
+  };
+
+  const handleCheckUpdate = async () => {
+    setUpdateChecking(true);
+    setShowUpdateResult(true);
+    try {
+      const res = await fetch("/api/ping/check-update");
+      const data = await res.json();
+      const currentVer = data.currentVersion || addOnVersion || "0.1.9";
+      const latestVer = data.latestVersion || "0.1.8";
+      const releaseUrl = data.releaseUrl || data.releasesPageUrl || "https://github.com/bleufeng/mepbridge-acaistr/releases";
+
+      let statusText = "";
+      if (data.updateStatus === "UPDATE_AVAILABLE" || data.hasUpdate) {
+        statusText = lang === "zh-CN"
+          ? `发现新版本 v${latestVer}`
+          : `New version v${latestVer} available`;
+      } else if (data.updateStatus === "AHEAD_OF_REMOTE" || data.isAhead) {
+        statusText = lang === "zh-CN"
+          ? `当前为先行版本 v${currentVer}（公开仓最新 v${latestVer}）`
+          : `Ahead of release v${currentVer} (Public v${latestVer})`;
+      } else if (data.offline) {
+        statusText = lang === "zh-CN"
+          ? `当前版本 v${currentVer}（离线未连公开仓）`
+          : `Current v${currentVer} (Offline)`;
+      } else {
+        statusText = lang === "zh-CN"
+          ? `已是最新版本 v${currentVer}`
+          : `Up to date v${currentVer}`;
+      }
+
+      setUpdateInfo({
+        checked: true,
+        hasUpdate: !!data.hasUpdate,
+        isAhead: !!data.isAhead,
+        updateStatus: data.updateStatus || (data.hasUpdate ? "UPDATE_AVAILABLE" : "UP_TO_DATE"),
+        latestVersion: latestVer,
+        currentVersion: currentVer,
+        releaseUrl,
+        text: statusText
+      });
+    } catch {
+      setUpdateInfo({
+        checked: true,
+        hasUpdate: false,
+        isAhead: false,
+        updateStatus: "OFFLINE_CHECK",
+        latestVersion: addOnVersion,
+        currentVersion: addOnVersion,
+        releaseUrl: "https://github.com/bleufeng/mepbridge-acaistr/releases",
+        text: lang === "zh-CN" ? `当前版本 v${addOnVersion}（无法连接检测）` : `Current v${addOnVersion} (Check failed)`
+      });
+    } finally {
+      setUpdateChecking(false);
+    }
+  };
 
   // P3+: Auto-poll Archicad selection set every 3s in both BASE and Copilot.
   // The selection signature controls the summary; the AABB signature also detects
@@ -1260,9 +1380,10 @@ export default function App() {
     setExtPanelExpanded(false);
   }, [activeModule]);
 
-  // 切换 BASE/Copilot 模式时自动折叠扩展功能面板 + 清除上一个模式的执行结果
+  // Switch presentation without discarding a running task or retained plan result.
   useEffect(() => {
     setExtPanelExpanded(false);
+    if (isExecutingPlan || isChainRunning || activePlan || chainStatus) return;
     chainPollTokenRef.current += 1;
     if (chainPollIntervalRef.current) {
       clearInterval(chainPollIntervalRef.current);
@@ -1308,14 +1429,27 @@ export default function App() {
   };
 
   const openCustomCommandsPanel = () => {
+    loadUserTemplates();
     loadCustomCommands();
-    setShowCustomCommandsPanel(true);
+    navigateExtension("commands");
   };
 
   // E.5: 启动时加载自定义命令（用于本地短路匹配）
   useEffect(() => {
     loadCustomCommands();
   }, [lang]);
+
+  // 当后端连接恢复或首次成功，且模板/命令列表为空时，自动补载
+  useEffect(() => {
+    if (serverConnected) {
+      if (userTemplates.length === 0) {
+        loadUserTemplates();
+      }
+      if (customCommands.length === 0) {
+        loadCustomCommands();
+      }
+    }
+  }, [serverConnected, lang]);
 
   useEffect(() => {
     loadLlmConfigFromServer().then(() => {
@@ -1368,9 +1502,15 @@ export default function App() {
 
   // User places new columns directly on CAD viewport!
   const handleGridClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = Math.round(e.clientX - rect.left);
-    const y = Math.round(e.clientY - rect.top);
+    // Invert the SVG transform so obstacle clicks track centered, aspect-preserving scaling.
+    const screenTransform = e.currentTarget.getScreenCTM();
+    if (!screenTransform) return;
+    const point = e.currentTarget.createSVGPoint();
+    point.x = e.clientX;
+    point.y = e.clientY;
+    const localPoint = point.matrixTransform(screenTransform.inverse());
+    const x = Math.round(localPoint.x);
+    const y = Math.round(localPoint.y);
 
     // Filter out borders or existing start/end pads
     if (x < 40 || x > 460 || y < 30 || y > 270) return;
@@ -1478,6 +1618,15 @@ export default function App() {
               setActivePlan(filledPlan);
               setShowPlanCard(true);
               setIsAnalyzing(false);
+              if (autonomyMode === "copilot-auto") {
+                if (!archicadConnected || !mepbridgeConnected) {
+                  setSystemError(currentT.errConnDesc);
+                  triggerToast(currentT.errConnTitle);
+                } else {
+                  triggerToast(lang === "zh-CN" ? "自动模式：用户模板直接执行" : "Auto mode: executing template directly");
+                  await executeOperationPlan(filledPlan, "copilot");
+                }
+              }
               return;
             }
           }
@@ -1578,6 +1727,15 @@ export default function App() {
         setActivePlan(plan);
         setShowPlanCard(true);
         setIsAnalyzing(false);
+        if (autonomyMode === "copilot-auto") {
+          if (!archicadConnected || !mepbridgeConnected) {
+            setSystemError(currentT.errConnDesc);
+            triggerToast(currentT.errConnTitle);
+          } else {
+            triggerToast(lang === "zh-CN" ? "自动模式：命令直接执行" : "Auto mode: executing command directly");
+            await executeOperationPlan(plan, "copilot");
+          }
+        }
         return;
       }
     }
@@ -1593,7 +1751,7 @@ export default function App() {
       const res = await fetch("/api/copilot/message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: textToSend, locale: lang })
+        body: JSON.stringify({ message: textToSend, locale: lang, targetPort: activeArchicadPort })
       });
 
       if (!res.ok) {
@@ -1601,10 +1759,15 @@ export default function App() {
       }
 
       const rawData = await res.json();
+      if (rawData?.target?.port !== activeArchicadPort) {
+        throw new Error(`Target instance mismatch: expected port ${activeArchicadPort}, got ${rawData?.target?.port ?? "no echo"}`);
+      }
 
       // Complete message synthesis response
       const aiMsgId = `ai_${Date.now()}`;
-      const resPlan: OperationPlan | undefined = rawData.isMepAction ? rawData.action : undefined;
+      const resPlan: OperationPlan | undefined = rawData.isMepAction
+        ? { ...rawData.action, target: rawData.target }
+        : undefined;
 
       // 构建丰富的 AI 响应文本
       let aiText = rawData.message || "";
@@ -1645,15 +1808,26 @@ export default function App() {
           status: "pending" as const
         }));
 
-        setActivePlan({
+        const planToSet = {
           ...resPlan,
           steps: stepsWithStatus
-        });
+        };
+        setActivePlan(planToSet);
         setExecutionResultData(resPlan.parameters || []);
         setShowPlanCard(true);
         setExecutionCompleted(false);
         setCurrentExecutingStepIndex(-1);
         triggerToast(currentT.toastPlanGenerated);
+
+        if (autonomyMode === "copilot-auto") {
+          if (!archicadConnected || !mepbridgeConnected) {
+            setSystemError(currentT.errConnDesc);
+            triggerToast(currentT.errConnTitle);
+          } else {
+            triggerToast(lang === "zh-CN" ? "自动模式：AI 计划直接执行" : "Auto mode: executing AI plan directly");
+            await executeOperationPlan(planToSet, "copilot");
+          }
+        }
       }
     } catch (err: any) {
       console.warn("Express backend API unavailable. Simulating locally...", err);
@@ -1753,7 +1927,8 @@ export default function App() {
           message: text,
           mode: autonomyMode,
           autoConfirm: autonomyMode === "copilot-auto",
-          locale: lang
+          locale: lang,
+          targetPort: activeArchicadPort
         })
       });
 
@@ -1764,6 +1939,9 @@ export default function App() {
       }
       if (pollToken !== chainPollTokenRef.current) {
         return true;
+      }
+      if (data.target?.port !== activeArchicadPort) {
+        throw new Error(`Target instance mismatch: expected port ${activeArchicadPort}, got ${data.target?.port ?? 'no echo'}`);
       }
 
       if (data.status === "unsupported") {
@@ -1792,6 +1970,18 @@ export default function App() {
         reasoning: data.reasoning
       };
       setMessages((prev) => [...prev, { ...aiMsg, mode: executionMode }]);
+
+      // Native single edits return completion and readback in this response.
+      // Never poll, replay or run a second execute for an already dispatched edit.
+      if (data.executedInline === true) {
+        if (chainPollIntervalRef.current) clearInterval(chainPollIntervalRef.current);
+        chainPollIntervalRef.current = null;
+        setIsChainRunning(false);
+        setExecutionCompleted(true);
+        setIsAnalyzing(false);
+        if (data.status !== "completed") setSystemError(data.message || data.errorType || "Native edit failed");
+        return true;
+      }
 
       // 启动状态轮询
       if (chainPollIntervalRef.current) clearInterval(chainPollIntervalRef.current);
@@ -1859,7 +2049,9 @@ export default function App() {
       setIsChainRunning(false);
       setShowChainProgress(false);
       setSystemError(lang === "zh-CN" ? `自动执行失败: ${err.message}` : `Autonomy failed: ${err.message}`);
-      return false;
+      // Dispatch may already have happened. Never re-plan and auto-write after
+      // a transport failure; the operation receipt must be inspected first.
+      return true;
     } finally {
       setIsAnalyzing(false);
     }
@@ -1880,8 +2072,9 @@ export default function App() {
       setMessages((prev) => [...prev, { ...msg, mode: workbenchMode }]);
     };
 
-    // Show confirmation dialog for mutation operations
-    if (activePlan.isMutation && safetyGate) {
+    // Show confirmation dialog for mutation operations only when not in copilot-auto
+    // 在自动模式（copilot-auto）下，AI 优先执行且 Gate 3 放行直通，不弹出二次物理写入询问
+    if (activePlan.isMutation && safetyGate && autonomyMode !== "copilot-auto") {
       setPendingExecution(activePlan);
       setShowConfirmationDialog(true);
       return;
@@ -1894,7 +2087,7 @@ export default function App() {
   // Actual execution logic (extracted for reuse)
   const executeOperationPlan = async (plan: OperationPlan, executionMode: "base" | "copilot" = workbenchMode) => {
     setSystemError(null);
-    const targetPort = activeArchicadPort;
+    const targetPort = plan.target?.port ?? activeArchicadPort;
     if (targetPort === null) {
       setSystemError(lang === "zh-CN"
         ? "未获取到已验证的 Archicad 目标实例端口，已停止执行。"
@@ -1935,11 +2128,11 @@ export default function App() {
       });
 
       try {
-        const command = buildExecutePayload(step, targetPort);
+        const command = buildExecutePayload(step, targetPort, plan.target);
 
         // SYNC-5 防御：空 action 的 step 跳过执行（不再误发 Ping）
         // 正常情况下 copilot-message.js 已过滤 unsupported plan，此为兜底保护
-        const cmdName = command?.commandName || "";
+        const cmdName = "commandName" in command ? command.commandName || "" : "";
         const hasCommandJson = !!step.commandJson?.command;
         if (!cmdName && !hasCommandJson) {
           pushExecutionMessage({
@@ -1959,7 +2152,8 @@ export default function App() {
         });
 
         if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
+          const errData = await res.json().catch(() => null);
+          throw new Error(errData?.error || `HTTP ${res.status}`);
         }
 
         const result = await res.json();
@@ -2076,6 +2270,7 @@ export default function App() {
       setExecutionResultData(autoPlan.parameters || []);
       setShowPlanCard(true);
       setWorkbenchMode("copilot");
+      setCenterViewportCollapsed(true);
       setExecutionCompleted(false);
       setCurrentExecutingStepIndex(-1);
 
@@ -2399,24 +2594,41 @@ export default function App() {
     setExecutionResultData(newParams);
   };
 
-  const buildExecutePayload = (step: PlanStep, targetPort: number) => {
+  const buildExecutePayload = (step: PlanStep, targetPort: number, target?: OperationPlan["target"]) => {
+    const targetBinding = {
+      targetPort,
+      ...(target?.projectPath ? { targetProject: target.projectPath } : {}),
+      ...(target?.fingerprint ? { targetFingerprint: target.fingerprint } : {}),
+      ...(target?.archicadVersion != null ? { expectedArchicadVersion: target.archicadVersion } : {})
+    };
     if (step.commandJson?.command) {
+      const commandCopy = JSON.parse(JSON.stringify(step.commandJson));
+      if (commandCopy.parameters?.addOnCommandParameters) {
+        commandCopy.parameters.addOnCommandParameters.dryRun = false;
+        commandCopy.parameters.addOnCommandParameters.confirmRequired = true;
+      }
       return {
-        command: step.commandJson,
-        targetPort,
+        command: commandCopy,
+        ...targetBinding,
         source: "ui-copilot",
-        intent: step.description
+        intent: step.description,
+        autoMode: true
       };
     }
+
+    const paramsCopy = JSON.parse(JSON.stringify(step.params || {}));
+    paramsCopy.dryRun = false;
+    paramsCopy.confirmRequired = true;
 
     return {
       commandName: mapStepToCommand(step),
       commandNamespace: step.commandNamespace || undefined,
-      parameters: step.params || {},
-      targetPort,
+      parameters: paramsCopy,
+      ...targetBinding,
       source: "ui-copilot",
       intent: step.description,
-      target: { scope: "selection" }
+      target: { scope: "selection" },
+      autoMode: true
     };
   };
 
@@ -2493,7 +2705,7 @@ export default function App() {
     appendMessage({
         id: `undo_${Date.now()}`,
         sender: "system",
-        text: "↩️ SYSTEM_ROLLBACK: Reverting latest CAD coordinate offset and deleting GUID 'A29C-D1'. Sync point retrieved successfully.",
+        text: "↩️ SYSTEM_ROLLBACK: Reverting latest Archicad model offset and deleting GUID 'A29C-D1'. Sync point retrieved successfully.",
         timestamp: new Date().toLocaleTimeString()
     });
     setActivePlan(null);
@@ -2719,8 +2931,28 @@ export default function App() {
     );
   };
 
+  const navigateExtension = (requested: ExtensionTab | null) => {
+    const next = requested === null ? null : nextExtensionTab(activeExtensionTab, requested);
+    if (next === activeExtensionTab) return true;
+    if (activeExtensionTab === "knowledge" && knowledgeEditorDirty && !window.confirm(lang === "zh-CN" ? "有未保存规范草稿；离开后仍保留在本次会话，是否继续？" : "An unsaved knowledge draft will remain in this session. Continue leaving?")) return false;
+    if (activeExtensionTab === "commands" && commandEditorDirty && !window.confirm(lang === "zh-CN" ? "有未保存指令草稿；离开后仍保留在本次会话，是否继续？" : "An unsaved command draft will remain in this session. Continue leaving?")) return;
+    if (next && !activeExtensionTab) { extensionReturnFocus.current = document.activeElement as HTMLElement; extensionReturnLayout.current = conversationFocusMode; }
+    setActiveExtensionTab(next); setExtPanelExpanded(next !== null);
+    if (next) setConversationFocusMode(false);
+    else { setConversationFocusMode(extensionReturnLayout.current); requestAnimationFrame(() => extensionReturnFocus.current?.focus()); }
+    return true;
+  };
+  useEffect(() => { if (!extPanelExpanded) setActiveExtensionTab(null); }, [extPanelExpanded]);
+  useEffect(() => {
+    const escape = (event: KeyboardEvent) => {
+      const target=event.target as HTMLElement;
+      if(event.key!=="Escape" || event.defaultPrevented || event.isComposing || target.closest('input,textarea,select,[contenteditable="true"]') || document.querySelector('[role="dialog"],.fixed.inset-0')) return;
+      if(activeExtensionTab){event.preventDefault();navigateExtension(null);}
+    };
+    window.addEventListener("keydown",escape);return()=>window.removeEventListener("keydown",escape);
+  },[activeExtensionTab,conversationFocusMode,commandEditorDirty,knowledgeEditorDirty,lang]);
   return (
-    <div className={`${conversationFocusMode ? "w-full sm:w-[384px] max-w-full h-screen overflow-hidden" : "min-h-screen"} flex flex-col bg-zinc-950 text-zinc-150 font-sans tracking-wide`}>
+    <UiLanguageContext.Provider value={lang}><div className={`${conversationFocusMode ? "w-full sm:w-[384px] max-w-full h-screen overflow-hidden" : "h-screen min-h-screen overflow-hidden"} flex flex-col bg-zinc-950 text-zinc-150 font-sans tracking-wide`}>
       {/* Demo Mode Banner - 仅在未连接时显示 */}
       {!conversationFocusMode && (!archicadConnected || !mepbridgeConnected) && (
       <div className="flex items-center justify-between px-5 py-2.5 bg-amber-900/20 border-b border-amber-800/50 text-amber-200 text-sm">
@@ -2764,12 +2996,12 @@ export default function App() {
             {/* Archicad */}
             <div
               className="flex items-center gap-1.5"
-              title="Archicad connection status (auto-polling)"
+              title={lang === "zh-CN" ? "Archicad??????????" : "Archicad connection status (auto-polling)"}
             >
               <div className={`w-1.5 h-1.5 rounded-full ${archicadConnected ? "bg-emerald-400 animate-pulse" : "bg-red-500"}`} />
               <span className="text-zinc-400">Archicad:</span>
               <span className={archicadConnected ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
-                {archicadConnected ? "ON" : "OFF"}
+                {archicadConnected ? (archicadVersion ? `AC${archicadVersion}` : "ON") : "OFF"}
               </span>
             </div>
 
@@ -2778,7 +3010,7 @@ export default function App() {
             {/* MEPBridge Extension */}
             <div
               className="flex items-center gap-1.5"
-              title="MEPBridge connection status (auto-polling)"
+              title={lang === "zh-CN" ? "MEPBridge??????????" : "MEPBridge connection status (auto-polling)"}
             >
               <div className={`w-1.5 h-1.5 rounded-full ${mepbridgeConnected ? "bg-emerald-400 animate-pulse" : "bg-red-500"}`} />
               <span className="text-zinc-400">MEPBridge:</span>
@@ -2789,15 +3021,18 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
+            {localeError && <span role="alert" className="text-xs text-red-400">{lang === "zh-CN" ? "界面语言未保存" : "UI language not saved"}: {localeError}</span>}
             <div className="flex bg-zinc-900/80 border border-zinc-800 rounded-lg p-0.5">
               <button
-                onClick={() => setLang("zh-CN")}
+                disabled={!localeReady}
+                onClick={() => selectLanguage("zh-CN")}
                 className={`px-2 py-1 text-xs font-semibold rounded cursor-pointer ${lang === "zh-CN" ? "bg-indigo-600 text-white" : "text-zinc-400 hover:text-white"}`}
               >
                 中
               </button>
               <button
-                onClick={() => setLang("en-US")}
+                disabled={!localeReady}
+                onClick={() => selectLanguage("en-US")}
                 className={`px-2 py-1 text-xs font-semibold rounded cursor-pointer ${lang === "en-US" ? "bg-indigo-600 text-white" : "text-zinc-400 hover:text-white"}`}
               >
                 EN
@@ -2809,7 +3044,7 @@ export default function App() {
       )}
 
       {/* 2. Main Sandbox Space Layout */}
-      <div className="flex flex-1 flex-col lg:flex-row overflow-hidden relative">
+      <div className="flex flex-1 min-h-0 flex-col lg:flex-row overflow-auto lg:overflow-hidden relative">
         {/* SUCCESS ALERTS & TOASTS */}
         <AnimatePresence>
           {successToast && (
@@ -2837,26 +3072,201 @@ export default function App() {
             </h3>
 
             <div className="flex flex-col gap-2 font-sans">
-              <div className="flex items-center justify-between p-2 rounded bg-zinc-850/40 border border-zinc-800">
-                <span className="text-xs text-zinc-300">{currentT.statArchicad}</span>
-                <div
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-mono font-medium ${archicadConnected ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400" : "bg-red-500/10 border border-red-500/20 text-red-400"}`}
-                  title="Archicad connection status (auto-polling)"
-                >
-                  {archicadConnected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-                  {archicadConnected ? "ONLINE" : "OFFLINE"}
+              {/* Card 1: Archicad 宿主环境 */}
+              <div className="flex flex-col p-2.5 rounded-lg bg-zinc-850/40 border border-zinc-800 gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-zinc-200">{currentT.statArchicad}</span>
+                  <div
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium ${
+                      archicadConnected
+                        ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+                        : "bg-red-500/10 border border-red-500/20 text-red-400"
+                    }`}
+                    title={lang === "zh-CN" ? "Archicad 宿主连接状态（自动轮询）" : "Archicad connection status (auto-polling)"}
+                  >
+                    {archicadConnected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                    {archicadConnected ? "ONLINE" : "OFFLINE"}
+                  </div>
                 </div>
+
+                {archicadConnected && (
+                  <div className="flex flex-col gap-2 pt-2 border-t border-zinc-800/60 font-sans">
+                    {/* 主卡片下方保持只显示1行：[ AC 28 ] 徽标 + Port 19725 端口，右侧 [ 实例切换 ] */}
+                    <div className="flex items-center justify-between text-[10px]">
+                      <div
+                        className="flex items-center gap-1.5 cursor-default truncate"
+                        title={activeProjectName || (lang === "zh-CN" ? "未命名工程" : "Untitled Project")}
+                      >
+                        <span className="px-1.5 py-0.5 rounded font-mono font-semibold bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 flex-shrink-0">
+                          {archicadVersion ? `AC${archicadVersion}` : "Archicad"}
+                        </span>
+                        <span className="font-mono text-zinc-400 flex-shrink-0">
+                          {activeArchicadPort ? `Port ${activeArchicadPort}` : ""}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowInstancePicker((prev) => !prev)}
+                        className={`px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors flex items-center gap-1 flex-shrink-0 ${
+                          showInstancePicker
+                            ? "bg-indigo-600 text-white shadow-sm"
+                            : "bg-zinc-800/80 text-zinc-400 hover:text-indigo-300 hover:bg-zinc-800 border border-zinc-700/60"
+                        }`}
+                        title={lang === "zh-CN" ? "点击展开/收回实例切换列表" : "Toggle Archicad instance selection"}
+                      >
+                        <span>{lang === "zh-CN" ? "实例切换" : "Switch"}</span>
+                        {detectedInstances.length > 1 && (
+                          <span className="px-1 py-0.2 rounded-full bg-indigo-400/25 text-indigo-200 text-[8px] font-bold">
+                            {detectedInstances.length}
+                          </span>
+                        )}
+                        <ChevronDown className={`w-2.5 h-2.5 transition-transform duration-200 ${showInstancePicker ? "rotate-180" : ""}`} />
+                      </button>
+                    </div>
+
+                    {/* 点击实例切换展开一行选择按钮，再点击可收回 */}
+                    {showInstancePicker && (
+                      <div className="flex items-center gap-1.5 pt-1.5 border-t border-dashed border-zinc-800 flex-wrap">
+                        {detectedInstances.length > 0 ? (
+                          detectedInstances.map((inst) => {
+                            const isCurrent = inst.port === activeArchicadPort;
+                            return (
+                              <button
+                                key={inst.port}
+                                type="button"
+                                onClick={() => handleSwitchInstance(inst.port)}
+                                title={
+                                  lang === "zh-CN"
+                                    ? `切换至 Archicad ${inst.version || ""} (Port ${inst.port})`
+                                    : `Switch to Archicad ${inst.version || ""} (Port ${inst.port})`
+                                }
+                                className={`px-2 py-0.5 rounded text-[9px] font-mono font-medium transition-colors flex items-center gap-1 ${
+                                  isCurrent
+                                    ? "bg-indigo-600 text-white shadow-sm"
+                                    : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 border border-zinc-700/60"
+                                }`}
+                              >
+                                <span>{(inst.version || inst.archicadVersion) ? `AC${inst.version || inst.archicadVersion}` : "Port"}</span>
+                                <span className="opacity-70">:{inst.port}</span>
+                                {isCurrent && <span className="w-1 h-1 rounded-full bg-emerald-400 ml-0.5" />}
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <span className="text-[10px] text-zinc-500 font-mono">
+                            {lang === "zh-CN" ? "未发现其他在线实例" : "No other instances"}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div className="flex items-center justify-between p-2 rounded bg-zinc-850/40 border border-zinc-800">
-                <span className="text-xs text-zinc-300">{currentT.statMepbridge}</span>
-                <div
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-mono font-medium ${mepbridgeConnected ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400" : "bg-red-500/10 border border-red-500/20 text-red-400"}`}
-                  title="MEPBridge connection status (auto-polling)"
-                >
-                  {mepbridgeConnected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-                  {mepbridgeConnected ? "ONLINE" : "OFFLINE"}
+              {/* Card 2: MEPBridge 插件 */}
+              <div className="flex flex-col p-2.5 rounded-lg bg-zinc-850/40 border border-zinc-800 gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-zinc-200">{currentT.statMepbridge}</span>
+                  <div
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium ${
+                      mepbridgeConnected
+                        ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+                        : "bg-red-500/10 border border-red-500/20 text-red-400"
+                    }`}
+                    title={lang === "zh-CN" ? "MEPBridge 插件连接状态（自动轮询）" : "MEPBridge connection status (auto-polling)"}
+                  >
+                    {mepbridgeConnected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                    {mepbridgeConnected ? "ONLINE" : "OFFLINE"}
+                  </div>
                 </div>
+
+                {mepbridgeConnected && (
+                  <div className="flex flex-col gap-2 pt-2 border-t border-zinc-800/60 font-sans">
+                    {/* 主卡片下方保持只显示1行：[ v0.1.9 ] + 91 核心命令，右侧 [ 检查更新 ] */}
+                    <div className="flex items-center justify-between text-[10px]">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className="px-1.5 py-0.5 rounded font-mono font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex-shrink-0">
+                          v{addOnVersion}
+                        </span>
+                        <span className="text-zinc-400 font-mono flex-shrink-0">
+                          {lang === "zh-CN" ? "91 核心命令" : "91 Commands"}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!showUpdateResult) {
+                            handleCheckUpdate();
+                          } else {
+                            setShowUpdateResult(false);
+                          }
+                        }}
+                        disabled={updateChecking}
+                        className={`px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors flex items-center gap-1 flex-shrink-0 disabled:opacity-50 ${
+                          showUpdateResult
+                            ? "bg-indigo-600 text-white shadow-sm"
+                            : "bg-zinc-800/80 text-zinc-400 hover:text-indigo-300 hover:bg-zinc-800 border border-zinc-700/60"
+                        }`}
+                        title={lang === "zh-CN" ? "点击检查最新插件更新版本，再点击可收回" : "Check for updates / toggle collapse"}
+                      >
+                        <span>{lang === "zh-CN" ? "检查更新" : "Check"}</span>
+                        <ChevronDown className={`w-2.5 h-2.5 transition-transform duration-200 ${showUpdateResult ? "rotate-180" : ""}`} />
+                      </button>
+                    </div>
+
+                    {/* 点击检查更新展开一行结果，已是最新版本 v0.1.9 等信息，再点击可收回 */}
+                    {showUpdateResult && (
+                      <div className="flex items-center justify-between pt-1.5 border-t border-dashed border-zinc-800 text-[10px]">
+                        <div className="flex items-center gap-1.5 text-zinc-300 truncate">
+                          {updateChecking ? (
+                            <>
+                              <RefreshCw className="w-3 h-3 text-indigo-400 animate-spin flex-shrink-0" />
+                              <span className="text-indigo-300 font-sans">{lang === "zh-CN" ? "正在检测更新..." : "Checking..."}</span>
+                            </>
+                          ) : updateInfo ? (
+                            <>
+                              <span className={updateInfo.hasUpdate ? "text-amber-400" : updateInfo.isAhead ? "text-purple-400" : "text-emerald-400"}>●</span>
+                              <span className="truncate">{updateInfo.text}</span>
+                              {updateInfo.releaseUrl && (
+                                <a
+                                  href={updateInfo.releaseUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[9px] text-indigo-400 hover:text-indigo-300 underline flex-shrink-0 ml-1"
+                                  title={lang === "zh-CN" ? "在浏览器中查看 GitHub Releases 页面" : "Open GitHub Releases in browser"}
+                                >
+                                  {updateInfo.hasUpdate
+                                    ? (lang === "zh-CN" ? "前往下载" : "Download")
+                                    : (lang === "zh-CN" ? "查看公开仓" : "View")}
+                                </a>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-emerald-400">●</span>
+                              <span className="truncate">
+                                {lang === "zh-CN" ? `已是最新版本 v${addOnVersion}` : `Up to date v${addOnVersion}`}
+                              </span>
+                            </>
+                          )}
+                        </div>
+
+                        {!updateChecking && (
+                          <button
+                            type="button"
+                            onClick={handleCheckUpdate}
+                            className="text-[9px] text-zinc-500 hover:text-indigo-300 transition-colors flex-shrink-0 ml-1 p-0.5"
+                            title={lang === "zh-CN" ? "重新检测" : "Re-check"}
+                          >
+                            <RefreshCw className="w-2.5 h-2.5" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
             </div>
@@ -2869,40 +3279,42 @@ export default function App() {
               {currentT.configTitle}
             </h3>
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2.5">
               {/* Safety Gate Toggle */}
-              <label className="flex items-start gap-2.5 cursor-pointer group">
+              <label
+                className="flex items-center gap-2.5 cursor-pointer group select-none"
+                title={lang === "zh-CN" ? "非自动模式下修改模型执行弹窗审批" : "Modal approval for model changes in non-auto modes."}
+              >
                 <input
                   type="checkbox"
                   checked={safetyGate}
                   onChange={(e) => setSafetyGate(e.target.checked)}
-                  className="mt-0.5 rounded border-zinc-700 text-indigo-600 focus:ring-indigo-500/40 bg-zinc-950 w-4 h-4"
+                  className="rounded border-zinc-700 text-indigo-600 focus:ring-indigo-500/40 bg-zinc-950 w-4 h-4 cursor-pointer"
                 />
-                <div className="flex flex-col">
-                  <span className="text-xs font-semibold text-zinc-200 group-hover:text-indigo-400 transition-colors">
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  <span className="text-xs font-semibold text-zinc-200 group-hover:text-indigo-400 transition-colors truncate">
                     {currentT.gate2}
                   </span>
-                  <span className="text-[10px] text-zinc-400 leading-normal mt-0.5">
-                    {lang === "zh-CN" ? "拦截并预览未经校验的修改请求" : "Enforce verification review before mutation write."}
-                  </span>
+                  <Info className="w-3 h-3 text-zinc-500 group-hover:text-indigo-400 transition-colors flex-shrink-0" />
                 </div>
               </label>
 
               {/* Auto Readback Verify */}
-              <label className="flex items-start gap-2.5 cursor-pointer group">
+              <label
+                className="flex items-center gap-2.5 cursor-pointer group select-none"
+                title={lang === "zh-CN" ? "自动回读真实构件展示实测数据对比表" : "Read back elements to show actual verification table."}
+              >
                 <input
                   type="checkbox"
                   checked={autoReadback}
                   onChange={(e) => setAutoReadback(e.target.checked)}
-                  className="mt-0.5 rounded border-zinc-700 text-indigo-600 focus:ring-indigo-500/40 bg-zinc-950 w-4 h-4"
+                  className="rounded border-zinc-700 text-indigo-600 focus:ring-indigo-500/40 bg-zinc-950 w-4 h-4 cursor-pointer"
                 />
-                <div className="flex flex-col">
-                  <span className="text-xs font-semibold text-zinc-200 group-hover:text-indigo-400 transition-colors">
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  <span className="text-xs font-semibold text-zinc-200 group-hover:text-indigo-400 transition-colors truncate">
                     {currentT.gate4}
                   </span>
-                  <span className="text-[10px] text-zinc-400 leading-normal mt-0.5">
-                    {lang === "zh-CN" ? "物理端点比对与偏差异常校核" : "Continuous model comparison checking."}
-                  </span>
+                  <Info className="w-3 h-3 text-zinc-500 group-hover:text-indigo-400 transition-colors flex-shrink-0" />
                 </div>
               </label>
 
@@ -2975,8 +3387,8 @@ export default function App() {
                   <option value="openai">OpenAI</option>
                   <option value="anthropic">Anthropic</option>
                   <option value="google">Google</option>
-                  <option value="ollama">Ollama Local</option>
-                  <option value="custom">Custom Endpoint</option>
+                  <option value="ollama">{lang === "zh-CN" ? "Ollama??" : "Ollama Local"}</option>
+                  <option value="custom">{lang === "zh-CN" ? "自定义接口" : "Custom Endpoint"}</option>
                 </select>
                 {/* D5: 手动重新检测连接按钮 */}
                 {llmConnStatus !== "testing" && (
@@ -3058,7 +3470,19 @@ export default function App() {
         </aside>
 
         {/* MIDDLE Panel: Main interactive CAD pipeline + Steps review */}
-        <main className={`${conversationFocusMode ? "hidden" : "flex-1"} bg-zinc-950 flex flex-col overflow-y-auto p-4 md:p-5 gap-4 custom-scrollbar min-w-0`}>
+        <main className={`${conversationFocusMode ? "hidden" : "flex-1"} bg-zinc-950 flex flex-col overflow-y-auto p-4 md:p-5 gap-4 custom-scrollbar min-w-0 min-h-0`}>
+          <ExtensionPanel lang={lang} activeTab={activeExtensionTab} onNavigate={navigateExtension}
+            expanded={activeExtensionTab !== null} setExpanded={setExtPanelExpanded} onKnowledgeDirtyChange={setKnowledgeEditorDirty}
+            userTemplates={userTemplates} templateSearch={templateSearch} setTemplateSearch={setTemplateSearch}
+            onReplayTemplate={(tpl)=>{navigateExtension(null);void replayUserTemplate(tpl);}}
+            onDeleteTemplate={deleteUserTemplate} customCommands={customCommands} onOpenCustomCommands={openCustomCommandsPanel}
+            onAssetsChanged={async()=>{await loadUserTemplates();await loadCustomCommands();}}
+            onSuggestionClick={(action,params)=>{const draft=action+(params?" "+JSON.stringify(params):"");setInputMessage(prev=>prev?prev+"\n"+draft:draft);navigateExtension(null);}}
+            commandEditor={<CustomCommandsPanel isOpen={activeExtensionTab === "commands"} embedded lang={lang} onDirtyChange={setCommandEditorDirty}
+              onClose={()=>navigateExtension(null)} onSaved={()=>{void loadCustomCommands();}}/>}
+          />
+          <div hidden={activeExtensionTab !== null} style={{display:activeExtensionTab !== null ? "none" : undefined}} className="flex flex-col flex-1 min-h-0 overflow-y-auto gap-4">
+
 
           {/* Conditional Rendering: BASE Mode vs AI Copilot Mode */}
           {workbenchMode === "base" ? (
@@ -3305,7 +3729,6 @@ export default function App() {
                               value={selectedStoryForCapture ?? ''}
                               onChange={(e) => {
                                 const idx = e.target.value !== '' ? parseInt(e.target.value) : null;
-                                setSelectedStoryForCapture(idx);
                                 fetchViewportCapture(idx);
                               }}
                               className="text-[9px] px-1.5 py-0.5 rounded border border-violet-500/30 bg-zinc-900 text-violet-300 focus:outline-none focus:border-violet-500"
@@ -3364,7 +3787,7 @@ export default function App() {
                             {viewportCapture.imageBase64 ? (
                               <img
                                 src={`data:image/png;base64,${viewportCapture.imageBase64}`}
-                                alt="Archicad Viewport"
+                                alt={lang === "zh-CN" ? "Archicad视口" : "Archicad Viewport"}
                                 className="max-w-full object-contain rounded border border-zinc-700"
                               />
                             ) : (
@@ -4260,30 +4683,6 @@ export default function App() {
               )}
 
               {/* E.4/H8/H9/H6/H10 扩展功能面板 — 知识库/学习记忆/审计日志/主动智能/用户模板/自定义命令 */}
-              <ExtensionPanel
-                lang={lang}
-                userTemplates={userTemplates}
-                templateSearch={templateSearch}
-                setTemplateSearch={setTemplateSearch}
-                onReplayTemplate={(tpl) => replayUserTemplate(tpl)}
-                onDeleteTemplate={deleteUserTemplate}
-                customCommands={customCommands}
-                onOpenCustomCommands={openCustomCommandsPanel}
-                onAssetsChanged={async () => {
-                  await loadUserTemplates();
-                  await loadCustomCommands();
-                }}
-                onSuggestionClick={(action, params) => {
-                  triggerToast(
-                    lang === "zh-CN"
-                      ? `建议操作: ${action}（请在 Copilot 模式执行）`
-                      : `Suggested: ${action} (switch to Copilot to execute)`
-                  );
-                  console.log("[Proactive] Suggestion clicked:", action, params);
-                }}
-                expanded={extPanelExpanded}
-                setExpanded={setExtPanelExpanded}
-              />
 
               {/* NL Plan Card — BASE 模式下 NL 对话生成的计划在中区显示（修复 NL 执行成功但中区无结果显示的问题） */}
               <AnimatePresence>
@@ -4292,7 +4691,7 @@ export default function App() {
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="rounded-xl border border-indigo-500/30 bg-zinc-900/40 p-4 font-sans shadow-lg flex flex-col gap-3 relative"
+                    className="rounded-xl border border-indigo-500/30 bg-zinc-900/40 p-4 font-sans shadow-lg flex flex-col gap-3 relative mt-4"
                   >
                     <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -4446,7 +4845,7 @@ export default function App() {
 
               {/* Chain 执行结果卡片 — BASE 模式下自治编排链的结果在中区显示（修复 NL 执行成功但中区无结果显示的问题） */}
               {showChainProgress && chainStatus && (
-                <div className="rounded-xl border border-violet-500/30 bg-zinc-900/40 p-4 shadow-lg flex flex-col gap-3">
+                <div className="rounded-xl border border-violet-500/30 bg-zinc-900/40 p-4 shadow-lg flex flex-col gap-3 mt-4">
                   <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isChainRunning ? "bg-violet-500 animate-pulse" : chainStatus.status === "completed" ? "bg-emerald-500" : chainStatus.status === "failed" || chainStatus.status === "error" ? "bg-red-500" : "bg-zinc-500"}`} />
@@ -4749,21 +5148,29 @@ export default function App() {
           ) : (
             /* ========== AI COPILOT MODE (Original Content) ========== */
             <>
-          {/* Section A: SVG Professional Vector Design Canvas */}
+          {/* Section A: SVG Professional Vector Design Canvas / Screenshot / JSON */}
           <div
             ref={centerViewportRef}
-            className={`rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 shadow-lg flex flex-col gap-3 relative overflow-hidden group ${
-              centerViewportFullscreen ? "fixed inset-3 z-50 bg-zinc-950/95" : ""
+            className={`rounded-xl border border-zinc-800 bg-zinc-900/40 shadow-lg flex flex-col shrink-0 relative overflow-hidden group transition-all duration-300 w-full max-w-5xl mx-auto ${
+              centerViewportFullscreen
+                ? "fixed inset-3 z-50 bg-zinc-950/95 p-4 gap-3 max-w-none"
+                : centerViewportCollapsed
+                  ? "p-2.5 gap-0 shrink-0"
+                  : "p-4 gap-3 shrink-0"
             }`}
           >
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
-              <h2 className="text-xs font-semibold font-display tracking-wider uppercase text-zinc-300 flex items-center gap-2">
-                <Layers className="w-4 h-4 text-indigo-400" />
-                {centerViewMode === "viewport" ? currentT.navHeaderCAD
-                  : centerViewMode === "screenshot" ? (lang === "zh-CN" ? "📸 Archicad 视口截图" : "📸 Archicad Screenshot")
-                  : (lang === "zh-CN" ? "生成的 JSON 代码" : "Generated JSON Code")}
+            <div className={`flex items-center justify-between flex-wrap gap-2 ${
+              centerViewportCollapsed && !centerViewportFullscreen ? "pb-0" : "border-b border-zinc-800 pb-2.5"
+            }`}>
+              <div className="flex items-center gap-2 min-w-0">
+                <Layers className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                <h2 className="text-xs font-semibold font-display tracking-wider uppercase text-zinc-300 truncate">
+                  {centerViewMode === "viewport" ? currentT.navHeaderCAD
+                    : centerViewMode === "screenshot" ? (lang === "zh-CN" ? "📸 Archicad 视口截图" : "📸 Archicad Screenshot")
+                    : (lang === "zh-CN" ? "生成的 JSON 代码" : "Generated JSON Code")}
+                </h2>
                 {centerViewMode === "viewport" && (
-                  <span className={`px-1.5 py-0.5 border rounded-md font-mono ${
+                  <span className={`px-1.5 py-0.5 border rounded-md font-mono text-[10px] hidden sm:inline-block ${
                     liveViewportElements.length > 0
                       ? "bg-emerald-950/50 border-emerald-500/30 text-emerald-300"
                       : "bg-zinc-800 border-zinc-700 text-zinc-400"
@@ -4771,23 +5178,41 @@ export default function App() {
                     {liveViewportElements.length > 0
                       ? (lang === "zh-CN"
                         ? `实际读回 AABB · ${liveViewportElements.length} 个`
-                        : `Live AABB readback · ${liveViewportElements.length}`)
-                      : (lang === "zh-CN" ? "计划示意（未读回模型）" : "Plan schematic (no model readback)")}
+                        : `Live AABB · ${liveViewportElements.length}`)
+                      : (lang === "zh-CN" ? "计划示意" : "Plan schematic")}
                   </span>
                 )}
                 {centerViewMode === "screenshot" && viewportCapture.viewType && (
-                  <span className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 text-[10px] text-violet-300 rounded-md font-mono">
+                  <span className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 text-[10px] text-violet-300 rounded-md font-mono hidden sm:inline-block">
                     {viewportCapture.viewType} | {viewportCapture.storyName}
                   </span>
                 )}
-              </h2>
+                {centerViewportCollapsed && !centerViewportFullscreen && (
+                  <span className="text-[10px] text-zinc-500 font-mono hidden md:inline-block">
+                    {lang === "zh-CN" ? "已折叠 · 优先展示任务步骤演示" : "Collapsed · Focus on task steps"}
+                  </span>
+                )}
+                {centerViewportCollapsed && !centerViewportFullscreen && centerViewMode === "screenshot" && viewportCapture.imageBase64 && (
+                  <button
+                    onClick={() => setCenterViewportCollapsed(false)}
+                    className="px-2 py-0.5 rounded text-[10px] font-mono bg-violet-950/60 border border-violet-500/30 text-violet-300 hover:bg-violet-900/60 flex items-center gap-1 transition-colors"
+                    title={lang === "zh-CN" ? "展开查看视口截图" : "Expand to view screenshot"}
+                  >
+                    <span>📸</span>
+                    <span>{lang === "zh-CN" ? "截图已就绪" : "Screenshot Ready"}</span>
+                  </button>
+                )}
+              </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 {/* View Mode Toggle */}
                 <div className="flex items-center gap-1 bg-zinc-800/50 rounded-lg p-0.5 border border-zinc-700">
                   <button
-                    onClick={() => setCenterViewMode("viewport")}
-                    className={`px-2.5 py-1 rounded text-[10px] font-mono font-medium transition-all ${
+                    onClick={() => {
+                      setCenterViewMode("viewport");
+                      if (centerViewportCollapsed) setCenterViewportCollapsed(false);
+                    }}
+                    className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded text-[10px] font-mono font-medium transition-all ${
                       centerViewMode === "viewport"
                         ? "bg-indigo-600 text-white"
                         : "text-zinc-400 hover:text-zinc-200"
@@ -4798,9 +5223,10 @@ export default function App() {
                   <button
                     onClick={() => {
                       setCenterViewMode("screenshot");
+                      if (centerViewportCollapsed) setCenterViewportCollapsed(false);
                       if (!viewportCapture.imageBase64) fetchViewportCapture();
                     }}
-                    className={`px-2.5 py-1 rounded text-[10px] font-mono font-medium transition-all ${
+                    className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded text-[10px] font-mono font-medium transition-all ${
                       centerViewMode === "screenshot"
                         ? "bg-indigo-600 text-white"
                         : "text-zinc-400 hover:text-zinc-200"
@@ -4809,8 +5235,11 @@ export default function App() {
                     {lang === "zh-CN" ? "📸 截图" : "📸 Shot"}
                   </button>
                   <button
-                    onClick={() => setCenterViewMode("json")}
-                    className={`px-2.5 py-1 rounded text-[10px] font-mono font-medium transition-all ${
+                    onClick={() => {
+                      setCenterViewMode("json");
+                      if (centerViewportCollapsed) setCenterViewportCollapsed(false);
+                    }}
+                    className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded text-[10px] font-mono font-medium transition-all ${
                       centerViewMode === "json"
                         ? "bg-indigo-600 text-white"
                         : "text-zinc-400 hover:text-zinc-200"
@@ -4820,15 +5249,38 @@ export default function App() {
                   </button>
                 </div>
 
-                <span className="text-[11px] text-zinc-400 hidden sm:inline-block">
+                <span className="text-[11px] text-zinc-400 hidden xl:inline-block">
                   {gridObstacles.filter(o => o.isUserAdded).length > 0 ? (
                     <span className="text-indigo-400 font-medium font-mono">
                       + {gridObstacles.filter(o => o.isUserAdded).length} {lang === "zh-CN" ? "物理障碍覆盖" : "Obstacles overlay"}
                     </span>
                   ) : (
-                    <span className="text-zinc-500 font-mono text-[10px]">Parity checks active</span>
+                    <span className="text-zinc-500 font-mono text-[10px]">{lang === "zh-CN" ? "一致性检查已启用" : "Parity checks active"}</span>
                   )}
                 </span>
+
+                {/* Collapse / Expand Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setCenterViewportCollapsed(!centerViewportCollapsed)}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono border border-zinc-700 bg-zinc-800/60 hover:bg-zinc-700/60 text-zinc-300 transition-colors"
+                  title={lang === "zh-CN" ? (centerViewportCollapsed ? "展开视口画布" : "折叠视口以专注步骤演示") : (centerViewportCollapsed ? "Expand Viewport" : "Collapse Viewport")}
+                  aria-label={lang === "zh-CN" ? (centerViewportCollapsed ? "展开视口画布" : "折叠视口以专注步骤演示") : (centerViewportCollapsed ? "Expand Viewport" : "Collapse Viewport")}
+                >
+                  {centerViewportCollapsed ? (
+                    <>
+                      <ChevronDown className="w-3.5 h-3.5 text-indigo-400" />
+                      <span className="hidden sm:inline">{lang === "zh-CN" ? "展开" : "Expand"}</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronUp className="w-3.5 h-3.5 text-indigo-400" />
+                      <span className="hidden sm:inline">{lang === "zh-CN" ? "折叠" : "Collapse"}</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Fullscreen Button */}
                 <button
                   type="button"
                   onClick={async () => {
@@ -4853,10 +5305,14 @@ export default function App() {
               </div>
             </div>
 
+            {/* Conditional View: Viewport or JSON (hidden when collapsed unless fullscreen) */}
+            {(!centerViewportCollapsed || centerViewportFullscreen) && (
+              <>
+
             {/* Conditional View: Viewport or JSON */}
             {centerViewMode === "viewport" ? (
               liveViewportElements.length > 0 ? (
-                <div className="relative w-full h-80 bg-zinc-950/70 border border-emerald-500/20 rounded-xl overflow-hidden shadow-inner">
+                <div className={`relative ${centerViewportSizeClassName} bg-zinc-950/70 border border-emerald-500/20 rounded-xl overflow-hidden shadow-inner`}>
                   <div className="absolute top-2 left-2 z-20 flex flex-col gap-1.5 max-w-[75%]">
                     <span className="w-fit px-2 py-1 rounded bg-emerald-950/90 border border-emerald-500/30 text-[10px] font-mono text-emerald-300">
                       {lang === "zh-CN" ? "Archicad 实际读回 · AABB 二维尺寸示意" : "Archicad readback · AABB 2D size schematic"}
@@ -4878,7 +5334,7 @@ export default function App() {
                 </div>
               ) : (
               /* Plan schematic fallback: this is intentionally not presented as model geometry. */
-              <div className="relative w-full h-80 bg-zinc-950/70 border border-zinc-800 rounded-xl overflow-hidden shadow-inner select-none flex items-center justify-center group">
+              <div className={`relative ${centerViewportSizeClassName} bg-zinc-950/70 border border-zinc-800 rounded-xl overflow-hidden shadow-inner select-none flex items-center justify-center group`}>
 
               {/* Overlay Grid lines for schematic feel */}
               <div className="absolute inset-0 bg-grid-pattern opacity-10 pointer-events-none"
@@ -4895,6 +5351,8 @@ export default function App() {
               {/* Dynamic Interactive SVG Viewer with clickable grid */}
               <svg
                 className="w-full h-full cursor-crosshair relative z-10"
+                viewBox="0 0 500 320"
+                preserveAspectRatio="xMidYMid meet"
                 onClick={handleGridClick}
               >
                 {/* SVG definitions */}
@@ -4923,7 +5381,7 @@ export default function App() {
 
                 {/* Grid axis rulers */}
                 <g className="opacity-30 text-[9px] font-mono fill-zinc-500 font-bold">
-                  <text x="15" y="20">CAD VERTEX PATH</text>
+                  <text x="15" y="20">{lang === "zh-CN" ? "Archicad 路径规划" : "ARCHICAD VERTEX PATH"}</text>
                   <line x1="10" y1="30" x2="35" y2="30" stroke="#52525b" strokeWidth="1.5" />
                   <line x1="10" y1="30" x2="10" y2="55" stroke="#52525b" strokeWidth="1.5" />
                   <text x="40" y="34">X</text>
@@ -5002,7 +5460,7 @@ export default function App() {
                     {activePlan.steps[0]?.status === "running" && (
                       <g className="animate-pulse">
                         <line x1="50" y1="30" x2="450" y2="290" stroke="#10b981" strokeWidth="1.5" strokeDasharray="6,6" />
-                        <text x="50" y="50" className="text-[10px] font-mono fill-emerald-400 font-bold tracking-widest leading-none">SCAN ACTIVE_</text>
+                        <text x="50" y="50" className="text-[10px] font-mono fill-emerald-400 font-bold tracking-widest leading-none">{lang === "zh-CN" ? "扫描运行中_" : "SCAN ACTIVE_"}</text>
                       </g>
                     )}
 
@@ -5062,19 +5520,23 @@ export default function App() {
               )
             ) : centerViewMode === "screenshot" ? (
               /* Screenshot View - H4.1 Archicad 视口截图反馈 */
-              <div className="relative w-full h-80 bg-zinc-950/70 border border-zinc-800 rounded-xl overflow-hidden flex flex-col">
+              <div className={`relative ${centerViewportSizeClassName} bg-zinc-950/70 border border-zinc-800 rounded-xl overflow-hidden flex flex-col transition-all`}>
                 {/* 截图工具栏 */}
                 <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-800 bg-zinc-900/50">
-                  <span className="text-[10px] text-zinc-400 font-mono">
-                    {viewportCapture.summary || (lang === "zh-CN" ? "点击右侧按钮截图" : "Click button to capture")}
-                  </span>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[10px] text-zinc-400 font-mono truncate">
+                      {viewportCapture.summary || (lang === "zh-CN" ? "点击右侧按钮截图" : "Click button to capture")}
+                    </span>
+                    <span className="text-[9.5px] text-zinc-500 font-mono hidden xl:inline">
+                      {lang === "zh-CN" ? "（若图形不全，请在 Archicad 中按【适应窗口】后刷新）" : "(Fit in window in Archicad if clipped)"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
                     {stories.length > 0 && (
                       <select
                         value={selectedStoryForCapture ?? ''}
                         onChange={(e) => {
                           const idx = e.target.value !== '' ? parseInt(e.target.value) : null;
-                          setSelectedStoryForCapture(idx);
                           fetchViewportCapture(idx);
                         }}
                         className="text-[9px] px-1.5 py-0.5 rounded border border-violet-500/30 bg-zinc-900 text-violet-300 focus:outline-none focus:border-violet-500"
@@ -5088,6 +5550,17 @@ export default function App() {
                         ))}
                       </select>
                     )}
+                    {viewportCapture.imageBase64 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowBaseScreenshot(true)}
+                        className="text-[10px] px-2 py-0.5 rounded border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-300 transition-colors flex items-center gap-1"
+                        title={lang === "zh-CN" ? "全屏大图查看截图细节" : "View high-resolution screenshot"}
+                      >
+                        <Maximize2 className="w-3 h-3 text-indigo-400" />
+                        <span>{lang === "zh-CN" ? "放大" : "Enlarge"}</span>
+                      </button>
+                    )}
                     <button
                       onClick={() => fetchViewportCapture()}
                       disabled={viewportCapture.loading}
@@ -5100,13 +5573,27 @@ export default function App() {
                   </div>
                 </div>
                 {/* 截图显示区 */}
-                <div className="flex-1 flex items-center justify-center overflow-hidden p-2">
+                <div
+                  onClick={() => {
+                    if (viewportCapture.imageBase64) setShowBaseScreenshot(true);
+                  }}
+                  className={`flex-1 flex items-center justify-center overflow-hidden p-2 relative group/img ${
+                    viewportCapture.imageBase64 ? "cursor-zoom-in" : ""
+                  }`}
+                  title={viewportCapture.imageBase64 ? (lang === "zh-CN" ? "点击放大查看高精度截图" : "Click to view full-resolution screenshot") : undefined}
+                >
                   {viewportCapture.imageBase64 ? (
-                    <img
-                      src={`data:image/png;base64,${viewportCapture.imageBase64}`}
-                      alt="Archicad Viewport"
-                      className="max-w-full max-h-full object-contain rounded border border-zinc-700"
-                    />
+                    <>
+                      <img
+                        src={`data:image/png;base64,${viewportCapture.imageBase64}`}
+                        alt={lang === "zh-CN" ? "Archicad视口" : "Archicad Viewport"}
+                        className="max-w-full max-h-full object-contain rounded border border-zinc-700 shadow-md group-hover/img:border-violet-500/60 transition-colors"
+                      />
+                      <div className="absolute bottom-3 right-3 px-2 py-1 rounded bg-zinc-950/85 border border-zinc-700 text-[10px] font-mono text-zinc-300 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center gap-1 pointer-events-none shadow-lg backdrop-blur-xs">
+                        <Maximize2 className="w-3 h-3 text-indigo-400" />
+                        <span>{lang === "zh-CN" ? "点击查看大图" : "Click to Enlarge"}</span>
+                      </div>
+                    </>
                   ) : (
                     <div className="flex flex-col items-center text-zinc-500">
                       <Camera className="w-10 h-10 mb-2 opacity-50" />
@@ -5138,7 +5625,7 @@ export default function App() {
               </div>
             ) : (
               /* JSON Code View */
-              <div className="relative w-full h-80 bg-zinc-950/70 border border-zinc-800 rounded-xl overflow-hidden">
+              <div className={`relative ${centerViewportSizeClassName} bg-zinc-950/70 border border-zinc-800 rounded-xl overflow-hidden`}>
                 <div className="h-full overflow-y-auto p-4">
                   {activePlan && activePlanMode === "copilot" ? (
                     <pre className="text-xs font-mono text-emerald-400 leading-relaxed">
@@ -5153,6 +5640,42 @@ export default function App() {
                 </div>
               </div>
             )}
+              </>
+            )}
+
+            {/* Fullscreen Floating Step Progress Bar */}
+            {centerViewportFullscreen && activePlan && showPlanCard && activePlan.steps && activePlan.steps.length > 0 && (
+              <div className="absolute bottom-4 left-4 right-4 z-50 bg-zinc-950/95 border border-indigo-500/40 rounded-xl p-3 shadow-2xl backdrop-blur-md flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse flex-shrink-0" />
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-semibold text-zinc-200 truncate">
+                      {activePlan.title || (lang === "zh-CN" ? "任务步骤演示" : "Task Steps")}
+                    </span>
+                    <span className="text-[10px] font-mono text-indigo-300 truncate">
+                      {(() => {
+                        const runningIdx = activePlan.steps.findIndex(s => s.status === "running");
+                        const doneCount = activePlan.steps.filter(s => s.status === "done").length;
+                        if (runningIdx >= 0) {
+                          return `${lang === "zh-CN" ? "执行中" : "Running"} [${runningIdx + 1}/${activePlan.steps.length}]: ${activePlan.steps[runningIdx].title}`;
+                        }
+                        return `${lang === "zh-CN" ? "进度" : "Progress"}: ${doneCount}/${activePlan.steps.length} ${lang === "zh-CN" ? "已完成" : "done"}`;
+                      })()}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await document.exitFullscreen?.();
+                    setCenterViewportFullscreen(false);
+                  }}
+                  className="px-2.5 py-1 rounded text-[11px] font-mono bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition-colors flex-shrink-0"
+                >
+                  {lang === "zh-CN" ? "退出全屏查看完整步骤" : "Exit Fullscreen for Steps"}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Section B: Dynamic Operational Steps Checkbox Card — Copilot 模式只显示 copilot plan */}
@@ -5162,21 +5685,93 @@ export default function App() {
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 font-sans shadow-lg flex flex-col gap-4 relative"
+                className={`rounded-xl border border-zinc-800 bg-zinc-900/40 font-sans shadow-lg flex flex-col relative transition-all duration-300 mt-4 sm:mt-5 w-full max-w-5xl mx-auto ${
+                  planStepsCardCollapsed ? "p-3 gap-0" : "p-4 gap-4"
+                }`}
               >
                 {/* Header info */}
-                <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
+                <div className={`flex items-center justify-between flex-wrap gap-2 ${planStepsCardCollapsed ? "pb-0" : "border-b border-zinc-800 pb-2.5"}`}>
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse flex-shrink-0" />
                     <h3 className="text-sm font-semibold tracking-tight font-display text-zinc-200 truncate">
                       {activePlan.title || (lang === "zh-CN" ? "操作计划" : "Operation Plan")}
                     </h3>
+                    {planStepsCardCollapsed && (
+                      <span className="text-[10px] text-zinc-500 font-mono hidden sm:inline-block">
+                        {lang === "zh-CN" ? "已收起任务框 · 视口已完全展现" : "Task collapsed · Full viewport"}
+                      </span>
+                    )}
                   </div>
 
-                  <span className="px-2 py-0.5 rounded-full bg-indigo-950/80 border border-indigo-900/40 text-[10px] font-mono font-medium text-indigo-300 flex-shrink-0 ml-2">
-                    {activePlan.steps.length} {currentT.planStepsCount}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
+                      autonomyMode === "copilot-auto"
+                        ? "bg-emerald-950/80 border-emerald-900/40 text-emerald-300"
+                        : autonomyMode === "copilot-supervised"
+                        ? "bg-amber-950/80 border-amber-900/40 text-amber-300"
+                        : "bg-zinc-800 border-zinc-700 text-zinc-300"
+                    }`}>
+                      {autonomyMode === "copilot-auto"
+                        ? (lang === "zh-CN" ? "自动直通" : "Auto Bypass")
+                        : autonomyMode === "copilot-supervised"
+                        ? (lang === "zh-CN" ? "监督确认" : "Supervised")
+                        : (lang === "zh-CN" ? "手动严格" : "Strict")}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-indigo-950/80 border border-indigo-900/40 text-[10px] font-mono font-medium text-indigo-300">
+                      {activePlan.steps.filter(s => s.status === "done").length}/{activePlan.steps.length} {currentT.planStepsCount}
+                    </span>
+
+                    {/* Quick run when collapsed */}
+                    {planStepsCardCollapsed && !executionCompleted && (
+                      <button
+                        disabled={isExecutingPlan}
+                        onClick={handleExecutePlan}
+                        className="px-2 py-0.5 text-[11px] font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded flex items-center gap-1 shadow-sm transition-all disabled:opacity-40"
+                      >
+                        {isExecutingPlan ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                        <span>{isExecutingPlan ? (lang === "zh-CN" ? "执行中" : "Running") : (lang === "zh-CN" ? "执行" : "Run")}</span>
+                      </button>
+                    )}
+
+                    {/* One-click Collapse / Expand Section B & full viewport */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextCollapsed = !planStepsCardCollapsed;
+                        setPlanStepsCardCollapsed(nextCollapsed);
+                        if (nextCollapsed) {
+                          setCenterViewportCollapsed(false);
+                        }
+                      }}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-mono font-medium border transition-all shadow-sm ${
+                        planStepsCardCollapsed
+                          ? "bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-500/40"
+                          : "bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-300 border-zinc-700"
+                      }`}
+                      title={lang === "zh-CN"
+                        ? (planStepsCardCollapsed ? "展开任务步骤与执行面板" : "一键收起所有执行任务框，视口保持居中工模比例")
+                        : (planStepsCardCollapsed ? "Expand task steps" : "One-click collapse all execution task boxes to reveal full viewport")}
+                      aria-label={lang === "zh-CN"
+                        ? (planStepsCardCollapsed ? "展开任务步骤与执行面板" : "一键收起所有执行任务框，视口保持居中工模比例")
+                        : (planStepsCardCollapsed ? "Expand task steps" : "One-click collapse all execution task boxes to reveal full viewport")}
+                    >
+                      {planStepsCardCollapsed ? (
+                        <>
+                          <ChevronDown className="w-3.5 h-3.5" />
+                          <span>{lang === "zh-CN" ? "展开任务框" : "Expand Task"}</span>
+                        </>
+                      ) : (
+                        <>
+                          <ChevronUp className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>{lang === "zh-CN" ? "收起任务框" : "Collapse Task"}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
+
+                {!planStepsCardCollapsed && (
+                  <>
 
                 {/* Warning message triggers if mutating elements */}
                 {activePlan.warning && (
@@ -5194,15 +5789,22 @@ export default function App() {
                 )}
 
                 {/* Steps listing */}
-                <div className="flex flex-col gap-2.5 max-h-80 overflow-y-auto pr-1 custom-scrollbar">
+                <div className={`flex flex-col gap-2.5 ${centerViewportCollapsed ? "max-h-[58vh] sm:max-h-[64vh]" : "max-h-80"} overflow-y-auto pr-1 custom-scrollbar`}>
                   {activePlan.steps.map((st, idx) => {
                     const isDone = st.status === "done";
                     const isRunning = st.status === "running";
 
                     return (
                       <div
-                        key={st.id}
-                        className={`rounded px-3.5 py-3 border flex items-start gap-3.5 transition-all ${isDone ? "border-emerald-500/20 bg-emerald-500/10" : isRunning ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-100" : "border-zinc-800 bg-zinc-900/30"}`}
+                        key={st.id || idx}
+                        id={`plan-step-item-${idx}`}
+                        className={`rounded px-3.5 py-3 border flex items-start gap-3.5 transition-all ${
+                          isDone
+                            ? "border-emerald-500/20 bg-emerald-500/10"
+                            : isRunning
+                              ? "border-indigo-500/40 bg-indigo-500/15 text-indigo-100 ring-1 ring-indigo-500/50"
+                              : "border-zinc-800 bg-zinc-900/30"
+                        }`}
                       >
                         {/* Step Sequence Badge with Status states */}
                         <div className="flex flex-shrink-0 items-center justify-center">
@@ -5295,22 +5897,50 @@ export default function App() {
                     onClick={handleExecutePlan}
                     className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 tracking-wide rounded flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(79,70,229,0.4)] cursor-pointer active:scale-[0.98] disabled:opacity-40 disabled:cursor-wait transition-all"
                   >
-                    <Play className="w-3.5 h-3.5" />
-                    {currentT.btnExecute}
+                    {isExecutingPlan ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        {autonomyMode === "copilot-auto"
+                          ? (lang === "zh-CN" ? "AI 自动执行中..." : "AI Auto Executing...")
+                          : (lang === "zh-CN" ? "执行中..." : "Executing...")}
+                      </>
+                    ) : executionCompleted ? (
+                      <>
+                        <Play className="w-3.5 h-3.5" />
+                        {lang === "zh-CN" ? "重新写入 Archicad" : "Re-write to Archicad"}
+                      </>
+                    ) : autonomyMode === "copilot-auto" ? (
+                      <>
+                        <Play className="w-3.5 h-3.5" />
+                        {lang === "zh-CN" ? "写入 Archicad (自动直通)" : "Write to Archicad (Auto Direct)"}
+                      </>
+                    ) : autonomyMode === "manual-strict" ? (
+                      <>
+                        <Play className="w-3.5 h-3.5" />
+                        {lang === "zh-CN" ? "确认写入 Archicad (Gate 3 严格)" : "Confirm Write to Archicad (Gate 3 Strict)"}
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3.5 h-3.5" />
+                        {currentT.btnExecute}
+                      </>
+                    )}
                   </button>
                 </div>
+                  </>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
 
           {/* Section C: Telemetry Gate 4 Parity Verification Logs — Copilot 模式只显示 copilot plan 结果 */}
           <AnimatePresence>
-            {activePlan && autoReadback && executionCompleted && activePlanMode === "copilot" && (
+            {activePlan && autoReadback && executionCompleted && activePlanMode === "copilot" && !planStepsCardCollapsed && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, y: 10 }}
-                className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 shadow-lg flex flex-col gap-4 font-sans"
+                className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 shadow-lg flex flex-col gap-4 font-sans mt-4 w-full max-w-5xl mx-auto"
               >
                 <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
                   <div className="flex items-center gap-2">
@@ -5333,7 +5963,7 @@ export default function App() {
                         <th className="p-2.5">{currentT.parameterTitle}</th>
                         <th className="p-2.5">{currentT.expectedTitle}</th>
                         <th className="p-2.5">{currentT.actualTitle}</th>
-                        <th className="p-2.5 text-center">Parity</th>
+                        <th className="p-2.5 text-center">{lang === "zh-CN" ? "一致性" : "Parity"}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-800 text-zinc-300">
@@ -5419,34 +6049,11 @@ export default function App() {
           </AnimatePresence>
 
           {/* 扩展功能面板 — Copilot 模式也显示 */}
-          <ExtensionPanel
-            lang={lang}
-            userTemplates={userTemplates}
-            templateSearch={templateSearch}
-            setTemplateSearch={setTemplateSearch}
-            onReplayTemplate={(tpl) => replayUserTemplate(tpl)}
-            onDeleteTemplate={deleteUserTemplate}
-            customCommands={customCommands}
-            onOpenCustomCommands={openCustomCommandsPanel}
-            onAssetsChanged={async () => {
-              await loadUserTemplates();
-              await loadCustomCommands();
-            }}
-            onSuggestionClick={(action, params) => {
-              triggerToast(
-                lang === "zh-CN"
-                  ? `建议操作: ${action}`
-                  : `Suggested: ${action}`
-              );
-              console.log("[Proactive] Suggestion clicked:", action, params);
-            }}
-            expanded={extPanelExpanded}
-            setExpanded={setExtPanelExpanded}
-          />
           </>
           )}
           {/* End of Conditional Rendering (BASE vs AI Copilot) */}
 
+          </div>
         </main>
 
         {/* RIGHT Panel: CollabAI Stream Chat Container */}
@@ -5755,7 +6362,7 @@ export default function App() {
                     {m.isLocalMatch && (
                       <div className="mt-2 pt-2 border-t border-zinc-700/50 flex items-center gap-2">
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-mono">
-                          \u26A1 Local Match &middot; {m.executionTimeMs}ms
+                          {lang === "zh-CN" ? "⚡ 本地匹配 ·" : "⚡ Local match ·"} {m.executionTimeMs}ms
                         </span>
                       </div>
                     )}
@@ -5768,7 +6375,7 @@ export default function App() {
                         </span>
                         {m.isMepPlan && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 text-[10px] font-mono">
-                            \u26A0\uFE0F Mutation
+                            {lang === "zh-CN" ? "⚠ 模型变更" : "⚠ Mutation"}
                           </span>
                         )}
                       </div>
@@ -6030,8 +6637,12 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        setTemplateDropdownOpen(prev => !prev);
+                        const next = !templateDropdownOpen;
+                        setTemplateDropdownOpen(next);
                         setCustomCommandDropdownOpen(false);
+                        if (next && userTemplates.length === 0) {
+                          loadUserTemplates();
+                        }
                       }}
                       className="w-full px-2 py-1.5 text-[10px] font-mono hover:bg-pink-500/10 transition-colors text-left"
                       title={lang === "zh-CN" ? "展开/折叠已有用户模板列表" : "Expand/collapse user templates"}
@@ -6086,8 +6697,12 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        setCustomCommandDropdownOpen(prev => !prev);
+                        const next = !customCommandDropdownOpen;
+                        setCustomCommandDropdownOpen(next);
                         setTemplateDropdownOpen(false);
+                        if (next && customCommands.length === 0) {
+                          loadCustomCommands();
+                        }
                       }}
                       className="w-full px-2 py-1.5 text-[10px] font-mono hover:bg-cyan-500/10 transition-colors text-left"
                       title={lang === "zh-CN" ? "展开/折叠已有 NL 命令列表" : "Expand/collapse NL commands"}
@@ -6250,7 +6865,7 @@ export default function App() {
                   {/* 失败计数 */}
                   {(chainStatus?.failureCount ?? 0) > 0 && (
                     <span className="text-[8px] text-amber-400 font-mono">
-                      ⚠ 重试/失败: {chainStatus.failureCount}
+                      {lang === "zh-CN" ? "⚠ 重试/失败:" : "⚠ Retries/failures:"} {chainStatus.failureCount}
                     </span>
                   )}
                 </div>
@@ -6337,17 +6952,17 @@ export default function App() {
                     className="bg-zinc-950 border border-zinc-800 rounded py-2 px-3 text-xs text-zinc-200 focus:outline-none focus:border-indigo-600 font-mono"
                   >
                     <option value="deepseek">DeepSeek AI</option>
-                    <option value="openai">OpenAI (Direct Link)</option>
+                    <option value="openai">{lang === "zh-CN" ? "OpenAI 直连" : "OpenAI (Direct Link)"}</option>
                     <option value="anthropic">Anthropic (Claude)</option>
-                    <option value="ollama">Ollama Local Terminal</option>
-                    <option value="custom">Custom Proxy API</option>
+                    <option value="ollama">{lang === "zh-CN" ? "Ollama 本地终端" : "Ollama Local Terminal"}</option>
+                    <option value="custom">{lang === "zh-CN" ? "自定义代理API" : "Custom Proxy API"}</option>
                   </select>
                 </div>
 
                 {/* API Key */}
                 <div className="flex flex-col gap-1">
                   <span className="text-[10px] font-mono uppercase text-zinc-500 font-bold">
-                    API KEY {llmConfig.provider === "ollama" ? "(OPTIONAL)" : ""}
+                    {lang === "zh-CN" ? "API密钥" : "API KEY"} {llmConfig.provider === "ollama" ? "(OPTIONAL)" : ""}
                   </span>
                   <div className="relative">
                     <input
@@ -6376,7 +6991,7 @@ export default function App() {
 
                 {/* Endpoint */}
                 <div className="flex flex-col gap-1">
-                  <span className="text-[10px] font-mono uppercase text-zinc-500 font-bold">API ENDPOINT (URL)</span>
+                  <span className="text-[10px] font-mono uppercase text-zinc-500 font-bold">{lang === "zh-CN" ? "API 接口地址 (URL)" : "API ENDPOINT (URL)"}</span>
                   <input
                     type="text"
                     value={llmConfig.endpoint}
@@ -6388,7 +7003,7 @@ export default function App() {
 
                 {/* Model Name */}
                 <div className="flex flex-col gap-1">
-                  <span className="text-[10px] font-mono uppercase text-zinc-500 font-bold">MODEL ALIAS / IDENTIFIER</span>
+                  <span className="text-[10px] font-mono uppercase text-zinc-500 font-bold">{lang === "zh-CN" ? "模型别名／标识" : "MODEL ALIAS / IDENTIFIER"}</span>
                   <input
                     type="text"
                     value={llmConfig.modelName}
@@ -6465,31 +7080,45 @@ export default function App() {
         language={lang}
       />
 
-      {/* BASE 模式视口截图弹窗 */}
+      {/* Archicad 视口截图高清大图弹窗 (Lightbox) */}
       {showBaseScreenshot && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-6"
           onClick={() => setShowBaseScreenshot(false)}
         >
           <div
-            className="bg-zinc-900 border border-violet-500/30 rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] flex flex-col overflow-hidden"
+            className="bg-zinc-950 border border-violet-500/40 rounded-2xl shadow-2xl max-w-6xl w-full max-h-[94vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
             onClick={e => e.stopPropagation()}
           >
             {/* 弹窗标题栏 */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-              <h3 className="text-sm font-semibold font-display text-violet-300 flex items-center gap-2">
-                📸 {lang === "zh-CN" ? "Archicad 视口截图" : "Archicad Viewport Capture"}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/80">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Camera className="w-4 h-4 text-violet-400 flex-shrink-0" />
+                <h3 className="text-sm font-semibold font-display text-zinc-100 flex items-center gap-2 truncate">
+                  {lang === "zh-CN" ? "Archicad 视口高清截图" : "Archicad High-Res Viewport Capture"}
+                </h3>
                 {viewportCapture.viewType && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-violet-300 font-mono">
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-violet-950/80 border border-violet-500/30 text-violet-300 font-mono">
                     {viewportCapture.viewType} | {viewportCapture.storyName}
                   </span>
                 )}
-              </h3>
-              <div className="flex items-center gap-2">
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {viewportCapture.imageBase64 && (
+                  <a
+                    href={`data:image/png;base64,${viewportCapture.imageBase64}`}
+                    download={`archicad_viewport_${viewportCapture.storyName || 'view'}.png`}
+                    className="text-[11px] px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition-colors flex items-center gap-1.5"
+                    title={lang === "zh-CN" ? "下载截图 PNG 文件" : "Download PNG file"}
+                  >
+                    <Download className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>{lang === "zh-CN" ? "下载 PNG" : "Download"}</span>
+                  </a>
+                )}
                 <button
-                  onClick={fetchViewportCapture}
+                  onClick={() => fetchViewportCapture()}
                   disabled={viewportCapture.loading}
-                  className="text-[11px] px-2.5 py-1 rounded bg-violet-600/30 hover:bg-violet-600/50 text-violet-200 disabled:opacity-40 transition-colors"
+                  className="text-[11px] px-2.5 py-1 rounded bg-violet-600/40 hover:bg-violet-600/60 text-violet-200 border border-violet-500/30 disabled:opacity-40 transition-colors flex items-center gap-1"
                 >
                   {viewportCapture.loading
                     ? "⏳..."
@@ -6497,36 +7126,48 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => setShowBaseScreenshot(false)}
-                  className="text-zinc-400 hover:text-zinc-200 text-lg leading-none"
+                  className="p-1 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 text-lg leading-none transition-colors ml-1"
+                  title={lang === "zh-CN" ? "关闭" : "Close"}
                 >
                   ✕
                 </button>
               </div>
             </div>
-            {/* 截图内容 */}
-            <div className="flex-1 overflow-auto flex items-center justify-center p-4 bg-zinc-950">
+
+            {/* 截图内容 — 超大展示区，支持滚动浏览 */}
+            <div className="flex-1 overflow-auto flex items-center justify-center p-4 bg-zinc-950 min-h-[50vh]">
               {viewportCapture.loading ? (
-                <div className="text-zinc-500 text-sm">
-                  {lang === "zh-CN" ? "正在截图..." : "Capturing..."}
+                <div className="flex flex-col items-center gap-2 text-violet-300">
+                  <RefreshCw className="w-8 h-8 animate-spin opacity-80" />
+                  <span className="text-sm font-mono">{lang === "zh-CN" ? "正在捕获 Archicad 视口..." : "Capturing Archicad viewport..."}</span>
                 </div>
               ) : viewportCapture.imageBase64 ? (
-                <img
-                  src={`data:image/png;base64,${viewportCapture.imageBase64}`}
-                  alt="Archicad Viewport"
-                  className="max-w-full max-h-[60vh] object-contain rounded border border-zinc-700"
-                />
+                <div className="flex items-center justify-center w-full h-full max-h-[75vh]">
+                  <img
+                    src={`data:image/png;base64,${viewportCapture.imageBase64}`}
+                    alt={lang === "zh-CN" ? "Archicad视口截图" : "Archicad Viewport"}
+                    className="max-w-full max-h-[75vh] object-contain rounded-lg border border-zinc-700 shadow-2xl bg-white/5"
+                  />
+                </div>
               ) : (
-                <div className="text-center text-zinc-500 text-sm">
+                <div className="text-center text-zinc-500 text-sm py-12">
+                  <Camera className="w-12 h-12 mx-auto mb-3 opacity-30 text-zinc-400" />
                   <p>{lang === "zh-CN" ? "点击刷新截图按钮获取当前 Archicad 视口" : "Click refresh to capture Archicad viewport"}</p>
                 </div>
               )}
             </div>
-            {/* 底部信息 */}
-            {viewportCapture.summary && (
-              <div className="px-4 py-2 border-t border-zinc-800 text-[10px] text-zinc-500 font-mono">
+
+            {/* 底部信息与操作贴士 */}
+            <div className="px-4 py-2.5 border-t border-zinc-800 bg-zinc-900/90 text-[11px] font-mono flex items-center justify-between flex-wrap gap-2">
+              <span className="text-zinc-400 truncate max-w-xl">
                 {viewportCapture.summary}
-              </div>
-            )}
+              </span>
+              <span className="text-amber-300/90 font-sans text-[11px]">
+                {lang === "zh-CN"
+                  ? "💡 提示：若截图图形被截断或偏离中心，请在 Archicad 中按【适应窗口】（快捷键或双击滚轮）使建筑居中充满窗口，再点击刷新。"
+                  : "💡 Tip: If graphics are clipped, click 'Fit in Window' (double-click wheel) in Archicad to center the building, then refresh."}
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -6648,6 +7289,7 @@ export default function App() {
 
       {/* 通用输入对话框（替代 prompt/confirm） */}
       <SimpleInputDialog
+        lang={lang}
         isOpen={dialogState.isOpen}
         title={dialogState.title}
         label={dialogState.label}
@@ -6917,6 +7559,7 @@ export default function App() {
             setExecutionResultData(filledPlan.parameters || []);
             setShowPlanCard(true);
             setWorkbenchMode("copilot");
+            setCenterViewportCollapsed(true);
             setExecutionCompleted(false);
             setCurrentExecutingStepIndex(-1);
 
@@ -6935,15 +7578,7 @@ export default function App() {
       />
 
       {/* E.5: Custom Commands Panel */}
-      <CustomCommandsPanel
-        isOpen={showCustomCommandsPanel}
-        onClose={() => setShowCustomCommandsPanel(false)}
-        onSaved={() => {
-          loadCustomCommands();
-          triggerToast(lang === "zh-CN" ? "自定义命令已保存" : "Custom command saved");
-        }}
-        lang={lang}
-      />
-    </div>
+
+    </div></UiLanguageContext.Provider>
   );
 }

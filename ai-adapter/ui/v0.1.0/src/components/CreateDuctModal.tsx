@@ -1,3 +1,4 @@
+import { workbenchFetch as fetch } from "../execution-recovery";
 // CreateDuctModal.tsx
 // 创建风管对话框组件 — D5 V2 MEP Ventilation 模块
 
@@ -177,7 +178,7 @@ export const CreateDuctModal: React.FC<CreateDuctModalProps> = ({
               <input type="number" step="10" min="50" max="2000" value={params.widthMm}
                 onChange={e => setParams(p => ({ ...p, widthMm: Number(e.target.value) || 0 }))}
                 className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-2 text-sm text-zinc-200 outline-none focus:border-violet-500"
-                placeholder="e.g. 300" />
+                placeholder={lang === "zh-CN" ? "例如 300" : "e.g. 300"} />
             </div>
 
             <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3 space-y-2">
@@ -185,7 +186,7 @@ export const CreateDuctModal: React.FC<CreateDuctModalProps> = ({
               <input type="number" step="10" min="50" max="2000" value={params.heightMm}
                 onChange={e => setParams(p => ({ ...p, heightMm: Number(e.target.value) || 0 }))}
                 className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-2 text-sm text-zinc-200 outline-none focus:border-violet-500"
-                placeholder="e.g. 200" />
+                placeholder={lang === "zh-CN" ? "例如 200" : "e.g. 200"} />
             </div>
           </div>
 

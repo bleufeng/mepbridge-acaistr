@@ -15,7 +15,7 @@ const {
 } = require('../services/dynamic-command-resolver');
 const { getArchicadEndpoint, endpointForPort } = require('../services/archicad-endpoint');
 const { resolveTargetInstance } = require('../services/instance-targeting');
-const { normalizeCommandSafetyParameters } = require('../services/command-capabilities');
+const { normalizeCommandSafetyParameters, getCommandSafetyCapabilities } = require('../services/command-capabilities');
 const {
   getOfficialApiCapabilities,
   getDirectOfficialApiCommands,
@@ -26,6 +26,9 @@ const {
   extractPropertyWriteTargets,
   comparePropertyReadback,
 } = require('../services/official-api-capabilities');
+const { validateCommandSemanticFidelity } = require('../services/semantic-fidelity-gate');
+const {getExecutionCoordinator, captureTarget, mutation: isDurableMutation, operationId: validateOperationId} = require('../services/execution-coordinator');
+const {isAutomaticExecution} = require('../services/execution-mode');
 
 // Archicad JSON API 端点：动态解析（global.archicadPort > 环境变量 > 默认 19723）
 // 不能再硬编码 19723 —— AC29 实测会用 19724，导致 ping 在线但执行报 ARCHICAD_OFFLINE
@@ -46,8 +49,16 @@ function ARCHICAD_ENDPOINT() {
  *   失败：{ ok: false, error: "...", statusCode: 404/500/... }
  */
 router.post('/', async (req, res) => {
+  let executionId;
   try {
     const body = req.body || {};
+    if (body.execution !== undefined) {
+      if (!body.execution || typeof body.execution !== 'object' || Array.isArray(body.execution) || Object.keys(body.execution).some(k=>!['operationId'].includes(k))) throw Object.assign(Error('EXEC_INVALID_PROTOCOL'),{statusCode:400});
+      if (body.execution.operationId !== undefined) {
+        executionId = validateOperationId(body.execution.operationId);
+        res.setHeader?.('X-MEPBridge-Operation-Id', executionId);
+      }
+    }
 
     // 归一化：提取 {command, parameters} 对象
     let archicadCommand = null;
@@ -81,6 +92,19 @@ router.post('/', async (req, res) => {
       });
     }
 
+    if (archicadCommand.parameters?.addOnCommandParameters?._mepbridgeExecution !== undefined) {
+      return res.status(400).json({ok:false,errorType:'EXEC_RESERVED_NATIVE_ENVELOPE',error:'The host session envelope is server-owned.'});
+    }
+
+    // Classify the normalized request once. First-time AI/template callers need no
+    // credential negotiation: the server supplies the ID and returns its receipt.
+    // Explicit IDs remain caller-owned and must be reused for retries.
+    const durableMutation = isDurableMutation(archicadCommand);
+    if (archicadCommand.command === 'API.ExecuteAddOnCommand' && durableMutation && !executionId) {
+      executionId = validateOperationId();
+      res.setHeader?.('X-MEPBridge-Operation-Id', executionId);
+    }
+
     // D-1 目标实例寻址：顶层 targetPort / targetProject（所有 body 格式通用）。
     // 未提供时行为与历史完全一致（默认端点）；提供了就必须解析成功，
     // 未命中/多候选/类型非法显式失败 —— 绝不静默回落默认端口。
@@ -93,8 +117,12 @@ router.post('/', async (req, res) => {
       if (!targeting.ok) {
         const isUnreachable = targeting.errorType === 'TARGET_PORT_NOT_LIVE'
           || targeting.errorType === 'NO_ARCHICAD_INSTANCES';
+        const isConflict = targeting.errorType === 'TARGET_CONFLICT'
+          || targeting.errorType === 'TARGET_PROJECT_CHANGED'
+          || targeting.errorType === 'TARGET_FINGERPRINT_MISMATCH'
+          || targeting.errorType === 'TARGET_VERSION_MISMATCH';
         console.warn(`[Execute][D1] target resolve failed: ${targeting.errorType} - ${targeting.message}`);
-        return res.status(isUnreachable ? 503 : 400).json({
+        return res.status(isUnreachable ? 503 : (isConflict ? 409 : 400)).json({
           ok: false,
           error: targeting.message,
           errorType: targeting.errorType,
@@ -105,9 +133,29 @@ router.post('/', async (req, res) => {
       console.log(`[Execute][D1] resolved target -> port ${targeting.port} (mode: ${targeting.mode})`);
     }
 
+    const durableTarget = executionId && durableMutation
+      ? await captureTarget(endpoint, (...args)=>axios.post(...args)) : null;
     const dynamicResolution = await resolveDynamicCommandParameters(archicadCommand, endpoint);
 
-    console.log(`[Execute] ${archicadCommand.command} -> Archicad @ ${endpoint}`);
+    // V19-SEM-01: 跨入口语义保真与防静默降级门禁
+    const addOnCommandName = archicadCommand.parameters?.addOnCommandId?.commandName || archicadCommand.command;
+    const addOnParams = archicadCommand.parameters?.addOnCommandParameters || archicadCommand.parameters || {};
+    const fidelityCheck = validateCommandSemanticFidelity(addOnCommandName, addOnParams, body);
+    // Express JSON responses and the existing request audit can inspect the decision.
+    res.locals.semanticFidelity = fidelityCheck;
+    const sendJson = res.json.bind(res);
+    res.json = value => sendJson({ ...value, semanticFidelity: fidelityCheck });
+    if (!fidelityCheck.allowed) {
+      console.warn(`[Execute][SEM] Semantic degradation blocked: ${fidelityCheck.errorType} - ${fidelityCheck.message}`);
+      return res.status(422).json({
+        ok: false,
+        error: fidelityCheck.message,
+        errorType: fidelityCheck.errorType,
+        detail: fidelityCheck.detail
+      });
+    }
+
+    console.log(`[Execute] ${archicadCommand.command} (${archicadCommand.parameters?.addOnCommandId?.commandName || archicadCommand.command}) -> Archicad @ ${endpoint}`);
     let guardedOfficialContext = null;
 
     // V2 H1.4: 官方 API 命令透传安全包装（B 通道）
@@ -135,13 +183,31 @@ router.post('/', async (req, res) => {
       console.log(`[Execute] [B Official] ${archicadCommand.command} (${capability.layer}), parameters:`, Object.keys(archicadCommand.parameters || {}));
     }
 
-    // 透传到 Archicad JSON API
-    const response = await axios.post(endpoint, archicadCommand, {
-      headers: { 'Content-Type': 'application/json' },
-      timeout: 30000
-    });
-
-    const archicadResult = response.data;
+    // Add-On writes require the durable protocol. Its one receipt is
+    // based on the normalized/resolved outbound payload, not an LLM step or UI preview.
+    const isAuto = isAutomaticExecution(body); // AI-first default; explicit supervised/manual modes opt out
+    if (archicadCommand.command === 'API.ExecuteAddOnCommand' && archicadCommand.parameters?.addOnCommandParameters) {
+      const cmdName = archicadCommand.parameters?.addOnCommandId?.commandName;
+      const caps = getCommandSafetyCapabilities(cmdName);
+      const addOnParams = archicadCommand.parameters.addOnCommandParameters;
+      if (caps.dryRun && addOnParams.dryRun === undefined && isAuto) {
+        addOnParams.dryRun = false;
+      }
+      if (caps.confirmRequired && addOnParams.confirmRequired === undefined && (isAuto || addOnParams.dryRun === false)) {
+        addOnParams.confirmRequired = true;
+      }
+    }
+    let execution = null, durableCompletion = null;
+    let archicadResult;
+    if (executionId && durableMutation) {
+      const result = await getExecutionCoordinator().execute({id:executionId,command:archicadCommand,endpoint,target:durableTarget,allowUnresolved:isAuto,
+        complete:guardedOfficialContext ? data=>completeOfficialApiResponse({ok:true,response:data},guardedOfficialContext,endpoint) : null});
+      execution = result.execution; durableCompletion = result.completion;
+      if (result.error) return res.status(result.statusCode || 409).json({ok:false,error:result.error,errorType:result.error,response:result.data,execution,operationMayBeCommitted:result.operationMayBeCommitted});
+      archicadResult = result.data;
+    } else {
+      archicadResult = (await axios.post(endpoint, archicadCommand, {headers:{'Content-Type':'application/json'},timeout:30000})).data;
+    }
     const addOnResponse = archicadResult?.result?.addOnCommandResponse;
     const addOnStatus = addOnResponse?.status;
     const addOnSuccess = addOnResponse?.success;
@@ -150,13 +216,15 @@ router.post('/', async (req, res) => {
     if (archicadResult.succeeded && addOnStatus !== 'error' && addOnSuccess !== false) {
       let responseBody = {
         ok: true,
+        ...(execution ? {execution} : {}),
         response: archicadResult,
         command: archicadCommand,
         ...(targeting.requested ? { target: { port: targeting.port, mode: targeting.mode } } : {}),
         ...(dynamicResolution ? { dynamicResolution } : {})
       };
       // Guarded property writes return readback status in the same response.
-      if (guardedOfficialContext) {
+      if (durableCompletion) responseBody = {...responseBody,...durableCompletion};
+      else if (guardedOfficialContext) {
         responseBody = await completeOfficialApiResponse(responseBody, guardedOfficialContext, endpoint);
       }
       res.json(responseBody);
@@ -173,6 +241,12 @@ router.post('/', async (req, res) => {
     }
   } catch (error) {
     console.error('[Execute] Error:', error.message);
+    if (executionId) {
+      let execution;
+      try { execution = getExecutionCoordinator().query(executionId); } catch (_) { execution = {operationId:executionId,status:'UNKNOWN',recoveryRequired:true}; }
+      return res.status(error.statusCode || 409).json({ok:false,error:error.message,errorType:error.code || 'EXEC_ADMISSION_FAILED',execution,blockingOperationId:error.blockingOperationId});
+    }
+    if (error.statusCode) return res.status(error.statusCode).json({ok:false,error:error.message});
 
     if (error instanceof DynamicResolutionError) {
       return res.status(error.statusCode || 400).json({
@@ -418,4 +492,16 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value || {}));
 }
 
+router.get('/operations/:operationId', (req,res) => {
+  try { return res.json({ok:true,execution:getExecutionCoordinator().query(req.params.operationId)}); }
+  catch(error) { return res.status(error.statusCode || 503).json({ok:false,error:error.message,status:'UNKNOWN'}); }
+});
+router.post('/operations/:operationId/recovery-note', (req,res) => {
+  try { return res.json({ok:true,execution:getExecutionCoordinator().annotate(req.params.operationId,req.body?.note)}); }
+  catch(error) { return res.status(error.statusCode || 409).json({ok:false,error:error.message}); }
+});
+router.post('/operations/:operationId/settle', async (req,res) => {
+  try { return res.json({ok:true,execution:await getExecutionCoordinator().settle(req.params.operationId,req.body)}); }
+  catch(error) { return res.status(error.statusCode || 409).json({ok:false,error:error.message}); }
+});
 module.exports = router;

@@ -53,12 +53,14 @@ function pickPrimaryPort(instances, preferredPort) {
 
 // 补齐单个实例的 MEPBridge 可用性与当前打开的工程
 async function describeInstance(instance, { post, timeout = DESCRIBE_TIMEOUT_MS } = {}) {
+  const initialVer = instance.productInfo?.version ?? null;
   const described = {
     port: instance.port,
     productInfo: instance.productInfo,
     mepbridge: false,
     addOnVersion: null,
-    archicadVersion: null,
+    archicadVersion: initialVer,
+    version: initialVer,
     projectName: null,
     projectPath: null,
     untitled: null,
@@ -78,7 +80,9 @@ async function describeInstance(instance, { post, timeout = DESCRIBE_TIMEOUT_MS 
       { timeout }
     );
     const data = response && response.data;
-    return (data && data.result && data.result.addOnCommandResponse) || null;
+    const payload = data && data.result && data.result.addOnCommandResponse;
+    if (!data || data.succeeded === false || !payload || payload.status !== 'ok' || payload.success === false || payload.error) return null;
+    return payload;
   };
 
   // MEPBridge 未加载的实例仍应出现在列表里，只是缺少工程信息
@@ -87,7 +91,10 @@ async function describeInstance(instance, { post, timeout = DESCRIBE_TIMEOUT_MS 
     if (ping && ping.status === 'ok') {
       described.mepbridge = true;
       described.addOnVersion = ping.version || null;
-      described.archicadVersion = ping.archicadVersion !== undefined ? ping.archicadVersion : null;
+      if (ping.archicadVersion !== undefined) {
+        described.archicadVersion = ping.archicadVersion;
+        described.version = ping.archicadVersion;
+      }
     }
   } catch (_) { /* 保持 mepbridge=false */ }
 
