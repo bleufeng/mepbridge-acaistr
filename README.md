@@ -18,26 +18,35 @@
 
 Natural-language tasks and extensible user templates pass through safety orchestration and risk gates, connecting design instructions with AI algorithms through structured data, driving Archicad execution via the local Workbench / MCP layer, and reading back structured results to form a closed loop.
 
-## Top Capability Panorama Dashboard
+## Capability Panorama Dashboard
 
-According to the project capability panorama ledger, the system establishes five core measurement dimensions for industrial-grade capabilities:
-
-```text
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                        MEPBridge ACAIstr Capability Panorama Dashboard                 │
-├─────────────────────┬─────────────────────┬─────────────────────┬──────────────────────┤
-│ 1. Contract Tools   │ 2. Atomic API Scale │ 3. Official Coverage│ 4. Q1–Q4 Lifecycle   │
-│    95 Items         │    162 APIs (Max 189)│    46 / 73 Items    │    Full-depth Verified│
-├─────────────────────┴─────────────────────┴─────────────────────┴──────────────────────┤
-│ 5. Model Rollback Rate: 99.8% (147 live scenarios PASS, Zero-Dirty-Model guarantee)    │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-```
-
-1. **Contract Tool Boundary (95 Items)**: 91 C++ native Add-On commands (bound to DevKit C++ lineages) and 4 local Server orchestration tools;
-2. **Atomic API Scale (162 APIs, max 189)**: 95 unified, cohesive contracts polymorphically cover 8 official functional domains, preventing command bloat;
-3. **Official JSON API Pool (46 / 73 Items)**: 28 C++ superset extensions (enhanced performance with geometry) + 18 non-geometric whitelisted proxies;
-4. **Q1–Q4 Lifecycle Depth**: Covers construction/creation (Q1), readback/inspection (Q2), in-place GUID-preserved mutation (Q3, curtain wall live-verified), and topological solving (Q4);
-5. **Model Transaction Rollback Rate (99.8%)**: In-transaction 1mm geometry readback tolerance with kernel-level rollback and orphan element cleanup, achieving zero dirty model residue across 147 live tests.
+<table>
+  <tr>
+    <td><strong>Contract Tools</strong></td>
+    <td><code>████████████████████</code> <strong>95 Items</strong></td>
+    <td>91 C++ native Add-On commands + 4 Server tools</td>
+  </tr>
+  <tr>
+    <td><strong>Atomic API Scale</strong></td>
+    <td><code>█████████████████░░░</code> <strong>162 APIs</strong> (Full 189)</td>
+    <td>95 unified contracts polymorphically covering 162 Archicad official atomic capabilities</td>
+  </tr>
+  <tr>
+    <td><strong>Official JSON API</strong></td>
+    <td><code>█████████████░░░░░░░</code> <strong>46 / 77 Items</strong> (60%)</td>
+    <td>28 C++ supersets + 18 whitelisted proxies (AC30 base)</td>
+  </tr>
+  <tr>
+    <td><strong>Lifecycle Depth</strong></td>
+    <td><code>████████████████░░░░</code> <strong>Q1 ～ Q4</strong></td>
+    <td>Construction, inspection, in-place mutation & topology</td>
+  </tr>
+  <tr>
+    <td><strong>Transaction Safety</strong></td>
+    <td><code>████████████████████</code> <strong>99.8%</strong></td>
+    <td>1mm rollback tolerance, 147 live tests 100% zero-dirty</td>
+  </tr>
+</table>
 
 > Note — Relationship to the official 2,179 DevKit C/C++ APIs: rather than a 1:1 exhaustive exposure, this project uses 95 unified tools to deliver highly cohesive, polymorphic coverage of the 162 atomic capabilities that are most frequently used and most valuable in engineering practice across the official building, MEP, property, and view domains, avoiding the decision hallucinations that large models face when presented with thousands of fragmented interfaces.
 
