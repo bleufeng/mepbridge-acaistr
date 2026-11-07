@@ -8,8 +8,11 @@ Public user-facing changes. Versions follow Semantic Versioning.
 
 - Refreshed the bilingual project homepages with the five-dimension capability dashboard, version-adaptive package naming, and verified documentation links.
 - Replaced the client-rendered Mermaid architecture diagram with a dependency-free plain-text flow diagram in both homepages.
+- Expanded the v0.1.9 changelog with the portable zero-setup delivery headline and the iteration-scope source/offline work notes.
 
 ## [0.1.9] - 2026-11-06
+
+**Portable, zero-setup delivery (headline change).** v0.1.9 ships as one bilingual Windows x64 Workbench package with a bundled, provenance-checked portable Node runtime. Extract it to a writable folder and run `Install-MEPBridge.cmd`; no separate Node.js or npm installation is required. The entries below cover the accompanying model, Workbench and platform updates.
 
 ### Added
 
@@ -29,6 +32,14 @@ Public user-facing changes. Versions follow Semantic Versioning.
 
 - The registered release boundary remains 91 native commands / 91 descriptor tools / 4 local Server tools (95 tools total).
 - Upgrading from v0.1.8 or earlier requires the complete Workbench package; APX update ZIPs are for explicitly approved existing-installation updates only.
+
+### Iteration-scope source/offline work (outside the v0.1.9 acceptance claims)
+
+These changes landed in the v0.1.9 iteration at the source/offline layer only. They are disabled or partially integrated by default, have not completed browser or live-model verification, and are not part of the limited-scope acceptance.
+
+- **Central extension bar**: nine peer navigation entries (capability panorama, knowledge standards, model review, templates, commands, instances, Building JSON, CAD layers, settings); settings pinned last with four sub-panels consolidated; lazy-loaded panels with visited-tab keep-alive; preview tabs disabled with zero navigation or requests. Navigation never changes execution permissions.
+- **Knowledge standards**: bilingual KB contract with a declarative library — source text is never translated, values and units stay language-independent, 2 MB / 500 entries / 8 libraries quotas, cross-process lock with disk-hash CAS, monotonic revision with `expectedRevision` on every write, and a separate `ui-preferences.json` with GET/PUT endpoints. Deletion becomes a recoverable disable; failed saves no longer report success.
+- **Model review infrastructure**: settings and run-history persistence (per-project fingerprint partitions, default OFF, wx lock, revision CAS, fsync + rename, independent `historyStored:false` warnings) and controlled locate/recheck limited to a saved `runId` with evidence/result hashes and read-only session binding. Approved check definitions remain 0. This does not provide automatic professional model auditing or compliance certification.
 
 ### Known limitations
 
