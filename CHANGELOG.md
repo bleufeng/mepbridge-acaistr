@@ -4,6 +4,10 @@ Public user-facing changes. Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- Refreshed the bilingual project homepages with the five-dimension capability dashboard, version-adaptive package naming, and verified documentation links.
+
 ## [0.1.9] - 2026-11-06
 
 ### Added
