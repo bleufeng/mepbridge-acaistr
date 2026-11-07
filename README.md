@@ -18,26 +18,35 @@
 
 Natural-language tasks and extensible user templates pass through safety orchestration and risk gates, connecting design instructions with AI algorithms through structured data, driving Archicad execution via the local Workbench / MCP layer, and reading back structured results to form a closed loop.
 
-## Top Capability Panorama Dashboard
+## Capability Panorama Dashboard
 
-According to the project capability panorama ledger, the system establishes five core measurement dimensions for industrial-grade capabilities:
-
-```text
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                        MEPBridge ACAIstr Capability Panorama Dashboard                 │
-├─────────────────────┬─────────────────────┬─────────────────────┬──────────────────────┤
-│ 1. Contract Tools   │ 2. Atomic API Scale │ 3. Official Coverage│ 4. Q1–Q4 Lifecycle   │
-│    95 Items         │    162 APIs (Max 189)│    46 / 73 Items    │    Full-depth Verified│
-├─────────────────────┴─────────────────────┴─────────────────────┴──────────────────────┤
-│ 5. Model Rollback Rate: 99.8% (147 live scenarios PASS, Zero-Dirty-Model guarantee)    │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-```
-
-1. **Contract Tool Boundary (95 Items)**: 91 C++ native Add-On commands (bound to DevKit C++ lineages) and 4 local Server orchestration tools;
-2. **Atomic API Scale (162 APIs, max 189)**: 95 unified, cohesive contracts polymorphically cover 8 official functional domains, preventing command bloat;
-3. **Official JSON API Pool (46 / 73 Items)**: 28 C++ superset extensions (enhanced performance with geometry) + 18 non-geometric whitelisted proxies;
-4. **Q1–Q4 Lifecycle Depth**: Covers construction/creation (Q1), readback/inspection (Q2), in-place GUID-preserved mutation (Q3, curtain wall live-verified), and topological solving (Q4);
-5. **Model Transaction Rollback Rate (99.8%)**: In-transaction 1mm geometry readback tolerance with kernel-level rollback and orphan element cleanup, achieving zero dirty model residue across 147 live tests.
+<table>
+  <tr>
+    <td><strong>Contract Tools</strong></td>
+    <td><code>████████████████████</code> <strong>95 Items</strong></td>
+    <td>91 C++ native Add-On commands + 4 Server tools</td>
+  </tr>
+  <tr>
+    <td><strong>Atomic API Scale</strong></td>
+    <td><code>█████████████████░░░</code> <strong>162 APIs</strong> (Full 189)</td>
+    <td>95 unified contracts polymorphically covering 162 Archicad official atomic capabilities</td>
+  </tr>
+  <tr>
+    <td><strong>Official JSON API</strong></td>
+    <td><code>█████████████░░░░░░░</code> <strong>46 / 77 Items</strong> (60%)</td>
+    <td>28 C++ supersets + 18 whitelisted proxies (AC30 base)</td>
+  </tr>
+  <tr>
+    <td><strong>Lifecycle Depth</strong></td>
+    <td><code>████████████████░░░░</code> <strong>Q1 ～ Q4</strong></td>
+    <td>Construction, inspection, in-place mutation & topology</td>
+  </tr>
+  <tr>
+    <td><strong>Transaction Safety</strong></td>
+    <td><code>████████████████████</code> <strong>99.8%</strong></td>
+    <td>1mm rollback tolerance, 147 live tests 100% zero-dirty</td>
+  </tr>
+</table>
 
 > Note — Relationship to the official 2,179 DevKit C/C++ APIs: rather than a 1:1 exhaustive exposure, this project uses 95 unified tools to deliver highly cohesive, polymorphic coverage of the 162 atomic capabilities that are most frequently used and most valuable in engineering practice across the official building, MEP, property, and view domains, avoiding the decision hallucinations that large models face when presented with thousands of fragmented interfaces.
 
@@ -105,24 +114,34 @@ Public update history: [CHANGELOG.md](CHANGELOG.md).
 
 The system forms a closed AI Loop spanning "intent parsing ➔ plan orchestration ➔ model execution ➔ readback/inspection ➔ corrective iteration":
 
-```mermaid
-flowchart TB
-    A["User / AI Agent<br/>GPT / Claude / Gemini / Deepseek / Cursor"] --> B{"Choose Operation Entry"}
-    B --> C["CollabAI Smart<br/>Natural Language / Templates / AI Loop"]
-    B --> D["Manual<br/>Structured Commands / Precise Workflow Control"]
-    B --> E["MCP Client<br/>Standard MCP Client"]
-    E --> F["MCP Stdio Server"]
-    C --> G["Task Planning & Template Matching"]
-    D --> H["Structured Parameter Payload"]
-    G --> I["Safety Orchestration Gates<br/>Schema Validation / Risk Levels / Confirmation"]
-    H --> I
-    F --> I
-    I --> J["Node.js Workbench Server<br/>127.0.0.1:19780 · /api/execute"]
-    J --> K["Archicad JSON API<br/>127.0.0.1:19723-19743"]
-    K --> L["MEPBridge.apx<br/>C++ Native Add-On (1mm Rollback Guard)"]
-    L --> M["Archicad 28 / 29 / 30<br/>Real 3D Architectural & MEP Model"]
-    M --> N["Structured Result / 0.1mm Diff Snapshot / Audit Trail"]
-    N -. "Readback & Self-Healing Loop" .-> B
+```text
+User / AI Agent (GPT / Claude / Gemini / Deepseek / Cursor)
+  |
+  +-- CollabAI Smart : Natural Language / Templates / AI Loop
+  |     -> Task Planning & Template Matching
+  +-- Manual : Structured Commands / Precise Workflow Control
+  |     -> Structured Parameter Payload
+  +-- MCP Client -> MCP Stdio Server
+  |
+  v
+Safety Orchestration Gates (Schema Validation / Risk Levels / Confirmation)
+  |
+  v
+Node.js Workbench Server  127.0.0.1:19780 /api/execute
+  |
+  v
+Archicad JSON API  127.0.0.1:19723-19743
+  |
+  v
+MEPBridge.apx  C++ Native Add-On (1mm Rollback Guard)
+  |
+  v
+Archicad 28 / 29 / 30  Real 3D Architectural & MEP Model
+  |
+  v
+Structured Result / 0.1mm Diff Snapshot / Audit Trail
+  |
+  +-- Readback & Self-Healing Loop -> back to the operation entry
 ```
 
 UI and MCP model operations pass through `/api/execute`. Runtime data (templates, learning memory, audit logs) is stored in `%APPDATA%\MEPBridge` by default.
