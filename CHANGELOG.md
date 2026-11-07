@@ -7,6 +7,7 @@ Public user-facing changes. Versions follow Semantic Versioning.
 ### Changed
 
 - Refreshed the bilingual project homepages with the five-dimension capability dashboard, version-adaptive package naming, and verified documentation links.
+- Replaced the client-rendered Mermaid architecture diagram with a dependency-free plain-text flow diagram in both homepages.
 
 ## [0.1.9] - 2026-11-06
 

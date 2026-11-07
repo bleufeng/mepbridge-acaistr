@@ -105,24 +105,34 @@ Public update history: [CHANGELOG.md](CHANGELOG.md).
 
 The system forms a closed AI Loop spanning "intent parsing ➔ plan orchestration ➔ model execution ➔ readback/inspection ➔ corrective iteration":
 
-```mermaid
-flowchart TB
-    A["User / AI Agent<br/>GPT / Claude / Gemini / Deepseek / Cursor"] --> B{"Choose Operation Entry"}
-    B --> C["CollabAI Smart<br/>Natural Language / Templates / AI Loop"]
-    B --> D["Manual<br/>Structured Commands / Precise Workflow Control"]
-    B --> E["MCP Client<br/>Standard MCP Client"]
-    E --> F["MCP Stdio Server"]
-    C --> G["Task Planning & Template Matching"]
-    D --> H["Structured Parameter Payload"]
-    G --> I["Safety Orchestration Gates<br/>Schema Validation / Risk Levels / Confirmation"]
-    H --> I
-    F --> I
-    I --> J["Node.js Workbench Server<br/>127.0.0.1:19780 · /api/execute"]
-    J --> K["Archicad JSON API<br/>127.0.0.1:19723-19743"]
-    K --> L["MEPBridge.apx<br/>C++ Native Add-On (1mm Rollback Guard)"]
-    L --> M["Archicad 28 / 29 / 30<br/>Real 3D Architectural & MEP Model"]
-    M --> N["Structured Result / 0.1mm Diff Snapshot / Audit Trail"]
-    N -. "Readback & Self-Healing Loop" .-> B
+```text
+User / AI Agent (GPT / Claude / Gemini / Deepseek / Cursor)
+  |
+  +-- CollabAI Smart : Natural Language / Templates / AI Loop
+  |     -> Task Planning & Template Matching
+  +-- Manual : Structured Commands / Precise Workflow Control
+  |     -> Structured Parameter Payload
+  +-- MCP Client -> MCP Stdio Server
+  |
+  v
+Safety Orchestration Gates (Schema Validation / Risk Levels / Confirmation)
+  |
+  v
+Node.js Workbench Server  127.0.0.1:19780 /api/execute
+  |
+  v
+Archicad JSON API  127.0.0.1:19723-19743
+  |
+  v
+MEPBridge.apx  C++ Native Add-On (1mm Rollback Guard)
+  |
+  v
+Archicad 28 / 29 / 30  Real 3D Architectural & MEP Model
+  |
+  v
+Structured Result / 0.1mm Diff Snapshot / Audit Trail
+  |
+  +-- Readback & Self-Healing Loop -> back to the operation entry
 ```
 
 UI and MCP model operations pass through `/api/execute`. Runtime data (templates, learning memory, audit logs) is stored in `%APPDATA%\MEPBridge` by default.

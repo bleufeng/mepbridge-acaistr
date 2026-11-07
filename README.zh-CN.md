@@ -105,24 +105,34 @@
 
 系统形成“意图解析 ➔ 计划编排 ➔ 模型写入 ➔ 结果回读/比对 ➔ 修正自愈”的双向 AI Loop 闭环机制：
 
-```mermaid
-flowchart TB
-    A["用户 / AI Agent<br/>GPT / Claude / Gemini / Deepseek / Cursor"] --> B{"操作入口选择"}
-    B --> C["CollabAI 智能<br/>自然语言 / 模板 / AI Loop 自主循环"]
-    B --> D["Manual 手动<br/>结构化命令选择 / 工作流精准控制"]
-    B --> E["MCP Client<br/>标准 MCP 客户端"]
-    E --> F["MCP Stdio Server"]
-    C --> G["任务规划与规则匹配"]
-    D --> H["结构化参数载荷"]
-    G --> I["安全编排门禁<br/>Schema 校验 / 风险分级 / 确认闸门"]
-    H --> I
-    F --> I
-    I --> J["Node.js Workbench Server<br/>127.0.0.1:19780 · /api/execute"]
-    J --> K["Archicad JSON API<br/>127.0.0.1:19723-19743"]
-    K --> L["MEPBridge.apx<br/>C++ 原生 Add-On (1mm 容差/事务回滚)"]
-    L --> M["Archicad 28 / 29 / 30<br/>真实 3D 建筑/机电工程模型"]
-    M --> N["结构化结果 / 0.1mm 差异快照 / 审计日志"]
-    N -. "状态回读与自愈闭环" .-> B
+```text
+用户 / AI Agent（GPT / Claude / Gemini / Deepseek / Cursor）
+  |
+  +-- CollabAI 智能：自然语言 / 模板 / AI Loop 自主循环
+  |     -> 任务规划与规则匹配
+  +-- Manual 手动：结构化命令 / 工作流精准控制
+  |     -> 结构化参数载荷
+  +-- MCP Client -> MCP Stdio Server
+  |
+  v
+安全编排门禁（Schema 校验 / 风险分级 / 确认闸门）
+  |
+  v
+Node.js Workbench Server  127.0.0.1:19780 /api/execute
+  |
+  v
+Archicad JSON API  127.0.0.1:19723-19743
+  |
+  v
+MEPBridge.apx  C++ 原生 Add-On（1mm 容差 / 事务回滚）
+  |
+  v
+Archicad 28 / 29 / 30  真实 3D 建筑 / 机电工程模型
+  |
+  v
+结构化结果 / 0.1mm 差异快照 / 审计日志
+  |
+  +-- 状态回读与自愈闭环 -> 返回操作入口
 ```
 
 UI 与 MCP 模型操作均经过统一受控路由 `/api/execute`。运行时数据（用户模板、学习记忆和审计日志）默认保存在 `%APPDATA%\MEPBridge` 下。
