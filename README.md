@@ -39,6 +39,8 @@ According to the project capability panorama ledger, the system establishes five
 4. **Q1–Q4 Lifecycle Depth**: Covers construction/creation (Q1), readback/inspection (Q2), in-place GUID-preserved mutation (Q3, curtain wall live-verified), and topological solving (Q4);
 5. **Model Transaction Rollback Rate (99.8%)**: In-transaction 1mm geometry readback tolerance with kernel-level rollback and orphan element cleanup, achieving zero dirty model residue across 147 live tests.
 
+> Note — Relationship to the official 2,179 DevKit C/C++ APIs: rather than a 1:1 exhaustive exposure, this project uses 95 unified tools to deliver highly cohesive, polymorphic coverage of the 162 atomic capabilities that are most frequently used and most valuable in engineering practice across the official building, MEP, property, and view domains, avoiding the decision hallucinations that large models face when presented with thousands of fragmented interfaces.
+
 ## Release Scope & Evolution Milestones
 
 - Version: `v0.1.9` (expanded from single-version support to **full coverage of Archicad 28, 29, and 30**);
