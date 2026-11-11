@@ -30,7 +30,7 @@
     "vite": "^6.4.5",
     "@types/express": "^4.17.21",
     "@tailwindcss/vite": "^4.1.14",
-    "@vitejs/plugin-react": "^5.0.4"
+    "@vitejs/plugin-react": "^6.2.1"
   },
   "overrides": {
     "body-parser": "1.20.9",
