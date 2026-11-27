@@ -1,6 +1,8 @@
 import { workbenchFetch as fetch } from "./execution-recovery";
 import { fetchViewportSnapshot } from "./viewport-capture-client";
 import { UiLanguageContext } from "./ui-language";
+import { useUiLanguagePreferences } from "./hooks/useUiLanguagePreferences";
+import { useLlmConnection } from "./hooks/useLlmConnection";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -64,7 +66,9 @@ import {
   Minimize2,
   PanelRightOpen,
   PanelRightClose,
-  Folder
+  Folder,
+  Sun,
+  Moon
 } from "lucide-react";
 import { MoveElementsModal } from "./components/MoveElementsModal";
 import { EditPropertiesModal } from "./components/EditPropertiesModal";
@@ -101,7 +105,6 @@ import {
   PlanStep,
   OperationPlan,
   ChatMessage,
-  LlmConfig,
   ConnectionStatusState,
   ConfirmationGranularityType,
   UiLanguageType
@@ -317,7 +320,7 @@ type ConversationWindowHostProps = {
 };
 
 const APP_WINDOW_TITLE = "MEPbridge ACAIstr —— Zuxai Z.";
-const CONVERSATION_PANEL_WIDTH = 384;
+const CONVERSATION_PANEL_WIDTH = 480; // 加宽25% (384 -> 480)，增强长文对话感知
 const CONVERSATION_POPUP_INITIAL_WIDTH = CONVERSATION_PANEL_WIDTH + 40;
 
 function ConversationWindowHost({
@@ -436,37 +439,26 @@ function ConversationWindowHost({
 
 export default function App() {
   // Region 1: Localization & Global Config State
-  const [lang, setLang] = useState<UiLanguageType>("zh-CN");
-  const currentT = t[lang];
-
-  const localeRevision = useRef(0);
-  const localeBusy = useRef(false);
-  const [localeReady, setLocaleReady] = useState(false);
-  const [localeError, setLocaleError] = useState("");
-  useEffect(() => {
-    let active = true;
-    fetch("/api/ui-preferences").then(r => r.json()).then(async prefs => {
-      if (!prefs.ok) throw Error(prefs.code || prefs.error);
-      if (!prefs.initialized) {
-        const initialized = await fetch("/api/ui-preferences", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale: prefs.locale, source: prefs.source, expectedRevision: prefs.revision }) }).then(r => r.json());
-        if (!initialized.ok) throw Error(initialized.code || initialized.error);
-        prefs = initialized;
-      }
-      if (active) { setLang(prefs.locale); localeRevision.current = prefs.revision; }
-    }).catch(e => { if (active) setLocaleError(String(e.message)); }).finally(() => { if (active) setLocaleReady(true); });
-    return () => { active = false; };
-  }, []);
-  const selectLanguage = async (locale: UiLanguageType) => {
-    if (!localeReady || localeBusy.current) return;
-    localeBusy.current = true;
-    setLocaleReady(false);
+  const { lang, localeReady, localeError, selectLanguage } = useUiLanguagePreferences();
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
     try {
-      const result = await fetch("/api/ui-preferences", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale, source: "explicit", expectedRevision: localeRevision.current }) }).then(r => r.json());
-      if (!result.ok) throw Error(result.code || result.error);
-      localeRevision.current = result.revision; setLang(result.locale); setLocaleError("");
-    } catch (e: any) { setLocaleError(String(e.message)); }
-    finally { localeBusy.current = false; setLocaleReady(true); }
+      const saved = localStorage.getItem("mepbridge_theme");
+      if (saved === "light" || saved === "dark") return saved;
+    } catch {}
+    return "dark";
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("mepbridge_theme", theme);
+    } catch {}
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   };
+  const currentT = t[lang];
 
   // Mode switch state (NEW: BASE vs AI Copilot)
   const [workbenchMode, setWorkbenchMode] = useState<"base" | "copilot">("copilot");
@@ -598,7 +590,7 @@ export default function App() {
   const [archicadVersion, setArchicadVersion] = useState<number | string | null>(null);
   const [activeProjectName, setActiveProjectName] = useState<string | null>(null);
   const [detectedInstances, setDetectedInstances] = useState<Array<{ port: number; version?: number | string | null }>>([]);
-  const [addOnVersion, setAddOnVersion] = useState<string>("0.1.9");
+  const [addOnVersion, setAddOnVersion] = useState<string>("0.2.0");
   const [updateChecking, setUpdateChecking] = useState<boolean>(false);
   const [updateInfo, setUpdateInfo] = useState<{ checked: boolean; hasUpdate: boolean; isAhead?: boolean; updateStatus?: string; latestVersion?: string; currentVersion?: string; releaseUrl?: string; text?: string } | null>(null);
   const [showInstancePicker, setShowInstancePicker] = useState<boolean>(true);
@@ -610,7 +602,8 @@ export default function App() {
   const [autoReadback, setAutoReadback] = useState<boolean>(true);
   const [confirmationGranularity, setConfirmationGranularity] =
     useState<ConfirmationGranularityType>("smart");
-  const [llmProvider, setLlmProvider] = useState<string>("deepseek");
+  const llm = useLlmConnection();
+  const llmProvider = llm.active?.provider || "";
 
   // Interaction logic elements
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -656,10 +649,10 @@ export default function App() {
   const [centerViewportFullscreen, setCenterViewportFullscreen] = useState<boolean>(false);
   const [centerViewportCollapsed, setCenterViewportCollapsed] = useState<boolean>(false);
   const [planStepsCardCollapsed, setPlanStepsCardCollapsed] = useState<boolean>(false);
-  // 视口（实际读回/计划示意）、截图与 JSON 视图在任务栏折叠/展开变化时均保持适当固定的宽度比例居中显示
+  // 视口（实际读回/计划示意）、截图与 JSON 视图自适应铺满中区宽度，与下方功能区保持对齐；高度保持克制工模高度
   const centerViewportSizeClassName =
-    "w-full max-w-4xl mx-auto min-w-0 " + (centerViewportFullscreen
-      ? "h-[calc(100vh-140px)] max-w-none"
+    "w-full min-w-0 " + (centerViewportFullscreen
+      ? "h-[calc(100vh-140px)]"
       : "h-80 sm:h-[340px]");
 
   // Auto scroll to active executing step in plan steps demonstration
@@ -678,18 +671,12 @@ export default function App() {
 
   // Modal control
   const [showLlmModal, setShowLlmModal] = useState<boolean>(false);
-  const [llmConfig, setLlmConfig] = useState<LlmConfig>({
-    provider: "deepseek",
-    endpoint: "",
-    apiKey: "",
-    modelName: "deepseek-reasoner"
-  });
-  const [isTestingLlm, setIsTestingLlm] = useState<boolean>(false);
-  const [llmFeedback, setLlmFeedback] = useState<{ success: boolean; text: string } | null>(null);
+  const llmConfig = llm.draft;
+  const setLlmConfig = llm.setDraft;
+  const isTestingLlm = llm.busy;
+  const llmFeedback = llm.feedback;
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
-  // D5: LLM 连接状态指示器 (unknown/testing/connected/disconnected)
-  const [llmConnStatus, setLlmConnStatus] = useState<"unknown" | "testing" | "connected" | "disconnected">("unknown");
-  const [llmManuallyDisconnected, setLlmManuallyDisconnected] = useState<boolean>(false);
+  const llmConnStatus = llm.status;
   const [mcpPlatforms, setMcpPlatforms] = useState<McpPlatformStatus[]>([]);
   const [mcpStatusLoading, setMcpStatusLoading] = useState<boolean>(false);
 
@@ -945,7 +932,7 @@ export default function App() {
     try {
       const res = await fetch("/api/ping/check-update");
       const data = await res.json();
-      const currentVer = data.currentVersion || addOnVersion || "0.1.9";
+      const currentVer = data.currentVersion || addOnVersion || "0.2.0";
       const latestVer = data.latestVersion || "0.1.8";
       const releaseUrl = data.releaseUrl || data.releasesPageUrl || "https://github.com/bleufeng/mepbridge-acaistr/releases";
 
@@ -1204,38 +1191,6 @@ export default function App() {
     setTaskHistory(prev => [...prev.slice(-7), task]); // 保留最近8个
   };
 
-  const isMaskedApiKey = (value: string) => value.includes("...") || value.includes("•") || value === "***";
-
-  const normalizeLlmConfigForApi = (config: LlmConfig) => ({
-    provider: config.provider,
-    endpoint: config.endpoint?.trim() || null,
-    model: config.modelName?.trim() || null,
-    apiKey: config.provider === "ollama" || isMaskedApiKey(config.apiKey) ? undefined : config.apiKey?.trim()
-  });
-
-  const loadLlmConfigFromServer = async () => {
-    try {
-      const res = await fetch("/api/llm-config/load");
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || `HTTP ${res.status}`);
-      }
-      if (data.configured) {
-        setLlmConfig({
-          provider: data.provider || "deepseek",
-          endpoint: data.endpoint || "",
-          apiKey: data.apiKey || "",
-          modelName: data.model || ""
-        });
-        if (data.provider) {
-          setLlmProvider(data.provider);
-        }
-      }
-    } catch (err) {
-      console.error("[App] Load LLM config error:", err);
-    }
-  };
-
   // E.4: 加载用户模板列表
   const loadUserTemplates = async () => {
     setIsLoadingTemplates(true);
@@ -1451,32 +1406,8 @@ export default function App() {
     }
   }, [serverConnected, lang]);
 
-  useEffect(() => {
-    loadLlmConfigFromServer().then(() => {
-      // D5: 配置加载完成后自动测试 LLM 连接状态
-      testLlmConnection();
-    });
-  }, []);
-
-  // D5: 测试 LLM 连接状态（独立函数，可重复调用刷新指示器）
-  const testLlmConnection = async () => {
-    setLlmManuallyDisconnected(false);
-    setLlmConnStatus("testing");
-    try {
-      const res = await fetch("/api/llm-config/test", { method: "POST" });
-      const data = await res.json();
-      setLlmConnStatus(data.success ? "connected" : "disconnected");
-    } catch (err) {
-      setLlmConnStatus("disconnected");
-    }
-  };
-
-  const disconnectLlmConnection = () => {
-    setLlmManuallyDisconnected(true);
-    setLlmConnStatus("disconnected");
-    setLlmFeedback(null);
-  };
-
+  const testLlmConnection = llm.testSaved;
+  const disconnectLlmConnection = llm.disconnect;
   const loadMcpStatus = async () => {
     setMcpStatusLoading(true);
     try {
@@ -2728,65 +2659,11 @@ export default function App() {
     handleSendMessage(text);
   };
 
-  // Test LLM Connection Credentials in Modal
-  const testLlmCredentials = async () => {
-    setIsTestingLlm(true);
-    setLlmFeedback(null);
-
-    try {
-      const saveRes = await fetch("/api/llm-config/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(normalizeLlmConfigForApi(llmConfig))
-      });
-      const saveData = await saveRes.json();
-      if (!saveRes.ok || saveData.error) {
-        throw new Error(saveData.error || `HTTP ${saveRes.status}`);
-      }
-
-      const testRes = await fetch("/api/llm-config/test", { method: "POST" });
-      const testData = await testRes.json();
-      setLlmFeedback({
-        success: !!testData.success,
-        text: testData.success ? currentT.successTest : (testData.error || currentT.failTest)
-      });
-      // D5: 同步更新连接状态指示器
-      setLlmConnStatus(testData.success ? "connected" : "disconnected");
-    } catch (err: any) {
-      setLlmFeedback({ success: false, text: err.message || currentT.failTest });
-    } finally {
-      setIsTestingLlm(false);
-    }
-  };
-
-  // Apply parameters in Modal
+  // A draft test never saves or applies the edited endpoint.
+  const testLlmCredentials = llm.testDraft;
   const saveLlmCredentials = async () => {
-    setLlmFeedback(null);
-    try {
-      const res = await fetch("/api/llm-config/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(normalizeLlmConfigForApi(llmConfig))
-      });
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error || `HTTP ${res.status}`);
-      }
-
-      setShowLlmModal(false);
-      setLlmProvider(llmConfig.provider);
-      triggerToast(currentT.okLlm);
-      appendMessage({
-          id: `sys_llm_upd_${Date.now()}`,
-          sender: "system",
-          text: `⚡ MODELLING_CORE: Changed active processing endpoint to: ${llmConfig.provider.toUpperCase()} (Model: ${llmConfig.modelName || "default"}). Checkpoints loaded.`,
-          timestamp: new Date().toLocaleTimeString()
-      });
-    } catch (err: any) {
-      setLlmFeedback({ success: false, text: err.message || currentT.failTest });
-    }
+    if (await llm.save()) { setShowLlmModal(false); triggerToast(currentT.okLlm); }
   };
-
   // Render elegant custom vector CAD canvas pipeline path line
   const renderPipesSvg = () => {
     // Start layout: (50, 150)
@@ -2952,7 +2829,7 @@ export default function App() {
     window.addEventListener("keydown",escape);return()=>window.removeEventListener("keydown",escape);
   },[activeExtensionTab,conversationFocusMode,commandEditorDirty,knowledgeEditorDirty,lang]);
   return (
-    <UiLanguageContext.Provider value={lang}><div className={`${conversationFocusMode ? "w-full sm:w-[384px] max-w-full h-screen overflow-hidden" : "h-screen min-h-screen overflow-hidden"} flex flex-col bg-zinc-950 text-zinc-150 font-sans tracking-wide`}>
+    <UiLanguageContext.Provider value={lang}><div data-theme={theme} className={`${conversationFocusMode ? "w-full sm:w-[480px] max-w-full h-screen overflow-hidden" : "h-screen min-h-screen overflow-hidden"} flex flex-col bg-zinc-950 text-zinc-150 font-sans tracking-wide transition-colors duration-200`}>
       {/* Demo Mode Banner - 仅在未连接时显示 */}
       {!conversationFocusMode && (!archicadConnected || !mepbridgeConnected) && (
       <div className="flex items-center justify-between px-5 py-2.5 bg-amber-900/20 border-b border-amber-800/50 text-amber-200 text-sm">
@@ -3021,6 +2898,29 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Theme Toggle Button: 无边框微型幽灵图标，同一位置点击切换 */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors cursor-pointer ${
+                theme === "dark"
+                  ? "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60"
+                  : "text-slate-600 hover:text-indigo-600 hover:bg-slate-200/60"
+              }`}
+              title={
+                lang === "zh-CN"
+                  ? (theme === "dark" ? "当前为深色模式，点击切换为浅色" : "当前为浅色模式，点击切换为深色")
+                  : (theme === "dark" ? "Dark mode, click to switch to light" : "Light mode, click to switch to dark")
+              }
+              aria-label={lang === "zh-CN" ? "切换深浅背景主题" : "Toggle theme"}
+            >
+              {theme === "dark" ? (
+                <Moon className="w-2.5 h-2.5 text-indigo-400" />
+              ) : (
+                <Sun className="w-2.5 h-2.5 text-amber-500" />
+              )}
+            </button>
+
             {localeError && <span role="alert" className="text-xs text-red-400">{lang === "zh-CN" ? "界面语言未保存" : "UI language not saved"}: {localeError}</span>}
             <div className="flex bg-zinc-900/80 border border-zinc-800 rounded-lg p-0.5">
               <button
@@ -3183,7 +3083,7 @@ export default function App() {
 
                 {mepbridgeConnected && (
                   <div className="flex flex-col gap-2 pt-2 border-t border-zinc-800/60 font-sans">
-                    {/* 主卡片下方保持只显示1行：[ v0.1.9 ] + 91 核心命令，右侧 [ 检查更新 ] */}
+                    {/* 主卡片下方保持只显示1行：[ 当前版本 ] + 91 核心命令，右侧 [ 检查更新 ] */}
                     <div className="flex items-center justify-between text-[10px]">
                       <div className="flex items-center gap-1.5 truncate">
                         <span className="px-1.5 py-0.5 rounded font-mono font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex-shrink-0">
@@ -3216,7 +3116,7 @@ export default function App() {
                       </button>
                     </div>
 
-                    {/* 点击检查更新展开一行结果，已是最新版本 v0.1.9 等信息，再点击可收回 */}
+                    {/* 点击检查更新展开一行结果，已是最新版本等信息，再点击可收回 */}
                     {showUpdateResult && (
                       <div className="flex items-center justify-between pt-1.5 border-t border-dashed border-zinc-800 text-[10px]">
                         <div className="flex items-center gap-1.5 text-zinc-300 truncate">
@@ -3342,80 +3242,31 @@ export default function App() {
                   <span className="text-[10px] font-mono tracking-wider font-bold text-zinc-500 uppercase">
                     {currentT.llmProvider}
                   </span>
-                  {/* D5: LLM 连接状态指示器（闪烁绿点 + 文字） */}
-                  {llmConnStatus === "connected" && (
-                    <span className="flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-400">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-                      </span>
-                      {lang === "zh-CN" ? "已连接" : "Connected"}
-                    </span>
-                  )}
-                  {llmConnStatus === "testing" && (
-                    <span className="flex items-center gap-1 text-[10px] font-mono font-bold text-amber-400">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-pulse inline-flex rounded-full h-2 w-2 bg-amber-400"></span>
-                      </span>
-                      {lang === "zh-CN" ? "检测中" : "Testing"}
-                    </span>
-                  )}
-                  {llmConnStatus === "disconnected" && (
-                    <span className="flex items-center gap-1 text-[10px] font-mono font-bold text-red-400">
-                      <span className="inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                      {lang === "zh-CN" ? (llmManuallyDisconnected ? "已断开" : "未连接") : (llmManuallyDisconnected ? "Disconnected" : "Offline")}
-                    </span>
-                  )}
-                  {llmConnStatus === "unknown" && (
-                    <span className="flex items-center gap-1 text-[10px] font-mono font-bold text-zinc-500">
-                      <span className="inline-flex rounded-full h-2 w-2 bg-zinc-600"></span>
-                      {lang === "zh-CN" ? "未检测" : "Idle"}
-                    </span>
-                  )}
+                  <span className="text-[10px] font-mono font-bold text-zinc-400" title={llm.error || llm.active?.effectiveEndpoint || ''}>
+                    {({ loading: lang === 'zh-CN' ? '读取中' : 'Loading', unconfigured: lang === 'zh-CN' ? '未配置' : 'Not configured', unknown: lang === 'zh-CN' ? '未检测' : 'Unverified', testing: lang === 'zh-CN' ? '检测中' : 'Testing', connected: lang === 'zh-CN' ? '本配置已验证' : 'Verified', 'model-available': lang === 'zh-CN' ? '模型可用（未推理）' : 'Model available (not inferred)', disconnected: lang === 'zh-CN' ? '检测失败' : 'Test failed', disabled: lang === 'zh-CN' ? '已停用' : 'Disabled', unsupported: lang === 'zh-CN' ? '当前不支持' : 'Unsupported', 'load-failed': lang === 'zh-CN' ? '加载失败' : 'Load failed' })[llmConnStatus]}
+                  </span>
                 </div>
-                <select
-                  value={llmProvider}
-                  onChange={(e) => {
-                    setLlmProvider(e.target.value);
-                    setLlmConfig((prev) => ({ ...prev, provider: e.target.value }));
-                    // D5: 切换 provider 后重置状态（用户需保存后重新检测）
-                    setLlmConnStatus("unknown");
-                  }}
-                  className="w-full bg-zinc-800 border border-zinc-705 rounded py-1.5 px-2.5 text-xs text-zinc-200 outline-none focus:border-indigo-500 font-mono"
-                >
-                  <option value="deepseek">DeepSeek</option>
-                  <option value="openai">OpenAI</option>
-                  <option value="anthropic">Anthropic</option>
-                  <option value="google">Google</option>
-                  <option value="ollama">{lang === "zh-CN" ? "Ollama??" : "Ollama Local"}</option>
-                  <option value="custom">{lang === "zh-CN" ? "自定义接口" : "Custom Endpoint"}</option>
+                <select value={llmProvider} disabled={llm.busy} onChange={async (e) => { const provider = e.target.value; if (await llm.load(provider)) setShowLlmModal(true); }} className="w-full bg-zinc-800 border border-zinc-700 rounded py-1.5 px-2.5 text-xs text-zinc-200 outline-none focus:border-indigo-400 font-mono">
+                  <option value="" disabled>{lang === 'zh-CN' ? '选择并配置' : 'Choose and configure'}</option>
+                  <option value="deepseek">DeepSeek</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option>
+                  <option value="google" disabled>Google — {lang === 'zh-CN' ? '当前不支持' : 'Unsupported'}</option>
+                  <option value="ollama">Ollama Local</option><option value="custom">{lang === 'zh-CN' ? '自定义接口' : 'Custom Endpoint'}</option>
                 </select>
-                {/* D5: 手动重新检测连接按钮 */}
-                {llmConnStatus !== "testing" && (
-                  <div className="self-end flex items-center gap-2 mt-0.5">
-                    <button
-                      onClick={disconnectLlmConnection}
-                      className="text-[10px] font-mono text-zinc-500 hover:text-red-400 transition-colors"
-                      title={lang === "zh-CN" ? "手动断开当前 LLM 推理连接状态" : "Manually disconnect current LLM status"}
-                    >
-                      ⏻ {lang === "zh-CN" ? "断开" : "Disconnect"}
-                    </button>
-                    <button
-                      onClick={testLlmConnection}
-                      className="text-[10px] font-mono text-zinc-500 hover:text-indigo-400 transition-colors"
-                      title={lang === "zh-CN" ? "重新检测连接" : "Re-test connection"}
-                    >
-                      ↻ {lang === "zh-CN" ? "重新检测" : "Re-test"}
-                    </button>
-                  </div>
-                )}
+                <div className="self-end flex items-center gap-2 mt-0.5">
+                  <button disabled={llm.busy || !llm.active?.configured} onClick={llm.active?.disabled ? llm.connect : disconnectLlmConnection} className="text-[10px] font-mono text-zinc-500 hover:text-red-400 disabled:opacity-50">
+                    ⏻ {llm.active?.disabled ? (lang === 'zh-CN' ? '恢复' : 'Enable') : (lang === 'zh-CN' ? '停用' : 'Disable')}
+                  </button>
+                  <button disabled={llm.busy || !llm.active?.configured || llm.active.disabled || !llm.active.supported} onClick={testLlmConnection} className="text-[10px] font-mono text-zinc-500 hover:text-indigo-400 disabled:opacity-50">↻ {lang === 'zh-CN' ? '重新检测' : 'Re-test'}</button>
+                </div>
+                {llm.error && <span role="alert" className="text-xs text-red-400">{llm.error}</span>}
               </div>
 
               {/* Config trigger button */}
               <button
                 onClick={() => {
-                  setLlmFeedback(null);
+                  setShowApiKey(false);
                   setShowLlmModal(true);
+                  void llm.load();
                 }}
                 className="w-full mt-1.5 flex items-center justify-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-xs font-semibold text-zinc-200 cursor-pointer active:scale-[0.98] transition-all"
               >
@@ -5147,13 +4998,13 @@ export default function App() {
             </div>
           ) : (
             /* ========== AI COPILOT MODE (Original Content) ========== */
-            <>
+            <div className="flex flex-col gap-4">
           {/* Section A: SVG Professional Vector Design Canvas / Screenshot / JSON */}
           <div
             ref={centerViewportRef}
-            className={`rounded-xl border border-zinc-800 bg-zinc-900/40 shadow-lg flex flex-col shrink-0 relative overflow-hidden group transition-all duration-300 w-full max-w-5xl mx-auto ${
+            className={`rounded-xl border border-zinc-800 bg-zinc-900/40 shadow-lg flex flex-col shrink-0 relative overflow-hidden group transition-all duration-300 w-full ${
               centerViewportFullscreen
-                ? "fixed inset-3 z-50 bg-zinc-950/95 p-4 gap-3 max-w-none"
+                ? "fixed inset-3 z-50 bg-zinc-950/95 p-4 gap-3"
                 : centerViewportCollapsed
                   ? "p-2.5 gap-0 shrink-0"
                   : "p-4 gap-3 shrink-0"
@@ -5334,7 +5185,7 @@ export default function App() {
                 </div>
               ) : (
               /* Plan schematic fallback: this is intentionally not presented as model geometry. */
-              <div className={`relative ${centerViewportSizeClassName} bg-zinc-950/70 border border-zinc-800 rounded-xl overflow-hidden shadow-inner select-none flex items-center justify-center group`}>
+              <div data-cad-viewport="true" className={`relative ${centerViewportSizeClassName} bg-zinc-950/70 border border-zinc-800 rounded-xl overflow-hidden shadow-inner select-none flex items-center justify-center group cad-dark-viewport`}>
 
               {/* Overlay Grid lines for schematic feel */}
               <div className="absolute inset-0 bg-grid-pattern opacity-10 pointer-events-none"
@@ -5685,7 +5536,7 @@ export default function App() {
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className={`rounded-xl border border-zinc-800 bg-zinc-900/40 font-sans shadow-lg flex flex-col relative transition-all duration-300 mt-4 sm:mt-5 w-full max-w-5xl mx-auto ${
+                className={`rounded-xl border border-zinc-800 bg-zinc-900/40 font-sans shadow-lg flex flex-col relative transition-all duration-300 w-full ${
                   planStepsCardCollapsed ? "p-3 gap-0" : "p-4 gap-4"
                 }`}
               >
@@ -5875,11 +5726,15 @@ export default function App() {
 
                 {/* Call to actions - Safe execution parameters */}
                 <div className="flex items-center justify-end gap-3 mt-1.5 select-none font-sans">
-                  {/* E.3: 存为模板按钮 */}
+                  {/* E.3: 存为模板按钮 (方案A: 工程紫绀色系) */}
                   <button
                     onClick={() => setShowSaveTemplateModal(true)}
                     disabled={isExecutingPlan}
-                    className="px-3.5 py-1.5 text-xs font-semibold text-pink-400 border border-pink-500/30 hover:bg-pink-500/10 rounded cursor-pointer transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className={`px-3.5 py-1.5 text-xs font-semibold rounded cursor-pointer transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${
+                      theme === "dark"
+                        ? "text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/10"
+                        : "text-indigo-700 border border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100 shadow-sm"
+                    }`}
                   >
                     <Bookmark className="w-3.5 h-3.5" />
                     {lang === "zh-CN" ? "存为模板" : "Save as Template"}
@@ -5940,7 +5795,7 @@ export default function App() {
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, y: 10 }}
-                className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 shadow-lg flex flex-col gap-4 font-sans mt-4 w-full max-w-5xl mx-auto"
+                className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 shadow-lg flex flex-col gap-4 font-sans w-full"
               >
                 <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
                   <div className="flex items-center gap-2">
@@ -6049,7 +5904,7 @@ export default function App() {
           </AnimatePresence>
 
           {/* 扩展功能面板 — Copilot 模式也显示 */}
-          </>
+          </div>
           )}
           {/* End of Conditional Rendering (BASE vs AI Copilot) */}
 
@@ -6062,7 +5917,7 @@ export default function App() {
           externalWindow={conversationWindow}
           onExternalWindowClosed={handleConversationWindowClosed}
         >
-        <aside className={`${conversationFocusMode ? "w-full max-w-full flex-1 min-h-0" : "w-full lg:w-[384px] lg:flex-shrink-0 h-[500px] lg:h-full"} bg-zinc-900/40 border-t lg:border-t-0 lg:border-l border-zinc-800 flex flex-col overflow-hidden z-10`}>
+        <aside className={`${conversationFocusMode ? "w-full max-w-full flex-1 min-h-0" : "w-full lg:w-[480px] lg:flex-shrink-0 h-[500px] lg:h-full"} bg-zinc-900/40 border-t lg:border-t-0 lg:border-l border-zinc-800 flex flex-col overflow-hidden z-10`}>
 
           {/* Chat Headers */}
           <div className="flex-shrink-0 px-4 py-3 bg-zinc-900/50 border-b border-zinc-800 flex items-center justify-between select-none">
@@ -6106,7 +5961,7 @@ export default function App() {
 
             <div className="flex min-w-0 items-center gap-2">
               <span className="min-w-0 truncate text-[10px] font-mono text-zinc-500 leading-none">
-                {llmConfig.provider.toUpperCase()} : {(llmConfig.modelName || "default").replace("deepseek-", "")}
+                {llm.active?.provider?.toUpperCase() || 'NOT CONFIGURED'} : {llm.active?.model || '—'}
               </span>
               <button
                 type="button"
@@ -6143,32 +5998,13 @@ export default function App() {
             className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 font-sans custom-scrollbar"
           >
             {workbenchMode === "base" ? (
-              /* BASE Mode: 介绍卡片 + 历史任务列表 */
+              /* BASE Mode: 顶部灰色一行提示 + 历史任务列表 */
               <>
-              <div className="p-3.5 rounded bg-zinc-900/50 border border-zinc-800 leading-relaxed text-zinc-300">
-                <h4 className="text-[11.5px] font-bold text-zinc-150 mb-1 flex items-center gap-1.5">
-                  <Database className="w-3.5 h-3.5 text-emerald-400" />
-                  {lang === "zh-CN" ? "Manual BASE 模式" : "Manual BASE Mode"}
-                </h4>
-
-                <ul className="text-[10px] space-y-1.5 mt-2 font-medium">
-                  <li className="flex items-center gap-1.5 text-emerald-300">
-                    <span className="w-1 h-1 rounded-full bg-emerald-400" />
-                    {lang === "zh-CN" ? "📋 直接执行 MEPBridge 命令（无需 LLM）" : "📋 Direct MEPBridge command execution (no LLM)"}
-                  </li>
-                  <li className="flex items-center gap-1.5 text-emerald-300">
-                    <span className="w-1 h-1 rounded-full bg-emerald-400" />
-                    {lang === "zh-CN" ? "🔍 实时读取 Archicad 选择集和结构" : "🔍 Real-time Archicad selection and structure reading"}
-                  </li>
-                  <li className="flex items-center gap-1.5 text-emerald-300">
-                    <span className="w-1 h-1 rounded-full bg-emerald-400" />
-                    {lang === "zh-CN" ? "⚡ 快速操作，即点即用" : "⚡ Quick operations, click and run"}
-                  </li>
-                </ul>
-
-                <p className="text-[9.5px] text-zinc-500 mt-2.5 italic border-t border-zinc-800/60 pt-2 leading-none">
-                  {lang === "zh-CN" ? "提示：使用左侧按钮或下方快速模板执行操作" : "Tip: Use left panel buttons or quick templates below"}
-                </p>
+              <div className="px-3 py-1.5 rounded bg-zinc-900/40 border border-zinc-800/60 text-[11px] text-zinc-400 flex items-center gap-2 select-none shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/80 shrink-0" />
+                <span className="truncate">
+                  {lang === "zh-CN" ? "Manual BASE ：人工复用工序自定义模式" : "Manual BASE: Custom reusable workflow mode"}
+                </span>
               </div>
 
               {/* 历史任务列表 */}
@@ -6259,49 +6095,26 @@ export default function App() {
               )}
               </>
             ) : (
-              /* AI Copilot Mode: Show original welcome and messages */
+              /* AI Copilot Mode: 顶部灰色一行提示 + 对话消息 */
               <>
-            {/* Friendly initial Greeting intro card */}
-            <div className="p-3.5 rounded bg-zinc-900/50 border border-zinc-800 leading-relaxed text-zinc-300">
-              <h4 className="text-[11.5px] font-bold text-zinc-150 mb-1 flex items-center gap-1.5">
-                <Wifi className="w-3.5 h-3.5 text-indigo-400" />
-                {currentT.chatWelcomeHeader}
-              </h4>
-
-              <ul className="text-[10px] space-y-1.5 mt-2 font-medium">
-                <li className="flex items-center gap-1.5 text-indigo-300">
-                  <span className="w-1 h-1 rounded-full bg-indigo-400" />
-                  {currentT.itemCap1}
-                </li>
-                <li className="flex items-center gap-1.5 text-indigo-300">
-                  <span className="w-1 h-1 rounded-full bg-indigo-400" />
-                  {currentT.itemCap2}
-                </li>
-                <li className="flex items-center gap-1.5 text-purple-300">
-                  <span className="w-1 h-1 rounded-full bg-purple-400" />
-                  {currentT.itemCap3}
-                </li>
-                <li className="flex items-center gap-1.5 text-emerald-300">
-                  <span className="w-1 h-1 rounded-full bg-emerald-400" />
-                  {currentT.itemCap4}
-                </li>
-              </ul>
-
-              <p className="text-[9.5px] text-zinc-500 mt-2.5 italic border-t border-zinc-800/60 pt-2 leading-none">
-                {currentT.chatHint}
-              </p>
+            {/* CollabAI 顶部提示：灰色一行文字 */}
+            <div className="px-3 py-1.5 rounded bg-zinc-900/40 border border-zinc-800/60 text-[11px] text-zinc-400 flex items-center gap-2 select-none shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400/80 shrink-0" />
+              <span className="truncate">
+                {lang === "zh-CN" ? "AC 协处理器： AI 精准操控与自主循环" : "AC Coprocessor: AI precision control & autonomous cycle"}
+              </span>
             </div>
 
-            {/* Conversation message bubbles — Copilot 模式只显示 copilot 消息 */}
-            <div className="p-3 rounded bg-zinc-900/50 border border-zinc-800 min-h-0">
-              <h4 className="text-[11px] font-bold text-zinc-300 mb-2 flex items-center gap-1.5">
+            {/* Conversation message bubbles — Copilot 模式对话区域自适应扩大 */}
+            <div className="p-3 rounded bg-zinc-900/50 border border-zinc-800 min-h-0 flex-1 flex flex-col">
+              <h4 className="text-[11px] font-bold text-zinc-300 mb-2 flex items-center gap-1.5 shrink-0">
                 <Send className="w-3.5 h-3.5 text-indigo-400" />
                 {lang === "zh-CN" ? "AI 对话历史" : "AI Dialog History"}
                 <span className="text-[9px] text-zinc-500 font-normal ml-auto">
                   {copilotMessages.length}
                 </span>
               </h4>
-              <div className="space-y-3 max-h-[360px] overflow-y-auto custom-scrollbar pr-1 flex flex-col">
+              <div className="space-y-3 flex-1 min-h-[360px] overflow-y-auto custom-scrollbar pr-1 flex flex-col">
             {copilotMessages.map((m) => {
               const isUser = m.sender === "user";
               const isSystem = m.sender === "system";
@@ -6391,12 +6204,18 @@ export default function App() {
                     {/* V2: LLM CAD-CoT 思考过程 - 可折叠 */}
                     {m.reasoning && !m.isLocalMatch && (
                       <details className="mt-1.5 group">
-                        <summary className="cursor-pointer text-[10px] font-mono text-violet-400/80 hover:text-violet-300 flex items-center gap-1 select-none">
+                        <summary className={`cursor-pointer text-[10px] font-mono flex items-center gap-1 select-none ${
+                          theme === "dark" ? "text-indigo-400/80 hover:text-indigo-300" : "text-indigo-700 hover:text-indigo-800 font-semibold"
+                        }`}>
                           \U0001F9E0 {lang === "zh-CN" ? "AI 思考过程" : "AI Reasoning"}
                           <span className="text-zinc-600 group-open:hidden">\u25B6</span>
                           <span className="text-zinc-600 hidden group-open:inline">\u25BC</span>
                         </summary>
-                        <div className="mt-1 max-h-40 overflow-y-auto custom-scrollbar px-2 py-1.5 rounded bg-violet-500/5 text-[10px] text-violet-200/70 border border-violet-500/20 font-mono whitespace-pre-line leading-relaxed">
+                        <div className={`mt-1 max-h-40 overflow-y-auto custom-scrollbar px-2 py-1.5 rounded font-mono whitespace-pre-line leading-relaxed ${
+                          theme === "dark"
+                            ? "bg-indigo-500/5 text-indigo-200/70 border border-indigo-500/20 text-[10px]"
+                            : "bg-indigo-50/70 text-indigo-900 border border-indigo-200 text-[10px] shadow-sm"
+                        }`}>
                           {m.reasoning}
                         </div>
                       </details>
@@ -6470,7 +6289,7 @@ export default function App() {
                     disabled={isBaseExecuting || !mepbridgeConnected}
                     className="w-full bg-zinc-800 border border-zinc-705 rounded py-1.5 px-2.5 text-[10px] text-zinc-200 outline-none hover:border-indigo-500 font-mono text-left cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    📋 {lang === "zh-CN" ? "读取选中的构件详情" : "Get selected element details"}
+                    {lang === "zh-CN" ? "读取选中的构件详情" : "Get selected element details"}
                   </button>
 
                   {/* BASE Template 2: Scan Structure → AABB 视口显示 */}
@@ -6522,7 +6341,7 @@ export default function App() {
                     disabled={isBaseExecuting || !mepbridgeConnected}
                     className="w-full bg-zinc-800 border border-zinc-705 rounded py-1.5 px-2.5 text-[10px] text-zinc-200 outline-none hover:border-amber-500 font-mono text-left cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    🔍 {lang === "zh-CN" ? "扫描墙/柱/梁 → AABB 视口示意" : "Scan Wall/Column/Beam → AABB viewport"}
+                    {lang === "zh-CN" ? "扫描墙/柱/梁 → AABB 视口示意" : "Scan Wall/Column/Beam → AABB viewport"}
                   </button>
 
                   {/* BASE Template 3: Move Up 1000mm */}
@@ -6566,7 +6385,7 @@ export default function App() {
                     disabled={isBaseExecuting || !mepbridgeConnected}
                     className="w-full bg-emerald-600 hover:bg-emerald-500 border border-emerald-500 rounded py-1.5 px-2.5 text-[10px] text-white font-bold outline-none font-mono text-left cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    ↑ {lang === "zh-CN" ? "移动选中构件向上 1000mm" : "Move selected up 1000mm"}
+                    {lang === "zh-CN" ? "移动选中构件向上 1000mm" : "Move selected up 1000mm"}
                   </button>
                 </>
               ) : (
@@ -6577,7 +6396,7 @@ export default function App() {
                     onClick={() => selectQuickSuggestion(lang === "zh-CN" ? "建示例首层房间墙体" : "Build ground floor walls")}
                     className="w-full bg-zinc-800 border border-zinc-705 rounded py-1.5 px-2.5 text-[10px] text-zinc-200 outline-none hover:border-emerald-500 font-mono text-left cursor-pointer transition-colors"
                   >
-                    🏠 {lang === "zh-CN" ? "示例首层房间墙体（15.3×14.3m，19面墙）" : "Ground Floor Walls (15.3×14.3m, 19 walls)"}
+                    {lang === "zh-CN" ? "示例首层房间墙体（15.3×14.3m，19面墙）" : "Ground Floor Walls (15.3×14.3m, 19 walls)"}
                   </button>
 
                   {/* AI Scenario 2: 示例创建box结构机电建筑 (TPL-021 / SYS-021，120步组合) */}
@@ -6585,7 +6404,7 @@ export default function App() {
                     onClick={() => selectQuickSuggestion(lang === "zh-CN" ? "示例创建box结构机电建筑" : "Sample box structural MEP building")}
                     className="w-full bg-zinc-800 border border-zinc-705 rounded py-1.5 px-2.5 text-[10px] text-zinc-200 outline-none hover:border-cyan-500 font-mono text-left cursor-pointer transition-colors"
                   >
-                    🏗️ {lang === "zh-CN" ? "整体示例建筑（主体柱梁楼梯先行，逐层 墙→机电→楼板，144步）" : "Full Sample Building (structure first, then per story: walls+MEP+slabs, 144 steps)"}
+                    {lang === "zh-CN" ? "整体示例建筑（主体柱梁楼梯先行，逐层 墙→机电→楼板，144步）" : "Full Sample Building (structure first, then per story: walls+MEP+slabs, 144 steps)"}
                   </button>
 
                   {/* AI Scenario 3: 示例创建首层楼梯 (参照文件首层真实参数) */}
@@ -6593,7 +6412,7 @@ export default function App() {
                     onClick={() => selectQuickSuggestion(lang === "zh-CN" ? "示例创建首层楼梯" : "Create ground floor stair")}
                     className="w-full bg-zinc-800 border border-zinc-705 rounded py-1.5 px-2.5 text-[10px] text-zinc-200 outline-none hover:border-orange-500 font-mono text-left cursor-pointer transition-colors"
                   >
-                    🪜 {lang === "zh-CN" ? "示例创建首层楼梯（2段10步+平台楼板，同图层）" : "Ground Floor Stair (2 flights + landing slab, same layer)"}
+                    {lang === "zh-CN" ? "示例创建首层楼梯（2段10步+平台楼板，同图层）" : "Ground Floor Stair (2 flights + landing slab, same layer)"}
                   </button>
                 </>
               )}
@@ -6603,7 +6422,11 @@ export default function App() {
           {/* Mode-aware user extension assets: template save + custom command creation */}
           <div className="flex-shrink-0 px-3 py-2 bg-zinc-900/25 border-t border-zinc-800 flex flex-col gap-1.5 select-none">
             <div className="flex items-center justify-between gap-2">
-              <span className={`text-[10px] font-mono uppercase tracking-wider flex items-center gap-1 ${workbenchMode === "copilot" ? "text-pink-400/75" : "text-cyan-400/75"}`}>
+              <span className={`text-[10px] font-mono uppercase tracking-wider flex items-center gap-1 ${
+                workbenchMode === "copilot"
+                  ? (theme === "dark" ? "text-indigo-400/80" : "text-indigo-700 font-semibold")
+                  : (theme === "dark" ? "text-cyan-400/75" : "text-teal-700 font-semibold")
+              }`}>
                 {workbenchMode === "copilot" ? <Bookmark className="w-3 h-3" /> : <Zap className="w-3 h-3" />}
                 {workbenchMode === "copilot"
                   ? (lang === "zh-CN" ? "AI 扩展资产" : "AI Assets")
@@ -6625,7 +6448,13 @@ export default function App() {
                 <>
                   <button
                     onClick={() => activePlan ? setShowSaveTemplateModal(true) : triggerToast(lang === "zh-CN" ? "请先生成一个可保存的计划" : "Generate a plan before saving a template")}
-                    className={`rounded border px-2 py-1.5 text-[10px] font-mono transition-colors text-left ${activePlan ? "border-pink-500/30 bg-pink-500/10 text-pink-200 hover:bg-pink-500/15" : "border-zinc-800 bg-zinc-900/50 text-zinc-600 cursor-not-allowed"}`}
+                    className={`rounded border px-2 py-1.5 text-[10px] font-mono transition-colors text-left ${
+                      activePlan
+                        ? (theme === "dark"
+                            ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/15"
+                            : "border-indigo-200 bg-indigo-50/80 text-indigo-700 hover:bg-indigo-100 shadow-sm")
+                        : "border-zinc-800 bg-zinc-900/50 text-zinc-500 cursor-not-allowed"
+                    }`}
                     title={lang === "zh-CN" ? "把当前中区计划保存为用户模板" : "Save current center plan as a user template"}
                   >
                     <span className="flex items-center gap-1.5">
@@ -6633,7 +6462,11 @@ export default function App() {
                       {lang === "zh-CN" ? "添加用户模板" : "Add Template"}
                     </span>
                   </button>
-                  <div className="relative rounded border border-pink-500/30 bg-pink-500/10 text-pink-200">
+                  <div className={`relative rounded border ${
+                    theme === "dark"
+                      ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-200"
+                      : "border-indigo-200 bg-indigo-50/80 text-indigo-700 shadow-sm"
+                  }`}>
                     <button
                       type="button"
                       onClick={() => {
@@ -6644,14 +6477,16 @@ export default function App() {
                           loadUserTemplates();
                         }
                       }}
-                      className="w-full px-2 py-1.5 text-[10px] font-mono hover:bg-pink-500/10 transition-colors text-left"
+                      className={`w-full px-2 py-1.5 text-[10px] font-mono transition-colors text-left ${
+                        theme === "dark" ? "hover:bg-indigo-500/10" : "hover:bg-indigo-100/70"
+                      }`}
                       title={lang === "zh-CN" ? "展开/折叠已有用户模板列表" : "Expand/collapse user templates"}
                     >
                       <span className="flex items-center gap-1.5">
                         <Bookmark className="w-3 h-3" />
                         {lang === "zh-CN" ? "选择已有模板" : "Choose Template"}
-                        <span className="ml-auto text-[8px] text-pink-300/70">{userTemplates.length}</span>
-                        <ChevronDown className={`w-3 h-3 text-pink-300/70 transition-transform ${templateDropdownOpen ? "rotate-180" : ""}`} />
+                        <span className={`ml-auto text-[8px] ${theme === "dark" ? "text-indigo-300/70" : "text-indigo-600/80 font-semibold"}`}>{userTemplates.length}</span>
+                        <ChevronDown className={`w-3 h-3 ${theme === "dark" ? "text-indigo-300/70" : "text-indigo-600/80"} transition-transform ${templateDropdownOpen ? "rotate-180" : ""}`} />
                       </span>
                     </button>
                     {templateDropdownOpen && (
@@ -6685,7 +6520,11 @@ export default function App() {
                 <>
                   <button
                     onClick={openCustomCommandsPanel}
-                    className="rounded border border-cyan-500/30 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-mono text-cyan-200 hover:bg-cyan-500/15 transition-colors text-left"
+                    className={`rounded border px-2 py-1.5 text-[10px] font-mono transition-colors text-left ${
+                      theme === "dark"
+                        ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/15"
+                        : "border-teal-300 bg-teal-50/80 text-teal-800 hover:bg-teal-100 shadow-sm"
+                    }`}
                     title={lang === "zh-CN" ? "添加 NL 触发单步常用命令" : "Add an NL command that triggers a frequent single-step command"}
                   >
                     <span className="flex items-center gap-1.5">
@@ -6693,7 +6532,11 @@ export default function App() {
                       {lang === "zh-CN" ? "添加 NL 命令" : "Add NL Command"}
                     </span>
                   </button>
-                  <div className="relative rounded border border-cyan-500/30 bg-cyan-500/10 text-cyan-200">
+                  <div className={`relative rounded border ${
+                    theme === "dark"
+                      ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-200"
+                      : "border-teal-300 bg-teal-50/80 text-teal-800 shadow-sm"
+                  }`}>
                     <button
                       type="button"
                       onClick={() => {
@@ -6704,14 +6547,16 @@ export default function App() {
                           loadCustomCommands();
                         }
                       }}
-                      className="w-full px-2 py-1.5 text-[10px] font-mono hover:bg-cyan-500/10 transition-colors text-left"
+                      className={`w-full px-2 py-1.5 text-[10px] font-mono transition-colors text-left ${
+                        theme === "dark" ? "hover:bg-cyan-500/10" : "hover:bg-teal-100/70"
+                      }`}
                       title={lang === "zh-CN" ? "展开/折叠已有 NL 命令列表" : "Expand/collapse NL commands"}
                     >
                       <span className="flex items-center gap-1.5">
                         <Zap className="w-3 h-3" />
                         {lang === "zh-CN" ? "选择已有命令" : "Choose Command"}
-                        <span className="ml-auto text-[8px] text-cyan-300/70">{enabledCustomCommands.length}</span>
-                        <ChevronDown className={`w-3 h-3 text-cyan-300/70 transition-transform ${customCommandDropdownOpen ? "rotate-180" : ""}`} />
+                        <span className={`ml-auto text-[8px] ${theme === "dark" ? "text-cyan-300/70" : "text-teal-700/80 font-semibold"}`}>{enabledCustomCommands.length}</span>
+                        <ChevronDown className={`w-3 h-3 ${theme === "dark" ? "text-cyan-300/70" : "text-teal-700/80"} transition-transform ${customCommandDropdownOpen ? "rotate-180" : ""}`} />
                       </span>
                     </button>
                     {customCommandDropdownOpen && (
@@ -6754,7 +6599,9 @@ export default function App() {
             <div className="flex-shrink-0 px-3 py-2 bg-zinc-900/30 border-t border-zinc-800 flex flex-col gap-1.5 select-none">
               {/* 三预设模式切换 */}
               <div className="flex items-center gap-1">
-                <span className="text-[9px] font-mono uppercase text-violet-400/70 tracking-wider flex items-center gap-0.5">
+                <span className={`text-[9px] font-mono uppercase tracking-wider flex items-center gap-0.5 ${
+                  theme === "dark" ? "text-indigo-400/80" : "text-indigo-700 font-semibold"
+                }`}>
                   <Zap className="w-3 h-3" />
                   {lang === "zh-CN" ? "自动模式" : "Autonomy"}
                 </span>
@@ -6783,7 +6630,7 @@ export default function App() {
               {showChainProgress && chainStatus && (
                 <div className={`flex flex-col gap-1 bg-black/20 rounded p-1.5 custom-scrollbar ${rightChainExpanded ? "max-h-36 overflow-y-auto" : "max-h-20 overflow-hidden"}`}>
                   <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-mono text-violet-300">
+                    <span className={`text-[9px] font-mono ${theme === "dark" ? "text-indigo-300" : "text-indigo-700 font-semibold"}`}>
                       {isChainRunning ? (
                         <span className="flex items-center gap-1">
                           <Activity className="w-2.5 h-2.5 animate-spin" />
@@ -6800,7 +6647,7 @@ export default function App() {
                     <div className="flex gap-1">
                       <button
                         onClick={() => setRightChainExpanded(prev => !prev)}
-                        className="px-1 rounded text-[8px] bg-zinc-800 text-zinc-400 hover:text-violet-300 hover:bg-zinc-700 cursor-pointer"
+                        className="px-1 rounded text-[8px] bg-zinc-800 text-zinc-400 hover:text-indigo-300 hover:bg-zinc-700 cursor-pointer"
                         title={lang === "zh-CN" ? "展开/折叠执行链详情" : "Expand/collapse chain details"}
                       >
                         {rightChainExpanded ? "▴" : "▾"}
@@ -6848,10 +6695,10 @@ export default function App() {
                           key={step.id}
                           title={`${step.title} (${step.riskLevel}) - ${step.status}${visualIcon ? ` | 视觉: ${visualIcon}` : ""}`}
                           className={`flex-shrink-0 w-5 h-5 rounded-sm flex items-center justify-center text-[8px] cursor-default transition-colors ${
-                            isCurrent ? "ring-1 ring-violet-400" : ""
+                            isCurrent ? "ring-1 ring-indigo-400" : ""
                           } ${
                             step.status === "completed" ? "bg-emerald-500/20 text-emerald-300" :
-                            step.status === "running" ? "bg-violet-500/30 text-violet-200 animate-pulse" :
+                            step.status === "running" ? (theme === "dark" ? "bg-indigo-500/30 text-indigo-200 animate-pulse" : "bg-indigo-100 text-indigo-800 animate-pulse") :
                             step.status === "failed" ? "bg-red-500/20 text-red-300" :
                             "bg-zinc-700/50 text-zinc-500"
                           }`}
@@ -6901,14 +6748,10 @@ export default function App() {
             <button
               disabled={isAnalyzing || !inputMessage.trim()}
               onClick={() => handleSendMessage()}
-              className={`flex-shrink-0 w-11 h-11 flex items-center justify-center rounded text-white disabled:opacity-30 cursor-pointer active:scale-95 transition-all ${
-                workbenchMode === "base"
-                  ? "bg-emerald-650 hover:bg-emerald-600 disabled:hover:bg-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.4)]"
-                  : "bg-indigo-650 hover:bg-indigo-600 disabled:hover:bg-indigo-600 shadow-[0_0_15px_rgba(79,70,229,0.4)]"
-              }`}
+              className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-lg text-white bg-indigo-600 hover:bg-indigo-500 active:scale-95 transition-all shadow-md disabled:bg-indigo-400 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               aria-label={lang === "zh-CN" ? "发送消息" : "Send message"}
             >
-              <Send className="w-4.5 h-4.5" />
+              <Send className="w-4.5 h-4.5 text-white" />
             </button>
           </div>
         </aside>
@@ -6948,7 +6791,7 @@ export default function App() {
                   <span className="text-[10px] font-mono uppercase text-zinc-500 font-bold">{currentT.llmProv}</span>
                   <select
                     value={llmConfig.provider}
-                    onChange={(e) => setLlmConfig({ ...llmConfig, provider: e.target.value })}
+                    onChange={(e) => llm.chooseDraftProvider(e.target.value)}
                     className="bg-zinc-950 border border-zinc-800 rounded py-2 px-3 text-xs text-zinc-200 focus:outline-none focus:border-indigo-600 font-mono"
                   >
                     <option value="deepseek">DeepSeek AI</option>
@@ -6964,6 +6807,7 @@ export default function App() {
                   <span className="text-[10px] font-mono uppercase text-zinc-500 font-bold">
                     {lang === "zh-CN" ? "API密钥" : "API KEY"} {llmConfig.provider === "ollama" ? "(OPTIONAL)" : ""}
                   </span>
+                  <span className="text-[10px] text-zinc-400">{llm.active?.keyPresent ? (lang === 'zh-CN' ? '密钥已设置；同提供商同端点留空保留。更换提供商/端点须输入新密钥。' : 'Key stored. Leave blank to keep it only for the same provider and endpoint.') : (lang === 'zh-CN' ? '尚未设置密钥' : 'No stored key')}</span>
                   <div className="relative">
                     <input
                       type={showApiKey ? "text" : "password"}
@@ -7024,7 +6868,7 @@ export default function App() {
               {/* Footer controls */}
               <div className="flex items-center justify-between border-t border-zinc-800 pt-3 select-none">
                 <button
-                  disabled={isTestingLlm}
+                  disabled={isTestingLlm || !llm.active || !llm.active.profiles[llmConfig.provider] || !llm.ready}
                   onClick={testLlmCredentials}
                   className="px-3.5 py-2 text-xs font-semibold text-zinc-300 border border-zinc-800 hover:bg-zinc-800 rounded cursor-pointer active:scale-95 disabled:opacity-50"
                 >

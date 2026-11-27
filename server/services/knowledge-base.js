@@ -33,8 +33,8 @@ const USER_KB_FILE = migrateLegacyFile('user-data/knowledge-base.json', 'user-da
 const BUILTIN_LIBRARIES = {
   'builtin:zh-CN': {
     id: 'builtin:zh-CN',
-    name: '中国国家标准 (GB/JGJ)',
-    nameEn: 'Chinese National Standards (GB/JGJ)',
+    name: '通用示例标准 (GB/JGJ)',
+    nameEn: 'General Example Standards (GB/JGJ)',
     region: 'CN',
     contentLanguage: 'zh-CN',
     version: '1.0.0',
@@ -63,7 +63,8 @@ class KnowledgeBase {
     this._snapshots = new WeakSet();
     const libraryId = RELEASE_LOCALE === 'en-US' ? 'builtin:en-US' : 'builtin:zh-CN';
     this._state = { version: 4, revision: 0, activeLibraryId: libraryId, customLibraries: {},
-      disabledByLibrary: {}, overridesByLibrary: {}, userRules: { buildingCode: [], mepStandard: [], material: [] } };
+      disabledByLibrary: {}, overridesByLibrary: {},
+      userRules: { buildingCode: [], mepStandard: [], material: [] } };
     this.loadError = null;
     this._diskHash = null;
     this._loadUserKB();
@@ -115,7 +116,7 @@ class KnowledgeBase {
         this._validateState(next);
         this._state = next;
       } else {
-        const id = typeof data.activeLibraryId === 'string' && Object.prototype.hasOwnProperty.call(BUILTIN_LIBRARIES, data.activeLibraryId) ? data.activeLibraryId : this._state.activeLibraryId;
+        const id = typeof data.activeLibraryId === 'string' && Object.prototype.hasOwnProperty.call(BUILTIN_LIBRARIES, data.activeLibraryId) ? data.activeLibraryId : 'builtin:zh-CN'; // v1–v3 without an ID historically used the Chinese library
         this._state.activeLibraryId = id;
         this._state.disabledByLibrary[id] = clone(data.disabledBuiltinRules || {});
         this._state.overridesByLibrary[id] = {};
@@ -138,6 +139,7 @@ class KnowledgeBase {
   }
   _validateState(next) {
     if (next.version !== 4 || !Number.isSafeInteger(next.revision) || next.revision < 0 || !next.customLibraries || !next.userRules || !next.disabledByLibrary || !next.overridesByLibrary) throw new Error('KB_INVALID_STATE');
+    if (next.automaticPlanValidation !== undefined && !['ON', 'OFF'].includes(next.automaticPlanValidation)) throw new Error('KB_INVALID_STATE');
     const previous = this._state; this._state = next;
     try {
       for (const [id, lib] of Object.entries(next.customLibraries)) { const valid = schema.library(lib); if (id !== valid.libraryId) throw new Error('KB_INVALID_LIBRARY_ID'); next.customLibraries[id] = valid; }
@@ -227,15 +229,39 @@ class KnowledgeBase {
     if (Object.keys(this._state.customLibraries).length >= 8) throw new Error('KB_TOO_MANY_LIBRARIES');
     this._state.customLibraries[lib.libraryId] = lib; return { libraryId: lib.libraryId, activated: false };
   }, expectedRevision); }
+  getPlanValidation() {
+    return this._state.automaticPlanValidation !== undefined
+      ? this._state.automaticPlanValidation
+      : (process.env.KB_VALIDATION === 'on' ? 'ON' : 'OFF');
+  }
   getStatus() { return { activeLibraryId: this.activeLibraryId, revision: this._state.revision, aliasVersion: ALIAS_VERSION,
     loadState: this.loadError ? 'UNKNOWN' : 'READY', loadError: this.loadError,
-    automaticPlanValidation: process.env.KB_VALIDATION === 'on' ? 'ON' : 'OFF',
+    automaticPlanValidation: this.getPlanValidation(),
     modelAudit: 'MANUAL_PROJECT_SCOPED_DEFAULT_OFF', injection: 'PER_TASK_ONLY' }; }
+  setPlanValidation(enabled, expectedRevision) {
+    if (![true, false, 'ON', 'OFF', 'true', 'false'].includes(enabled)) {
+      return { ok: false, code: 'KB_INVALID_SETTING', error: 'enabled must explicitly be true/false or ON/OFF.' };
+    }
+    const nextVal = (enabled === true || enabled === 'ON' || enabled === 'true') ? 'ON' : 'OFF';
+    return this._commit(() => {
+      if (this._state.automaticPlanValidation === nextVal) {
+        return { unchanged: true, automaticPlanValidation: nextVal };
+      }
+      this._state.automaticPlanValidation = nextVal;
+      return { automaticPlanValidation: nextVal };
+    }, expectedRevision);
+  }
   getAll() {
     const tier = getCurrentTier(), categories = Object.fromEntries(CATEGORIES.map(c => [c, clone(this[c])]));
     const count = key => Object.fromEntries(CATEGORIES.map(c => [c, this[c].filter(r => key ? r[key] : true).length]));
     const totals = count(); totals.total = Object.values(totals).reduce((a,b) => a+b, 0); totals.userAdded = count('isUserAdded');
     totals.disabled = count('disabled'); totals.disabled.total = Object.values(totals.disabled).reduce((a,b) => a+b,0);
+    totals.requirementLevels = {
+      MANDATORY: CATEGORIES.reduce((n, c) => n + this[c].filter(r => r.requirementLevel === 'MANDATORY').length, 0),
+      RECOMMENDED: CATEGORIES.reduce((n, c) => n + this[c].filter(r => r.requirementLevel === 'RECOMMENDED').length, 0),
+      REFERENCE: CATEGORIES.reduce((n, c) => n + this[c].filter(r => r.requirementLevel === 'REFERENCE').length, 0),
+      UNCLASSIFIED: CATEGORIES.reduce((n, c) => n + this[c].filter(r => !r.requirementLevel || r.requirementLevel === 'UNCLASSIFIED').length, 0)
+    };
     return { version: 4, schemaVersion: '1.0.0', ...this.getStatus(), locale: this.locale, contentLanguage: this.locale, region: this.region,
       tier: { level: CURRENT_TIER, label: tier.label, labelEn: tier.labelEn, limits: { knowledgeRules: getLimit('knowledgeRules'), templates: getLimit('templates'), commands: getLimit('commands') } },
       builtin: { libraryId: this.activeLibraryId, version: this.builtinVersion, updatedAt: this.builtinUpdatedAt, sources: clone(this.builtinSources),
@@ -325,12 +351,41 @@ class KnowledgeBase {
 
   validatePlan(plan, snapshot) {
     const view = snapshot ? this._view(snapshot) : this;
+    // A trusted request snapshot owns its toggle as well as its rules.
+    // Later edits only affect subsequently created tasks, never an in-flight snapshot.
+    const validationMode = snapshot ? view.automaticPlanValidation : this.getPlanValidation();
+    const isValidationDisabled = validationMode !== 'ON';
     plan = plan || {};
+    // Disabling rule interception does not turn a corrupt KB into trusted data.
+    if (isValidationDisabled && (snapshot || !this.loadError)) {
+      return {
+        activeLibraryId: view.activeLibraryId,
+        revision: snapshot ? snapshot.revision : this._state.revision,
+        aliasVersion: ALIAS_VERSION,
+        passed: true,
+        errorCount: 0,
+        warningCount: 0,
+        violations: [],
+        errors: [],
+        warnings: [],
+        validationKind: 'PLAN_PARAMETER_CHECK_ONLY',
+        modelAudit: 'MANUAL_PROJECT_SCOPED_DEFAULT_OFF',
+        evaluatedCount: 0,
+        coverage: 'VALIDATION_DISABLED',
+        summary: 'Automatic plan validation is turned OFF (no blocking or warnings).'
+      };
+    }
     const violations = [];
     if (this.loadError && !snapshot) violations.push({ stepIndex: -1, rule: 'KB_LOAD_FAILED', severity: 'error', message: this.loadError });
     const steps = Array.isArray(plan.steps) ? plan.steps : [];
     let evaluatedCount = 0;
     const ACTION_ALIAS = { 'AutoRoutePipe': 'CreatePipe' };
+
+    function resolveSeverity(r) {
+      if (r.requirementLevel === 'MANDATORY') return 'error';
+      if (r.requirementLevel === 'RECOMMENDED') return 'warning';
+      return r.severity || 'warning';
+    }
 
     steps.forEach((step, idx) => {
       if (!step || typeof step !== 'object') return;
@@ -341,8 +396,9 @@ class KnowledgeBase {
         violations.push({ stepIndex: idx, rule: 'KB_INVALID_NUMERIC_PARAMETER', severity: 'error', message: field + ' must be finite numeric input.' });
 
       for (const rule of view.buildingCode) {
-        // 核心修复：排除已禁用规则
+        // 排除已禁用规则与参考项（参考项不拦截）
         if (rule.disabled) continue;
+        if (rule.requirementLevel === 'REFERENCE') continue;
         if (!rule.field) continue;
         if (rule.commandAction && rule.commandAction !== action) continue;
         const value = params[rule.field];
@@ -358,31 +414,33 @@ class KnowledgeBase {
             ['CreateDoor','CreateWindow'].includes(action) && rule.field === 'width')) continue;
         if (rule.minValue === undefined && rule.maxValue === undefined && !rule.minRange) continue;
         evaluatedCount++;
+        const effectiveSeverity = resolveSeverity(rule);
         if (rule.commandAction) {
           if (typeof rule.minValue === 'number' && typeof value === 'number' && value < rule.minValue ||
               typeof rule.maxValue === 'number' && typeof value === 'number' && value > rule.maxValue ||
               rule.minRange && typeof value === 'number' && (value < rule.minRange[0] || value > rule.minRange[1]))
-            violations.push({ stepIndex: idx, ruleId: rule.id, rule: rule.rule, severity: rule.severity || 'warning', message: action + ' ' + rule.field + '=' + value + ' violates ' + rule.id });
+            violations.push({ stepIndex: idx, ruleId: rule.id, rule: rule.rule, severity: effectiveSeverity, requirementLevel: rule.requirementLevel, message: action + ' ' + rule.field + '=' + value + ' violates ' + rule.id });
           continue;
         }
 
         if (action === 'CreateWall' && rule.field === 'thickness' && value < rule.minValue) {
-          violations.push({ stepIndex: idx, rule: rule.rule, severity: rule.severity, message: `${action} thickness=${value}m < ${rule.minValue}m (${rule.rule})` });
+          violations.push({ stepIndex: idx, ruleId: rule.id, rule: rule.rule, severity: effectiveSeverity, requirementLevel: rule.requirementLevel, message: `${action} thickness=${value}m < ${rule.minValue}m (${rule.rule})` });
         }
         if (action === 'CreateWall' && rule.field === 'height' && value < rule.minValue) {
-          violations.push({ stepIndex: idx, rule: rule.rule, severity: rule.severity, message: `${action} height=${value}m < ${rule.minValue}m (${rule.rule})` });
+          violations.push({ stepIndex: idx, ruleId: rule.id, rule: rule.rule, severity: effectiveSeverity, requirementLevel: rule.requirementLevel, message: `${action} height=${value}m < ${rule.minValue}m (${rule.rule})` });
         }
         if (['CreateSlab', 'CreateRoof', 'CreateBeam'].includes(action) && rule.field === 'thickness' && value < rule.minValue) {
-          violations.push({ stepIndex: idx, rule: rule.rule, severity: rule.severity, message: `${action} thickness=${value}m < ${rule.minValue}m (${rule.rule})` });
+          violations.push({ stepIndex: idx, ruleId: rule.id, rule: rule.rule, severity: effectiveSeverity, requirementLevel: rule.requirementLevel, message: `${action} thickness=${value}m < ${rule.minValue}m (${rule.rule})` });
         }
         if ((action === 'CreateDoor' || action === 'CreateWindow') && rule.field === 'width' && value < rule.minValue) {
-          violations.push({ stepIndex: idx, rule: rule.rule, severity: rule.severity, message: `${action} width=${value}m < ${rule.minValue}m (${rule.rule})` });
+          violations.push({ stepIndex: idx, ruleId: rule.id, rule: rule.rule, severity: effectiveSeverity, requirementLevel: rule.requirementLevel, message: `${action} width=${value}m < ${rule.minValue}m (${rule.rule})` });
         }
       }
 
       for (const rule of view.mepStandard) {
-        // 核心修复：排除已禁用规则
+        // 排除已禁用规则与参考项（参考项不拦截）
         if (rule.disabled) continue;
+        if (rule.requirementLevel === 'REFERENCE') continue;
         const matchesAction = rule.commandAction === action || (rule.commandAction === effectiveAction && !rule.subType);
         if (!rule.commandAction || !matchesAction) continue;
         if (!rule.field) continue;
@@ -410,14 +468,15 @@ class KnowledgeBase {
 
         if (rule.minValue === undefined && rule.maxValue === undefined && !rule.minRange) continue;
         evaluatedCount++;
+        const effectiveSeverity = resolveSeverity(rule);
         if (typeof rule.minValue === 'number' && typeof value === 'number' && value < rule.minValue) {
-          violations.push({ stepIndex: idx, rule: rule.rule, severity: rule.severity, message: `${action} ${rule.field}=${value} < ${rule.minValue} (${rule.rule})` });
+          violations.push({ stepIndex: idx, ruleId: rule.id, rule: rule.rule, severity: effectiveSeverity, requirementLevel: rule.requirementLevel, message: `${action} ${rule.field}=${value} < ${rule.minValue} (${rule.rule})` });
         }
         if (typeof rule.maxValue === 'number' && typeof value === 'number' && value > rule.maxValue) {
-          violations.push({ stepIndex: idx, rule: rule.rule, severity: rule.severity, message: `${action} ${rule.field}=${value} > ${rule.maxValue} (${rule.rule})` });
+          violations.push({ stepIndex: idx, ruleId: rule.id, rule: rule.rule, severity: effectiveSeverity, requirementLevel: rule.requirementLevel, message: `${action} ${rule.field}=${value} > ${rule.maxValue} (${rule.rule})` });
         }
         if (rule.minRange && (value < rule.minRange[0] || value > rule.minRange[1])) {
-          violations.push({ stepIndex: idx, rule: rule.rule, severity: rule.severity, message: `${action} ${rule.field}=${value} not in range [${rule.minRange[0]}, ${rule.minRange[1]}] (${rule.rule})` });
+          violations.push({ stepIndex: idx, ruleId: rule.id, rule: rule.rule, severity: effectiveSeverity, requirementLevel: rule.requirementLevel, message: `${action} ${rule.field}=${value} not in range [${rule.minRange[0]}, ${rule.minRange[1]}] (${rule.rule})` });
         }
       }
     });

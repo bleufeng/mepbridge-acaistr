@@ -12,6 +12,7 @@ const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mepbridge-release-locale
 const manifestPath = path.join(tempRoot, 'RELEASE_MANIFEST.json');
 
 try {
+  assert.strictEqual(DEFAULT_LOCALE, 'en-US');
   assert.strictEqual(
     resolveReleaseLocale({ env: {}, manifestPath }),
     DEFAULT_LOCALE
@@ -43,6 +44,11 @@ try {
     'en-US'
   );
 
+  fs.writeFileSync(manifestPath, JSON.stringify({ defaultLocale: 'en-US', locale: 'zh-CN' }));
+  assert.strictEqual(resolveReleaseLocale({ env: {}, manifestPath }), 'en-US');
+  assert.strictEqual(resolveReleaseLocale({ env: { UI_LANGUAGE: 'invalid', MEPBRIDGE_LOCALE: 'zh-CN' }, manifestPath }), 'zh-CN');
+  fs.writeFileSync(manifestPath, JSON.stringify({ defaultLocale: 'invalid', locale: 'zh-CN' }));
+  assert.strictEqual(resolveReleaseLocale({ env: {}, manifestPath }), 'zh-CN');
   fs.writeFileSync(manifestPath, '{ invalid json');
   assert.strictEqual(resolveReleaseLocale({ env: {}, manifestPath }), DEFAULT_LOCALE);
 

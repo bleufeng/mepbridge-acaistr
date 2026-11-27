@@ -1,4 +1,4 @@
-// MACAI platform: durable operation IDs retained before outbound dispatch. No automatic retries.
+// MACAI platform: volatile operation IDs retained before dispatch; local persistence is best effort. No automatic retries.
 export type OperationRecord = { operationId: string; action: string; createdAt: string; status: string };
 const STORAGE_KEY = 'mepbridge-execution-recovery-v1';
 const volatileRecords = new Map<string, OperationRecord>();
@@ -26,8 +26,8 @@ function saveRecord(record: OperationRecord) {
     if (completedIdx !== -1) rows.splice(completedIdx, 1);
     else rows = rows.slice(rows.length - 199);
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([...rows, record]));
-  window.dispatchEvent(new Event('mepbridge-execution-recovery'));
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...rows, record])); } catch (_) { /* volatile ID retained; persistence failure must not block first dispatch */ }
+  try { window.dispatchEvent(new Event('mepbridge-execution-recovery')); } catch (_) { /* notification failure is not a model-write or receipt failure */ }
 }
 export async function queryOperation(operationId: string) {
   if (!/^[a-f0-9]{64}$/.test(operationId)) throw Error('EXEC_INVALID_OPERATION_ID');
@@ -55,14 +55,14 @@ export async function workbenchFetch(input: RequestInfo | URL, init?: RequestIni
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   const operationId = body.execution?.operationId || Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
   const record = {operationId,action,createdAt:new Date().toISOString(),status:'PENDING'};
-  saveRecord(record); // failure here prevents dispatch rather than losing recovery identity
+  saveRecord(record); // retain the volatile ID before dispatch; local persistence is best effort
   try {
     const response = await window.fetch(input,{...init,body:JSON.stringify({...body,execution:{operationId}})});
     const data = await response.clone().json();
     if ((data.ok || data.success) && !data.execution) {
       volatileRecords.delete(operationId);
       try { localStorage.setItem(STORAGE_KEY,JSON.stringify(recoveryRecords().filter(r=>r.operationId!==operationId))); } catch (_) { /* no execution blocker */ }
-      window.dispatchEvent(new Event('mepbridge-execution-recovery'));
+      try { window.dispatchEvent(new Event('mepbridge-execution-recovery')); } catch (_) { /* notification failure is not a model-write or receipt failure */ }
     } else saveRecord({...record,status:data.execution?.status || 'UNKNOWN'});
     return response;
   } catch (error: any) {

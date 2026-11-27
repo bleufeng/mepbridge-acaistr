@@ -6,7 +6,7 @@ const {FACTS,GUID}=require('./model-audit-adapter');
 const clone=x=>JSON.parse(JSON.stringify(x));
 const token=()=>crypto.randomBytes(32).toString('hex');
 const categories=['buildingCode','mepStandard','material'];
-function snapshot(kb){const view=kb.createSnapshot();if(view.loadState!=='READY')throw Error('AUDIT_KB_NOT_READY');return{activeLibraryId:view.activeLibraryId,revision:view.revision,rules:categories.flatMap(category=>(view[category]||[]).map(rule=>({...clone(rule),id:`${category}:${rule.id}`,originalRuleId:rule.id,category})))};}
+function snapshot(kb){const view=kb.createSnapshot();if(view.loadState!=='READY')throw Error('AUDIT_KB_NOT_READY');return{activeLibraryId:view.activeLibraryId,revision:view.revision,rules:categories.flatMap(category=>(view[category]||[]).map(rule=>({...clone(rule),id:`${category}:${rule.id}`,originalRuleId:rule.id,category,requirementLevel:rule.requirementLevel||'UNCLASSIFIED',requirementBasis:rule.requirementBasis||null})))};}
 class ModelAuditService {
  constructor({adapter,store,kb,definitions=[],now=Date.now,locator=null}={}){
   this.adapter=adapter;this.store=store;this.kb=kb;this.now=now;this.contexts=new Map();this.jobs=new Map();this.running=new Map();this.stopped=new Set();
@@ -18,14 +18,32 @@ class ModelAuditService {
  context(id){const c=this.contexts.get(id);if(!c)throw Error('AUDIT_CONTEXT_UNKNOWN_REBIND');if(c.expires<this.now()&&!this.running.has(identity(c.project)))throw Error('AUDIT_CONTEXT_EXPIRED_REBIND');return c;}
  settings(project){const setting=this.store.settings(project);return this.stopped.has(identity(project))?{...setting,enabled:false,locallyStopped:true}:setting;}
  async bind(port){if(!Number.isInteger(port)||port<19723||port>19743)throw Error('AUDIT_INVALID_PORT');this.prune();if(this.contexts.size>=100)throw Error('AUDIT_CONTEXT_QUOTA');const project=await this.adapter.bind(port);const id=token();this.contexts.set(id,{project,expires:this.now()+30*60*1000,selection:null});return{contextId:id,project,settings:this.settings(project),preflight:this.preflight(id)};}
- preflight(id){const c=this.context(id),library=snapshot(this.kb);return{libraryId:library.activeLibraryId,revision:library.revision,settings:this.settings(c.project),automaticPlanValidation:this.kb.getStatus().automaticPlanValidation,rules:library.rules.map(rule=>{const definition=this.definitions.find(d=>d.libraryId===library.activeLibraryId&&d.ruleId===rule.id&&d.ruleHash===ruleHash(rule));return{...rule,approved:!!definition&&!rule.disabled,definitionVersion:definition?.version,applicabilityKey:definition?.applicabilityKey,reason:rule.disabled?'RULE_DISABLED':definition?'APPROVED_CHECK':'NO_APPROVED_CHECK_DEFINITION'};}),runningJobId:this.running.get(identity(c.project))||null};}
+ preflight(id){
+  const c=this.context(id),library=snapshot(this.kb);
+  const rules=library.rules.map(rule=>{
+    const definition=this.definitions.find(d=>d.libraryId===library.activeLibraryId&&d.ruleId===rule.id&&d.ruleHash===ruleHash(rule));
+    return{...rule,approved:!!definition&&!rule.disabled,definitionVersion:definition?.version,applicabilityKey:definition?.applicabilityKey,reason:rule.disabled?'RULE_DISABLED':definition?'APPROVED_CHECK':'NO_APPROVED_CHECK_DEFINITION',requirementLevel:rule.requirementLevel||'UNCLASSIFIED',requirementBasis:rule.requirementBasis||null};
+  });
+  const totalRules=rules.length,disabledCount=rules.filter(r=>r.disabled).length,activeRules=rules.filter(r=>!r.disabled);
+  const approvedCount=activeRules.filter(r=>r.approved).length,manualCount=activeRules.filter(r=>!r.approved).length;
+  const mandatoryCount=activeRules.filter(r=>r.requirementLevel==='MANDATORY').length;
+  const recommendedCount=activeRules.filter(r=>r.requirementLevel==='RECOMMENDED').length;
+  const referenceCount=activeRules.filter(r=>r.requirementLevel==='REFERENCE').length;
+  const unclassifiedCount=activeRules.filter(r=>!r.requirementLevel||r.requirementLevel==='UNCLASSIFIED').length;
+  return{
+    libraryId:library.activeLibraryId,revision:library.revision,settings:this.settings(c.project),
+    automaticPlanValidation:this.kb.getStatus().automaticPlanValidation,rules,
+    stats:{totalRules,disabledCount,activeCount:activeRules.length,approvedCount,manualCount,mandatoryCount,recommendedCount,referenceCount,unclassifiedCount},
+    runningJobId:this.running.get(identity(c.project))||null
+  };
+}
  async enable(id,{enabled,expectedRevision,confirmed=false}={}){
   const c=this.context(id),key=identity(c.project);if(typeof enabled!=='boolean')throw Error('AUDIT_INVALID_SETTING');
   if(!enabled){this.stopped.add(key);this.cancel(id);c.selection=null;}else{if(confirmed!==true)throw Error('AUDIT_ENABLE_CONFIRMATION_REQUIRED');await this.adapter.verify(c.project);}
   const result=this.store.setEnabled(c.project,enabled,{expectedRevision});if(enabled)this.stopped.delete(key);return result;
  }
  async select(id){const c=this.context(id);if(!this.settings(c.project).enabled)throw Error('AUDIT_DISABLED');const guids=await this.adapter.selection(c.project);if(!this.settings(c.project).enabled)throw Error('AUDIT_DISABLED');const selectionId=token();c.selection={selectionId,guids,capturedAt:new Date(this.now()).toISOString(),expires:this.now()+5*60*1000};return clone(c.selection);}
- start(id,{selectionId,selectedRuleIds,conditions={},settingsRevision,libraryRevision,libraryId}={},recheckOf=null,mode='AUTOMATIC'){
+ start(id,{selectionId,selectedRuleIds,conditions={},settingsRevision,libraryRevision,libraryId,exclusions={},excludedMandatoryRules=[]}={},recheckOf=null,mode='AUTOMATIC'){
   if(!['AUTOMATIC','MANUAL'].includes(mode))throw Error('AUDIT_INVALID_MODE');
   const c=this.context(id),key=identity(c.project),library=snapshot(this.kb),setting=this.settings(c.project);
   if(!setting.enabled||setting.revision!==settingsRevision)throw Error('AUDIT_DISABLED_OR_STALE_START');
@@ -33,6 +51,30 @@ class ModelAuditService {
   if(!c.selection||c.selection.selectionId!==selectionId||c.selection.expires<this.now())throw Error('AUDIT_SELECTION_EXPIRED_OR_UNKNOWN');
   if(libraryRevision!==library.revision||libraryId!==library.activeLibraryId)throw Error('AUDIT_LIBRARY_CHANGED_REVIEW_AGAIN');
   if(!Array.isArray(selectedRuleIds)||!selectedRuleIds.length||new Set(selectedRuleIds).size!==selectedRuleIds.length||selectedRuleIds.some(id=>!library.rules.some(r=>r.id===id&&!r.disabled)))throw Error('AUDIT_RULE_SELECTION_INVALID');
+  const activeMandatory=library.rules.filter(r=>!r.disabled&&r.requirementLevel==='MANDATORY');
+  const unselectedMandatory=activeMandatory.filter(r=>!selectedRuleIds.includes(r.id));
+  const exclusionsInput=(exclusions&&typeof exclusions==='object'&&!Array.isArray(exclusions))?exclusions:{};
+  const excludedList=Array.isArray(excludedMandatoryRules)?excludedMandatoryRules:[];
+  const getReason=rId=>{
+    if(typeof exclusionsInput[rId]==='string'&&exclusionsInput[rId].trim())return exclusionsInput[rId].trim();
+    const found=excludedList.find(x=>x.ruleId===rId);
+    if(found&&typeof found.reason==='string'&&found.reason.trim())return found.reason.trim();
+    return null;
+  };
+  const normalizedExclusions=[];
+  for(const rule of unselectedMandatory){
+    const reason=getReason(rule.id);
+    if(!reason)throw Error('AUDIT_MANDATORY_EXCLUSION_REASON_REQUIRED');
+    normalizedExclusions.push({ruleId:rule.id,originalRuleId:rule.originalRuleId,category:rule.category,rule:rule.rule||rule.material||'',requirementLevel:'MANDATORY',requirementBasis:rule.requirementBasis||null,reason,excludedAt:new Date(this.now()).toISOString()});
+  }
+  for(const [rId,rReason]of Object.entries(exclusionsInput)){
+    if(typeof rReason==='string'&&rReason.trim()&&!normalizedExclusions.some(x=>x.ruleId===rId)){
+      const r=library.rules.find(x=>x.id===rId);
+      if(r&&!selectedRuleIds.includes(rId)){
+        normalizedExclusions.push({ruleId:r.id,originalRuleId:r.originalRuleId,category:r.category,rule:r.rule||r.material||'',requirementLevel:r.requirementLevel||'UNCLASSIFIED',requirementBasis:r.requirementBasis||null,reason:rReason.trim(),excludedAt:new Date(this.now()).toISOString()});
+      }
+    }
+  }
   const approved=mode==='MANUAL'?[]:this.definitions.filter(d=>d.libraryId===library.activeLibraryId&&library.rules.some(r=>r.id===d.ruleId&&!r.disabled&&selectedRuleIds.includes(r.id)&&ruleHash(r)===d.ruleHash));
   if(mode==='AUTOMATIC'&&!approved.length)throw Error('AUDIT_NO_APPROVED_CHECKS');
   if(!conditions||typeof conditions!=='object'||Array.isArray(conditions)||Object.keys(conditions).length>100||Object.entries(conditions).some(([k,v])=>!approved.some(d=>d.applicabilityKey===k)||typeof v!=='boolean'))throw Error('AUDIT_INVALID_PROJECT_CONDITIONS');
@@ -41,7 +83,7 @@ class ModelAuditService {
   const project={...clone(c.project),conditions:clone(conditions)},guids=clone(c.selection.guids),scope=this.adapter.scope(project,guids,{collect:mode==='AUTOMATIC'}),engine=new ModelAuditEngine({...scope,store:this.store,approvedDefinitions:approved});
   const selectionCapturedAt=c.selection.capturedAt;
   const jobId=token(),runId=crypto.randomUUID();const job={jobId,contextId:id,runId,projectKey:key,engine,status:'RUNNING',result:null};this.jobs.set(jobId,job);this.running.set(key,jobId);c.selection=null;
-  job.promise=engine.start({project,librarySnapshot:library,selectedGuids:guids,selectedRuleIds,settingsRevision,runId,recheckOf,mode,selectionCapturedAt}).then(result=>{job.status=result.taskState;job.result=result;}).catch(error=>{job.status='PARTIAL';job.error=error.message;}).finally(()=>{this.running.delete(key);job.engine=null;});
+  job.promise=engine.start({project,librarySnapshot:library,selectedGuids:guids,selectedRuleIds,settingsRevision,runId,recheckOf,mode,selectionCapturedAt,exclusions:normalizedExclusions}).then(result=>{job.status=result.taskState;job.result=result;}).catch(error=>{job.status='PARTIAL';job.error=error.message;}).finally(()=>{this.running.delete(key);job.engine=null;});
   return{jobId,runId,mode,status:'RUNNING',selectedCount:guids.length};
  }
  manual(id,input={}){if(input.confirmed!==true)throw Error('AUDIT_MANUAL_CONFIRMATION_REQUIRED');return this.start(id,input,null,'MANUAL');}

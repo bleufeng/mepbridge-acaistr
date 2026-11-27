@@ -75,6 +75,8 @@ router.post('/execute', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Missing required field: message' });
     }
 
+    // One request snapshot, before target discovery can yield to another KB revision.
+    const knowledgeSnapshot = knowledgeBase.createSnapshot();
     const frozenTarget = await freezeRequestTarget(req.body, { requireExplicit: false });
     const targetEnvelope = executionTarget(frozenTarget);
     const target = publicTarget(frozenTarget);
@@ -96,7 +98,7 @@ router.post('/execute', async (req, res) => {
         ok:true,status:'unsupported',chainId:null,steps:[],target,
         message:english?'Native edit is available in the supervised plan path.':'原生编辑已转入人工审核计划。'
       });
-      const snapshot=knowledgeBase.createSnapshot();
+      const snapshot=knowledgeSnapshot;
       knowledgeBase.verifySnapshot(snapshot);
       if(snapshot.automaticPlanValidation==='ON') {
         const validation=knowledgeBase.validatePlan(nativePlan,snapshot);
@@ -135,7 +137,7 @@ router.post('/execute', async (req, res) => {
       language: locale,
       locale,
       userIntent: message,
-      knowledgeSnapshot: knowledgeBase.createSnapshot(),
+      knowledgeSnapshot,
       target
     };
     // 注入模型快照上下文
@@ -315,6 +317,8 @@ router.post('/create', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Missing message' });
     }
 
+    // One request snapshot, before target discovery can yield to another KB revision.
+    const knowledgeSnapshot = knowledgeBase.createSnapshot();
     const frozenTarget = await freezeRequestTarget(req.body, { requireExplicit: false });
     const targetEnvelope = executionTarget(frozenTarget);
     const target = publicTarget(frozenTarget);
@@ -323,7 +327,7 @@ router.post('/create', async (req, res) => {
       language: locale,
       locale,
       userIntent: message,
-      knowledgeSnapshot: knowledgeBase.createSnapshot(),
+      knowledgeSnapshot,
       target
     };
     // 编号直达（与 /execute 同规则）：① 用户模板 TPL-0NN ② 出厂模板 SYS-0NN

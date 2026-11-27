@@ -1,39 +1,11 @@
 const axios = require('axios');
+const { resolveConfig } = require('./llm-provider-config');
 
 // OpenAI 兼容 provider 的默认完整 endpoint
-const DEFAULT_OPENAI_ENDPOINTS = {
-  openai: 'https://api.openai.com/v1/chat/completions',
-  deepseek: 'https://api.deepseek.com/v1/chat/completions'
-};
-
+const DEFAULT_OPENAI_ENDPOINTS = { openai: 'https://api.openai.com/v1/chat/completions', deepseek: 'https://api.deepseek.com/v1/chat/completions' };
 const DEFAULT_ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages';
-
-// 归一化 OpenAI 兼容 endpoint：
-// 用户常填 https://api.deepseek.com 或 https://api.openai.com/v1，
-// 但实际请求需要 .../v1/chat/completions
-function normalizeOpenAiEndpoint(endpoint, provider) {
-  if (!endpoint || !endpoint.trim()) {
-    return DEFAULT_OPENAI_ENDPOINTS[provider] || DEFAULT_OPENAI_ENDPOINTS.openai;
-  }
-  let url = endpoint.trim().replace(/\/+$/, ''); // 去掉尾部斜杠
-  // 已含完整路径
-  if (/\/chat\/completions$/.test(url)) return url;
-  // 已含 /v1
-  if (/\/v1$/.test(url)) return url + '/chat/completions';
-  // 已含 /v1/
-  if (/\/v1\/?$/.test(url)) return url.replace(/\/+$/, '') + '/chat/completions';
-  // 仅域名，补全 /v1/chat/completions
-  return url + '/v1/chat/completions';
-}
-
-// 归一化 Anthropic endpoint：补全 /v1/messages
-function normalizeAnthropicEndpoint(endpoint) {
-  if (!endpoint || !endpoint.trim()) return DEFAULT_ANTHROPIC_ENDPOINT;
-  let url = endpoint.trim().replace(/\/+$/, '');
-  if (/\/messages$/.test(url)) return url;
-  if (/\/v1$/.test(url)) return url + '/messages';
-  return url + '/v1/messages';
-}
+function normalizeOpenAiEndpoint(endpoint, provider) { return resolveConfig({ provider, endpoint, model: 'normalization-only' }).effectiveEndpoint; }
+function normalizeAnthropicEndpoint(endpoint) { return resolveConfig({ provider: 'anthropic', endpoint }).effectiveEndpoint; }
 
 class LLMAdapter {
   constructor(config) {
@@ -846,7 +818,7 @@ ${selectionSection}
     const response = await axios.post(
       url,
       {
-        model: this.model || 'gpt-4-turbo-preview',
+        model: this.model || require('./llm-provider-config').PROFILES[this.provider]?.model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }

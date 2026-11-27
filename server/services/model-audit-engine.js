@@ -30,7 +30,7 @@ class ModelAuditEngine {
 
  status(project){const key=identity(project);if(this.store)return this.store.settings(project);return clone(this.settings.get(key)||{enabled:false,revision:0});}
  cancel(project){const token=this.running.get(identity(project));if(token)token.cancelled=true;}
- async start({project,librarySnapshot,selectedGuids,selectedRuleIds,settingsRevision,runId,recheckOf,mode='AUTOMATIC',selectionCapturedAt}) {
+ async start({project,librarySnapshot,selectedGuids,selectedRuleIds,settingsRevision,runId,recheckOf,mode='AUTOMATIC',selectionCapturedAt,exclusions=[]}) {
   if(!['AUTOMATIC','MANUAL'].includes(mode))throw Error('AUDIT_INVALID_MODE');
   const key=identity(project),setting=this.status(project);
   if(!setting.enabled||setting.revision!==settingsRevision)throw Error('AUDIT_DISABLED_OR_STALE_START');
@@ -38,13 +38,13 @@ class ModelAuditEngine {
   if(!Array.isArray(selectedGuids)||!selectedGuids.length||selectedGuids.length>this.maxElements||selectedGuids.some(g=>typeof g!=='string'||!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(g))||new Set(selectedGuids).size!==selectedGuids.length)throw Error('AUDIT_SELECTION_INVALID_OR_OVER_BUDGET');
   if(!librarySnapshot||typeof librarySnapshot.activeLibraryId!=='string'||!Number.isSafeInteger(librarySnapshot.revision)||!Array.isArray(librarySnapshot.rules)||!Array.isArray(selectedRuleIds)||new Set(selectedRuleIds).size!==selectedRuleIds.length)throw Error('AUDIT_LIBRARY_SNAPSHOT_REQUIRED');
   if(selectedGuids.length*librarySnapshot.rules.length>this.maxResults)throw Error('AUDIT_RESULT_QUOTA');
-  const snapshot=freeze(clone({project,librarySnapshot,selectedGuids,selectedRuleIds,settingsRevision,mode,selectionCapturedAt}));
+  const snapshot=freeze(clone({project,librarySnapshot,selectedGuids,selectedRuleIds,settingsRevision,mode,selectionCapturedAt,exclusions}));
   if (Buffer.byteLength(JSON.stringify(snapshot)) > this.maxBytes) throw Error("AUDIT_SNAPSHOT_QUOTA");
   if (librarySnapshot.rules.some(r=>!r||typeof r.id!=="string"||!r.id)||new Set(librarySnapshot.rules.map(r=>r.id)).size!==librarySnapshot.rules.length||selectedRuleIds.some(id=>typeof id!=="string"||!librarySnapshot.rules.some(r=>r.id===id))) throw Error("AUDIT_RULE_IDENTITIES_INVALID");
   const token={cancelled:false},started=Date.now(),results=[];
   const run={runId:runId||crypto.randomUUID(),projectKey:key,startedAt:new Date(started).toISOString(),snapshotHash:hash(snapshot),libraryId:snapshot.librarySnapshot.activeLibraryId,revision:snapshot.librarySnapshot.revision,taskState:'RUNNING',consistency:'UNCONFIRMED',results,coverage:0,total:snapshot.selectedGuids.length*snapshot.librarySnapshot.rules.length};
   run.mode=mode;run.selectionCapturedAt=selectionCapturedAt||null;
-  if(mode==='MANUAL')run.ruleSnapshots=clone(snapshot.librarySnapshot.rules);
+  run.ruleSnapshots=clone(snapshot.librarySnapshot.rules);run.exclusions=clone(snapshot.exclusions||[]);
   run.selectedGuids=snapshot.selectedGuids;run.selectedRuleIds=snapshot.selectedRuleIds;run.projectConditions=snapshot.project.conditions||{};run.settingsRevision=snapshot.settingsRevision;
   if(recheckOf)run.recheckOf=clone(recheckOf);
   if(Buffer.byteLength(JSON.stringify(run))>this.maxBytes-1024)throw Error('AUDIT_SNAPSHOT_QUOTA');
@@ -61,7 +61,7 @@ class ModelAuditEngine {
     check();const hasApproved = mode==='AUTOMATIC'&&snapshot.librarySnapshot.rules.some(rule => !rule.disabled && snapshot.selectedRuleIds.includes(rule.id) && this.definitions.some(d => d.libraryId===snapshot.librarySnapshot.activeLibraryId && d.ruleId===rule.id && d.ruleHash===hash(rule) && d.professionalApprovalId && d.version));
     const facts=hasApproved ? await bounded(() => this.readFacts({project:snapshot.project,guid,signal:token})) : null;check();
     for(const rule of snapshot.librarySnapshot.rules) {
-     const result={guid,ruleId:rule.id,ruleHash:hash(rule),category:rule.category||null,originalRuleId:rule.originalRuleId||rule.id,sourceText:rule.rule||rule.material||'',source:rule.source||'',severity:rule.severity||'info',state:'NOT_CHECKED',reason:'NOT_SELECTED_OR_DISABLED',facts:[]};
+     const result={guid,ruleId:rule.id,ruleHash:hash(rule),category:rule.category||null,originalRuleId:rule.originalRuleId||rule.id,sourceText:rule.rule||rule.material||'',source:rule.source||'',severity:rule.severity||'info',requirementLevel:rule.requirementLevel||'UNCLASSIFIED',requirementBasis:rule.requirementBasis||null,state:'NOT_CHECKED',reason:'NOT_SELECTED_OR_DISABLED',facts:[]};
      if(mode==='MANUAL'){result.reason=snapshot.selectedRuleIds.includes(rule.id)&&!rule.disabled?'MANUAL_REVIEW_ONLY_NO_AUTOMATIC_VERDICT':'NOT_SELECTED_OR_DISABLED';}
      if(mode==='AUTOMATIC'&&snapshot.selectedRuleIds.includes(rule.id)&&!rule.disabled) {
       const definition=this.definitions.find(d=>d.libraryId===snapshot.librarySnapshot.activeLibraryId&&d.ruleId===rule.id&&d.ruleHash===hash(rule)&&d.professionalApprovalId&&d.version);
@@ -92,6 +92,30 @@ class ModelAuditEngine {
   } catch(error) {run.taskState=error.message==='AUDIT_CANCELLED'?'CANCELLED':'PARTIAL';run.error=error.message;for(const result of results)if(result.state==='PASS'){result.state='INDETERMINATE';result.reason='RUN_NOT_CONFIRMED';}}
   finally{token.cancelled = true; this.running.delete(key);}
   run.finishedAt=new Date().toISOString();
+  const rules = snapshot.librarySnapshot.rules, activeRules = rules.filter(r=>!r.disabled);
+  run.stats = {
+    ruleLevel: {
+      totalRules: rules.length,
+      selectedCount: snapshot.selectedRuleIds.length,
+      disabledCount: rules.filter(r=>r.disabled).length,
+      mandatoryCount: rules.filter(r=>r.requirementLevel==='MANDATORY').length,
+      recommendedCount: rules.filter(r=>r.requirementLevel==='RECOMMENDED').length,
+      referenceCount: rules.filter(r=>r.requirementLevel==='REFERENCE').length,
+      unclassifiedCount: rules.filter(r=>!r.requirementLevel||r.requirementLevel==='UNCLASSIFIED').length,
+      excludedMandatoryCount: (snapshot.exclusions||[]).filter(r=>r.requirementLevel==='MANDATORY').length,
+      approvedDefinitionsCount: this.definitions.length,
+      manualRequiredCount: activeRules.filter(r=>!this.definitions.some(d=>d.libraryId===snapshot.librarySnapshot.activeLibraryId&&d.ruleId===r.id&&d.ruleHash===hash(r))).length
+    },
+    elementRuleLevel: {
+      totalPairs: snapshot.selectedGuids.length * rules.length,
+      evaluatedCount: results.filter(r=>['PASS','FAIL','NOT_APPLICABLE'].includes(r.state)).length,
+      passCount: results.filter(r=>r.state==='PASS').length,
+      failCount: results.filter(r=>r.state==='FAIL').length,
+      indeterminateCount: results.filter(r=>r.state==='INDETERMINATE').length,
+      notCheckedCount: results.filter(r=>r.state==='NOT_CHECKED').length,
+      notApplicableCount: results.filter(r=>r.state==='NOT_APPLICABLE').length
+    }
+  };
   run.coverage=results.filter(r=>['PASS','FAIL','NOT_APPLICABLE'].includes(r.state)).length;
   run.counts=Object.fromEntries(STATES.map(state=>[state,results.filter(r=>r.state===state).length]));
   run.overallPass=run.taskState==='COMPLETED'&&run.total>0&&results.length===run.total&&run.counts.PASS>0&&run.counts.PASS+run.counts.NOT_APPLICABLE===run.total;

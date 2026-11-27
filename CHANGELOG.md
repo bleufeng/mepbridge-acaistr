@@ -4,11 +4,31 @@ Public user-facing changes. Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
-### Changed
+## [0.2.0] - 2026-11-10
 
-- Refreshed the bilingual project homepages with the five-dimension capability dashboard, version-adaptive package naming, and verified documentation links.
-- Replaced the client-rendered Mermaid architecture diagram with a dependency-free plain-text flow diagram in both homepages.
-- Expanded the v0.1.9 changelog with the portable zero-setup delivery headline and the iteration-scope source/offline work notes.
+**Development version increment — not a published Release.** The maintainer authorized the source version to advance from 0.1.9 to 0.2.0 before the next build (minor impact). VERSION, package/lockfile metadata, command-boundary metadata, bilingual guides and current version hints are synchronized; this change does not compile or deploy an Add-On.
+
+### Source changes under qualification
+
+- Existing building commands carry explicit column/beam section and anchor contracts, construction-asset resolution, wall/slab boundary support, scalar GDL handling and independent geometry readback. No C++ command or MCP tool is added: the boundary remains 91 native commands + 4 Server tools (95 total).
+- Curtain-wall fixed-grid editing and creation height remain in scope; edits to existing curtain-wall height are still rejected before writing. Version hints change without widening supported fields.
+- Three experimental MEP write paths are deferred and rejected before dispatch: MoveElements node/position writes, ChangeMEPRouteProperties segment/specification-table writes, and SolveConn apply=true. Existing stable operations and read-only analysis remain; UI hiding is not the safety boundary.
+
+### Evidence and delivery limits
+
+- Existing AC30 results belong to their original 0.1.9 APX hashes, sessions and bounded cases; they are not relabelled as 0.2.0 live PASS. Remaining building history/recovery gates and Lamp scalar write qualification are not complete; the original W1 scope is not declared complete.
+- Building basics and fixed-grid curtain walls are prioritized. MEP and other complex-element increments are deferred, with no promise of delivery in this version. The MACAI平台 Skill Center remains a separately discussed design, not an implemented or bundled feature.
+- The next AC30 build requires fresh binary-version/hash binding and affected-case checks. The AC28 and AC29 binaries are now built and referenced, but their affected 0.2.0 cases remain NOT_RUN; macOS is deferred with no asset delivered. No 0.2.0 package, tag, Release or public publication is created here; the published 0.1.9 installation assets stay unchanged.
+
+### Release preparation update (2026-11-26)
+
+- Release scope is Windows x64 only; macOS is `DEFERRED_NOT_DELIVERED_V020` and no Mac asset is produced.
+- Selected Archicad 30 scope passed. Archicad 28 and 29 remain referenced + NOT_RUN for v0.2.0 cases; no three-host live PASS is claimed.
+- Boundary and scope: 91 native + 91 descriptor + 4 Server = 95 tools; the release validation scope covers 47 groups (18/12/1/16).
+- G5 rollback-probe builds are test-only evidence and are not shipped in any release asset.
+- Local Add-Ons stay fail-closed: `MANUAL_LOCAL_MEPBRIDGE_ACTION_REQUIRED` requires manual archive or removal by exact path and SHA-256; the installer and uninstaller never overwrite, migrate, or delete them automatically.
+- English remains the default UI language with a remembered Chinese switch; LLM connectivity state is displayed separately from the saved endpoint/configuration.
+- Packaging, the final GO gate, the public PR, tagging, and the Release remain pending.
 
 ## [0.1.9] - 2026-11-06
 
@@ -40,11 +60,6 @@ These changes landed in the v0.1.9 iteration at the source/offline layer only. T
 - **Central extension bar**: nine peer navigation entries (capability panorama, knowledge standards, model review, templates, commands, instances, Building JSON, CAD layers, settings); settings pinned last with four sub-panels consolidated; lazy-loaded panels with visited-tab keep-alive; preview tabs disabled with zero navigation or requests. Navigation never changes execution permissions.
 - **Knowledge standards**: bilingual KB contract with a declarative library — source text is never translated, values and units stay language-independent, 2 MB / 500 entries / 8 libraries quotas, cross-process lock with disk-hash CAS, monotonic revision with `expectedRevision` on every write, and a separate `ui-preferences.json` with GET/PUT endpoints. Deletion becomes a recoverable disable; failed saves no longer report success.
 - **Model review infrastructure**: settings and run-history persistence (per-project fingerprint partitions, default OFF, wx lock, revision CAS, fsync + rename, independent `historyStored:false` warnings) and controlled locate/recheck limited to a saved `runId` with evidence/result hashes and read-only session binding. Approved check definitions remain 0. This does not provide automatic professional model auditing or compliance certification.
-
-### Known limitations
-
-- Height edits of existing curtain walls are unsupported and fail closed; there is no delete-and-recreate fallback. Creation height and verified grid edits remain available.
-- This is a limited-scope acceptance, not a full P0 claim. Undo/Redo and typed batch failure strategies were not run; the historical old-beam request remains unresolved.
 
 ## [0.1.8] - 2026-10-19
 

@@ -3,7 +3,7 @@
 > MEPbridge ACAIstr（MACAI）打通大语言模型（GPT / Claude / Gemini / Deepseek 等）与 Archicad 工业级三维设计软件之间的安全双向交互与 AI Loop 智能协同工作台。提供 `CollabAI 智能`（自然语言任务规划与自主循环）与 `Manual 手动`（工作流精准控制）双入口。
 
 [![Archicad](https://img.shields.io/badge/Archicad-28%20%7C%2029%20%7C%2030-blue.svg)](docs/user/INSTALL.zh-CN.md)
-[![Version](https://img.shields.io/badge/version-0.1.9-orange.svg)](https://github.com/bleufeng/mepbridge-acaistr/releases/tag/v0.1.9)
+[![Version](https://img.shields.io/badge/version-0.2.0-orange.svg)](CHANGELOG.zh-CN.md)
 [![Tools](https://img.shields.io/badge/MCP%20Tools-95%20Total-0F766E.svg)](ai-adapter/tool-descriptors.json)
 [![API Scale](https://img.shields.io/badge/Atomic%20APIs-162%20Covered-2563EB.svg)](ai-adapter/command-boundary.json)
 [![Rollback Rate](https://img.shields.io/badge/Atomic%20Rollback-99.8%25%20(Zero--Dirty)-7C3AED.svg)](CHANGELOG.zh-CN.md)
@@ -20,39 +20,19 @@
 
 ## 功能全景核心能力看板
 
-<table>
-  <tr>
-    <td><strong>契约注册边界</strong></td>
-    <td><code>████████████████████</code> <strong>95 项</strong></td>
-    <td>91 项 C++ 原生命令与 4 项服务协同工具</td>
-  </tr>
-  <tr>
-    <td><strong>原子能力点规模</strong></td>
-    <td><code>█████████████████░░░</code> <strong>162 项</strong> (全开 189)</td>
-    <td>95 项统一契约多态覆盖 Archicad 官方 162 项原子能力</td>
-  </tr>
-  <tr>
-    <td><strong>官方 JSON 覆盖</strong></td>
-    <td><code>█████████████░░░░░░░</code> <strong>46 / 77 项</strong> (60%)</td>
-    <td>28 项 C++ 超集替代 + 18 项非几何受控透传 (AC30基准)</td>
-  </tr>
-  <tr>
-    <td><strong>生命周期操控</strong></td>
-    <td><code>████████████████░░░░</code> <strong>Q1 ～ Q4</strong></td>
-    <td>涵盖构造创建、读取、原位修改与拓扑求解闭环</td>
-  </tr>
-  <tr>
-    <td><strong>模型事务安全</strong></td>
-    <td><code>████████████████████</code> <strong>99.8%</strong></td>
-    <td>1mm 超差内核级原子回滚，147 项实测 100% 零残留</td>
-  </tr>
-</table>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/capability-panorama-bento-zh-dark.svg">
+    <img src=".github/assets/capability-panorama-bento-zh-light.svg" alt="MEPbridge v0.2.0 功能全景核心能力看板：95 项契约注册边界（91 项 C++ 原生命令 + 4 项服务协同工具）；原子能力点规模 162／189 项（86%）；官方 JSON API 覆盖 46／73 项（63%，全开 77）；Q1–Q4 生命周期操控覆盖率 91.2%（v0.1.9 89.1%）；99.8% 模型事务安全，1mm 超差内核级原子回滚。" width="100%">
+  </picture>
+</p>
 
 > 附注 —— 与官方 2,179 项 DevKit C/C++ API 的关系：本项目没有采用 1:1 穷举暴露，而是通过 95 个统一工具，对官方在建筑、机电、属性、视图中最高频、最具工程价值的 162 项原子能力 进行了高内聚的多态覆盖，避免了让大模型面对数千个零碎接口而产生决策幻觉。
 
 ## 发布范围与版本演进
 
-- 版本：`v0.1.9`（相比早期单版本，现已**全面覆盖 Archicad 28、29、30 三代主流版本**）；
+- 版本：`v0.2.0`（**Windows x64 构建与打包已完成，尚未发布**）。[v0.1.9 安装版本](https://github.com/bleufeng/mepbridge-acaistr/releases/tag/v0.1.9)仍可下载。
+- **当前验收边界**：Archicad 30 已通过 v0.2.0 选定范围的实机验收，包含主体基础建筑和固定分格幕墙编辑。Archicad 28／29 已完成对应构建并有引用证据，未执行全量原生实机验收。本版不提供 macOS 构建，macOS 支持延期。既有幕墙高度编辑仍不支持。
 - **能力规模演进**：契约覆盖能力从 v0.1.0 约 20 项、v0.1.6 80+ 项，跃升至当前 **162 项官方原子功能规模**；
 - **事务安全演化**：从初期基础调用无回滚，演化为统一内核 RAII 守卫与 **99.8% 事务回滚防线**；
 - **空间比对质检**：引入 **0.1mm 量化空间模型快照**与 A/B 差异审阅、修订云线自动圈注；

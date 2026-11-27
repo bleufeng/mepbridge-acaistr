@@ -21,6 +21,7 @@ const {
 } = require('./nl-param-extractors');
 
 const CONFIG_FILE = migrateLegacyFile('.llm-config.json');
+const llmConfigStore = require('./llm-config-store').createConfigStore({ file: CONFIG_FILE });
 // D.5: 加载 tool-descriptors.json 作为命令注册中心
 const DESCRIPTORS_FILE = path.join(__dirname, '../../ai-adapter/tool-descriptors.json');
 
@@ -53,42 +54,31 @@ class AIAdapter {
   }
 
   // 加载配置
-  loadConfig() {
+  loadConfig(snapshot) {
     try {
-      if (fs.existsSync(CONFIG_FILE)) {
-        const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-
-        if (config.disabled === true) {
-          console.log('[AI Adapter] LLM config is disabled, using fallback mode');
-          this.llm = null;
-          return;
-        }
-
-        // 解密 API 密钥
-        if (config.apiKey) {
-          config.apiKey = this.decrypt(config.apiKey);
-        }
-
-        // 根据类型初始化适配器
-        if (config.provider === 'ollama') {
-          const OllamaAdapter = require('./ollama-adapter');
-          this.llm = new OllamaAdapter(config);
-          console.log(`[AI Adapter] Loaded Ollama configuration`);
-        } else {
-          const LLMAdapter = require('./llm-adapter');
-          // D5: 传入 descriptors，让 LLMAdapter 能自动生成 systemPrompt
-          this.llm = new LLMAdapter({ ...config, descriptors: this.descriptors });
-          console.log(`[AI Adapter] Loaded ${config.provider} configuration with ${this.descriptors.length} descriptors`);
-        }
-      } else {
-        console.log('[AI Adapter] No LLM config found, using fallback mode');
+      snapshot ||= llmConfigStore.read();
+      const meta = llmConfigStore.metadata(snapshot);
+      if (!meta.configured || meta.disabled) {
         this.llm = null;
+        this.llmRuntimeState = { configId: meta.configId, provider: meta.provider, disabled: meta.disabled, status: meta.disabled ? 'DISABLED' : 'NOT_CONFIGURED', model: meta.model, effectiveEndpoint: meta.effectiveEndpoint };
+        return { ok: true, ...this.llmRuntimeState };
       }
+      const config = llmConfigStore.credentials(snapshot);
+      const adapter = config.provider === 'ollama'
+        ? new (require('./ollama-adapter'))({ ...config, endpoint: config.effectiveEndpoint })
+        : new (require('./llm-adapter'))({ ...config, endpoint: config.effectiveEndpoint, descriptors: this.descriptors });
+      this.llm = adapter;
+      this.llmRuntimeState = { configId: meta.configId, provider: config.provider, model: config.model, effectiveEndpoint: config.effectiveEndpoint, disabled: false, status: 'APPLIED' };
+      return { ok: true, ...this.llmRuntimeState };
     } catch (error) {
-      console.error('[AI Adapter] Config load error:', error.message);
       this.llm = null;
+      this.llmRuntimeState = { configId: snapshot?.configId || null, disabled: false, status: 'LOAD_FAILED', code: error.code || 'LLM_CONFIG_LOAD_FAILED' };
+      console.error('[AI Adapter] Config load failed:', this.llmRuntimeState.code);
+      return { ok: false, ...this.llmRuntimeState };
     }
   }
+
+  getLlmRuntimeState() { return { ...this.llmRuntimeState }; }
 
   // V2 H3.3: 记录执行步骤到历史
   recordExecution(step) {

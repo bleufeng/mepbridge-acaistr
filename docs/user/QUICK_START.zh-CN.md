@@ -1,17 +1,19 @@
-# MEPbridge ACAIstr v0.1.9 快速开始
+# MEPbridge ACAIstr v0.2.0 快速开始
 
-> 本文适用于 v0.1.9。
+> v0.2.0 仅提供 Windows x64 版本，不含 macOS 资产。Archicad 30 已通过 v0.2.0 选定验收范围；Archicad 28／29 产物已构建并登记引用，但其 v0.2.0 受影响用例**未执行**。
 
 ## 1. 安装
 
-从 GitHub Release 下载唯一的双语 `MACAI-Workbench-v0.1.9-win64.zip`。完整包内置 Node 便携运行时、生产依赖、`RELEASE_MANIFEST.json` 与 `SHA256SUMS.txt`，**无需另装 Node.js 或 npm**。首次安装不要使用 APX 更新 ZIP 或源码归档。
+使用唯一的双语 `MACAI-Workbench-v0.2.0-win64.zip`。完整包内置 Node 便携运行时、生产依赖、`RELEASE_MANIFEST.json` 与 `SHA256SUMS.txt`，**无需另装 Node.js 或 npm**。首次安装不要使用 APX 更新 ZIP 或源码归档。
 
-1. 从 Releases 下载并解压最新版本的完整发布 ZIP（Windows 会创建同名文件夹，属预期行为）。
+1. 下载发布 ZIP 并解压完整包（Windows 会创建同名文件夹，属预期行为）。
 2. 关闭 Archicad，进入解压出的文件夹，双击其中的 `Install-MEPBridge.cmd`（该文件夹是 Workbench 运行目录，装完勿删）。
 3. 按提示选择 Archicad 28、29 或 30，重新启动 Archicad。
 4. 点击“MEPbridge ACAIstr → 打开 MEPbridge ACAIstr”。
 
-手动安装和 MCP 配置参见[安装说明](INSTALL.zh-CN.md)。
+界面默认英文，可切换中文并记忆选择。
+
+手动安装、MCP 配置与 Local Add-On 处置参见[安装说明](INSTALL.zh-CN.md)。
 
 ## 2. 确认连接
 
@@ -39,7 +41,7 @@
 3. 按当前风险策略确认步骤。
 4. 执行并检查每一步结果。
 
-没有连接 LLM 时，Manual 模式、已导入模板和已配置的本地自定义命令仍可使用。
+LLM 连通状态与已保存端点／配置分别显示；显示已连接不代表当前使用的就是已保存端点。没有连接 LLM 时，Manual 模式、已导入模板和已配置的本地自定义命令仍可使用。
 
 ## 5. 视口结果
 
@@ -59,7 +61,14 @@
 - dry-run 仅代表参数和结构预检，不代表模型已发生修改。
 - 保持项目备份。
 
-## 8. 联系与反馈
+## 8. 已知限制与 Local Add-On
+
+- 既有幕墙高度编辑在写入前拒绝；新建高度与已验证分格编辑保留。
+- 灯具 GDL 参数写与 MEP 高级写入延期，并在分派前拒绝。
+- 不声明合规认证；不含生产级自动专业模型审核定义。
+- 安装程序报告 `MANUAL_LOCAL_MEPBRIDGE_ACTION_REQUIRED` 时，请关闭 Archicad，按所列精确 APX 路径／SHA 人工归档或移除后重新运行安装；不会自动覆盖、迁移或删除。
+
+## 9. 联系与反馈
 
 联系邮箱：`aizuxa@agent.qq.com`
 

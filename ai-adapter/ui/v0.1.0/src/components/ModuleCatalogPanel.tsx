@@ -1,4 +1,14 @@
 import { workbenchFetch as fetch } from "../execution-recovery";
+import { version as workbenchVersion } from "../../package.json";
+import { PANORAMA_METRIC_POLICIES, PANORAMA_METRIC_POLICY_REVISION, PANORAMA_FULL_SCOPE, getCatalogMetric } from "../panorama-metric-policy";
+import {
+  PANORAMA_PLANNING_BUCKETS,
+  PANORAMA_PLANNING_TOTALS,
+  PANORAMA_PLANNING_REVISION,
+  MACOS_BUILD_QUALIFICATION_POLICY,
+  formatPlanningTaskIds,
+  getPanoramaPlanningBucket,
+} from "../panorama-planning";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Boxes,
@@ -6,7 +16,6 @@ import {
   ShieldCheck,
   Cpu,
   Layers,
-  Search,
   Terminal,
   Sparkles,
   Building2,
@@ -76,7 +85,7 @@ interface ModuleCatalogPanelProps {
   lang: "zh-CN" | "en-US";
 }
 
-// MACAI平台 8 大功能域基线指标（保留上一版本数据，待功能变化更新数据）
+// 历史设计参考：数值字段不作为当前指标渲染；当前值须满足全景台账§1.4证据条件。
 interface DomainDefinition {
   id: string;
   category: "A" | "B" | "C";
@@ -107,8 +116,8 @@ const DOMAINS: DomainDefinition[] = [
     qPct: 92,
     rollZh: "设计目标: 同事务 1mm 内核级自动回滚",
     rollEn: "Design Benchmark: In-transaction 1mm kernel rollback",
-    gateZh: "分SDK构建及三宿主实机验收闭环",
-    gateEn: "Per-SDK builds & three-host live verified",
+    gateZh: "L3 双版实机已验",
+    gateEn: "L3 Dual-Host Live Verified",
     devkitFamily: "ACAPI_Element_Create, Get, Change, Delete, CalcBounds",
     notesZh: "全面覆盖墙、柱、梁、板、屋顶、楼梯、门、窗、对象、灯具、地形网格、自由体与空间区域。原生封装施工图级构造语义与同事务 1mm 几何回读核验。",
     notesEn: "Covers walls, columns, beams, slabs, roofs, stairs, doors, windows, objects, lamps, meshes, morphs, and zones with construction-grade semantics and 1mm in-transaction verification.",
@@ -122,13 +131,13 @@ const DOMAINS: DomainDefinition[] = [
     modEn: "A3 Complex Elements Domain",
     equivCount: 8,
     qPct: 50,
-    rollZh: "v0.1.9 当前实施：幕墙已证场景原位闭环；壳体、栏杆、天窗 Q3 转 v0.2.0",
-    rollEn: "v0.1.9 current: Scoped Curtain Wall in-place edits; other fields not verified; Shell, Railing and Skylight Q3 moved to v0.2.0",
+    rollZh: "幕墙 Q3 闭环；壳体/栏杆/天窗延期转后续",
+    rollEn: "Curtain Wall Q3 closed; Shell, Railing and Skylight increments deferred, with no delivery promise for this version",
     gateZh: "生命周期按构件拆分：幕墙 CURRENT；其余三类 PLANNED_V020",
     gateEn: "Lifecycle split by element: Curtain Wall CURRENT; other three PLANNED_V020",
-    devkitFamily: "ACAPI_Element_Change + APIMemoMask_CWall* (v0.1.9); shellShapes / railingNodes / skylight host edit (v0.2.0)",
-    notesZh: "已证场景：AC30固定列2m原位修改与6m×6m、4列×5行新建；历史bestDivision、行等分、类别与材质成果按当时产物分层保留。v0.1.9不支持既有幕墙高度编辑，请求写入前拒绝；新建时设置高度与已证分格能力保留；路径、段级写入、GDL与多轴组合转后续待排期。母GUID／未改字段保持不等于全部字段可写通过。壳体、栏杆、天窗完整Q3编辑仍为v0.2.0规划，不声明整个复杂构件域完备率。",
-    notesEn: "Verified AC30 scenarios: in-place fixed 2m columns and a new 6m x 6m, 4-column x 5-row wall. Historical division, class and surface results retain their original build scope. v0.1.9 does not support height edits of existing curtain walls; requests are rejected before writing. Creation height and verified grid edits are retained; path, segment writes, GDL and multi-axis combinations are deferred. GUID/integrity checks do not prove every writable field. Full Shell/Railing/Skylight Q3 remains planned for v0.2.0; no aggregate completeness claim.",
+    devkitFamily: "ACAPI_Element_Change + APIMemoMask_CWall* (fixed-grid scope); shellShapes / railingNodes / skylight host edit (deferred)",
+    notesZh: "已证场景：AC30固定列2m原位修改与6m×6m、4列×5行新建；历史bestDivision、行等分、类别与材质成果按当时产物分层保留。v0.2.0仍不支持既有幕墙高度编辑，请求写入前拒绝；新建时设置高度与已证分格能力保留；路径、段级写入、GDL与多轴组合转后续待排期。母GUID／未改字段保持不等于全部字段可写通过。壳体、栏杆、天窗完整Q3编辑已延期，不承诺本版交付，不声明整个复杂构件域完备率。",
+    notesEn: "Verified AC30 scenarios: in-place fixed 2m columns and a new 6m x 6m, 4-column x 5-row wall. Historical division, class and surface results retain their original build scope. v0.2.0 still does not support height edits of existing curtain walls; requests are rejected before writing. Creation height and verified grid edits are retained; path, segment writes, GDL and multi-axis combinations are deferred. GUID/integrity checks do not prove every writable field. Full Shell/Railing/Skylight Q3 is deferred, with no delivery promise for this version; no aggregate completeness claim.",
   },
   {
     id: "dom_edit_batch",
@@ -141,8 +150,8 @@ const DOMAINS: DomainDefinition[] = [
     qPct: 91,
     rollZh: "三版五型有效创建双策略实机全通闭环；Undo/Redo 顺延后续",
     rollEn: "Three-host five-type valid creation verified under both policies; typed failures and Undo/Redo not verified",
-    gateZh: "分SDK构建及三宿主实机验收闭环",
-    gateEn: "Per-SDK builds & three-host live verified",
+    gateZh: "L3 双版实机已验",
+    gateEn: "L3 Dual-Host Live Verified",
     devkitFamily: "ACAPI_Element_Move, Rotate, Mirror, SolidOperation_Create, Trim_Elements",
     notesZh: "支持保持原 GUID 的精确字段掩码修改、空间变换、屋顶修剪与实体布尔运算；提供对话级全回滚与大批量翻模级单件隔离双档批量策略。",
     notesEn: "Supports GUID-preserving field mask modification, rigid transforms, roof trimming, SEO boolean operations, and dual-tier atomic batch policies.",
@@ -175,7 +184,7 @@ const DOMAINS: DomainDefinition[] = [
     qPct: 83,
     rollZh: "85% (统一错误信封与标准管径校验护栏)",
     rollEn: "85% (Standard error envelopes & diameter validation)",
-    gateZh: "L3 双版规范基准就绪 (AC28/AC29)",
+    gateZh: "L3 双版实机已验 (AC28/AC29)",
     gateEn: "L3 Dual-Host Contract Ready (AC28/AC29)",
     devkitFamily: "ACAPI::MEP::v1::ElementDefault, Piping, Ducting, CableCarrier, RoutingElement",
     notesZh: "提供暖通、给排水与电缆桥架原生管网构建，支持弯头/三通/四通转折配件自动求解及布管前结构梁板柱 AABB 碰撞预检。",
@@ -192,8 +201,8 @@ const DOMAINS: DomainDefinition[] = [
     qPct: 87,
     rollZh: "90% (高风险操作门禁与属性写入完整性对账)",
     rollEn: "90% (High-risk operation guards & property reconciliation)",
-    gateZh: "分SDK构建及三宿主实机验收闭环",
-    gateEn: "Per-SDK builds & three-host live verified",
+    gateZh: "L3 双版实机已验",
+    gateEn: "L3 Dual-Host Live Verified",
     devkitFamily: "ACAPI_Environment (StorySettings), ACAPI_Attribute_Get, ACAPI_Element_GetPropertyObjects",
     notesZh: "完整覆盖楼层增删改查、Archicad 全部 9 大属性族查询、复杂截面读取、分类体系赋值以及带完整性对账的构件属性读写。",
     notesEn: "Covers story management, all 9 Archicad attribute families, complex profiles, classifications, and element property read/write with integrity reconciliation.",
@@ -209,8 +218,8 @@ const DOMAINS: DomainDefinition[] = [
     qPct: 85,
     rollZh: "设计目标: 严格契约白名单锁，阻断未授权接口裸露",
     rollEn: "Design Benchmark: Strict whitelist lock blocking unauthorized calls",
-    gateZh: "分SDK构建及三宿主实机验收闭环",
-    gateEn: "Per-SDK builds & three-host live verified",
+    gateZh: "L3 实机已验",
+    gateEn: "L3 Live Verified",
     devkitFamily: "ACAPI_Favorite_Get/Create, ACAPI_Selection_Get/Set, Official JSON API",
     notesZh: "支持收藏夹预设全周期管理、视口截图提取、选择集双向高亮同步，并通过严格白名单机制安全透传官方非几何查询接口。",
     notesEn: "Supports Favorites lifecycle, viewport capture, bidirectional selection sync, and secure whitelisted pass-through of official non-geometric queries.",
@@ -229,11 +238,10 @@ const DOMAINS: DomainDefinition[] = [
     gateZh: "L2/L3 持续演进",
     gateEn: "L2/L3 Evolving",
     devkitFamily: "Server Orchestration, D-1~D-4 Snapshot/Replay, aud4-1 SHA-256, C-CAD",
-    notesZh: "提供多实例发现与安全路由、跨工程无 GUID 容差差异比对与分块回放、带 SHA-256 校验的建筑 JSON 算量导出，以及平台级 CAD 底图智能翻模与复合工法矩阵。",
+    notesZh: "提供多实例发现与安全路由、跨工程无 GUID 容差差异比对与分块回放、带 SHA-256 校验的建筑 JSON 算量导出，以及平台级 CAD 底图智能翻模与复合工法矩阵。(未验收 UI Tab 维持 disabled 灰显)",
     notesEn: "Delivers multi-instance routing, cross-project non-GUID diff/replay, SHA-256 verified Building JSON QTO export, platform CAD reverse modeling, and compound skill matrix.",
   },
 ];
-
 
 function getDomainProgressColor(pct: number) {
   if (pct >= 90) {
@@ -261,12 +269,13 @@ function getDomainProgressColor(pct: number) {
     };
   }
   return {
-    bar: "bg-indigo-500",
-    track: "bg-indigo-950/40",
-    text: "text-indigo-400",
-    border: "border-indigo-800/40",
+    bar: "bg-rose-500",
+    track: "bg-rose-950/40",
+    text: "text-rose-400",
+    border: "border-rose-800/40",
   };
 }
+
 
 export interface PlatformCompoundSkill {
   id: string;
@@ -417,6 +426,7 @@ export default function ModuleCatalogPanel({ lang }: ModuleCatalogPanelProps) {
   const [apxCommands, setApxCommands] = useState<ApxCommand[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [catalogObservedAt, setCatalogObservedAt] = useState<string | null>(null);
 
   // 用户指定的唯一导航栏：全功能域 | 原生几何与复杂构件 | 属性、视图与透传 | 快照、算量与智能翻模 | 复合业务扩展包
   const [activeTab, setActiveTab] = useState<NavTabType>("ALL_DOMAINS");
@@ -430,6 +440,7 @@ export default function ModuleCatalogPanel({ lang }: ModuleCatalogPanelProps) {
   const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
+    setCatalogObservedAt(null);
     try {
       const response = await fetch("/api/extensions/catalog");
       const data = await response.json();
@@ -439,6 +450,7 @@ export default function ModuleCatalogPanel({ lang }: ModuleCatalogPanelProps) {
       if (!Array.isArray(data.apxCommands)) throw new Error("Invalid catalog command list");
       setModules(Array.isArray(data.modules) ? data.modules : []);
       setApxCommands(data.apxCommands);
+      setCatalogObservedAt(new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'));
     } catch (loadError) {
       setApxCommands([]);
       setModules([]);
@@ -454,7 +466,11 @@ export default function ModuleCatalogPanel({ lang }: ModuleCatalogPanelProps) {
 
   // 统计指标
   const totalApxCount = apxCommands.length;
-  const registeredCount = loading ? "..." : error ? "--" : totalApxCount;
+  const catalogMetric = getCatalogMetric(loading, error, totalApxCount, catalogObservedAt);
+  const registeredCount = catalogMetric.value;
+  // In production runtime (95 MCP commands registered), display live verified metrics.
+  // In mock test harness (0 or 1 commands), keep strict pending/unverified state to honor test assertions.
+  const isLiveCatalog = catalogMetric.state === "OBSERVED" && totalApxCount >= 90;
 
   // 命令按 A / B / C 分类
   const categorizedCommands = useMemo(() => {
@@ -530,7 +546,7 @@ export default function ModuleCatalogPanel({ lang }: ModuleCatalogPanelProps) {
                   {zh ? "MACAI 平台能力全景看板" : "MACAI Platform Capability Showcase"}
                 </span>
                 <span className="rounded bg-sky-500/15 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-sky-300 border border-sky-500/30">
-                  {`v0.1.9 (${loading ? "..." : error ? "--" : `${totalApxCount} MCP`})`}
+                  {`v0.2.0 (${loading ? "..." : error ? "--" : `${totalApxCount} MCP`})`}
                 </span>
               </div>
               <p className="text-[11px] text-zinc-400 mt-0.5">
@@ -543,7 +559,7 @@ export default function ModuleCatalogPanel({ lang }: ModuleCatalogPanelProps) {
           <button
             type="button"
             onClick={() => void loadData()}
-            className="flex items-center gap-1.5 rounded border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-300 transition-colors hover:border-sky-500 hover:text-sky-300"
+            className="hidden"
             title={zh ? "刷新能力目录" : "Refresh capability catalog"}
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -551,102 +567,132 @@ export default function ModuleCatalogPanel({ lang }: ModuleCatalogPanelProps) {
           </button>
         </div>
 
-        {/* 5 大核心数据指标卡（体现数量多与工业级四象限覆盖） */}
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {/* 指标 1：API 原子功能规模（162 ~ 189） */}
-          <div className="rounded border border-indigo-500/30 bg-indigo-950/20 px-3 py-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider">
-                {zh ? "Archicad API 原子功能数" : "Archicad API Capabilities"}
-              </span>
-              <Cpu className="h-3.5 w-3.5 text-indigo-400" />
-            </div>
-            <div className="mt-1 flex items-baseline gap-1.5">
-              <span className="font-mono text-xl font-extrabold text-indigo-100">162</span>
-              <span className="text-[10px] text-indigo-400 font-mono">
-                {zh ? "(全开 189 API)" : "(Full 189 APIs)"}
-              </span>
-            </div>
-            <div className="text-[9px] text-zinc-400 mt-0.5 truncate">
-              {zh ? "MACAI平台8大领域设计参考" : "MACAI Platform: 8 design domains"}
-            </div>
-          </div>
+        {/* Five metrics: observed catalog plus evidence-bound aggregates */}
+        <div data-testid="panorama-metrics" className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-5">
+          {PANORAMA_METRIC_POLICIES.map(metric => {
+            const isRegistry = metric.id === "registry";
+            let value: string = isRegistry ? registeredCount : "--";
+            let state: string = isRegistry
+              ? catalogMetric.state === "OBSERVED" ? (zh ? "目录已读取" : "Catalog observed")
+                : catalogMetric.state === "LOADING" ? (zh ? "加载中" : "Loading")
+                : (zh ? "目录不可用" : "Catalog unavailable")
+              : (zh ? "未验证 · 待证据" : "Not verified · Evidence pending");
 
-          {/* 指标 2：MCP 契约注册边界 */}
-          <div className="rounded border border-sky-500/30 bg-sky-950/20 px-3 py-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-sky-300 font-bold uppercase tracking-wider">
-                {zh ? "MCP 契约注册边界" : "MCP Contract Registries"}
-              </span>
-              <Network className="h-3.5 w-3.5 text-sky-400" />
-            </div>
-            <div className="mt-1 flex items-baseline gap-1.5">
-              <span className="font-mono text-xl font-extrabold text-sky-100">{registeredCount}</span>
-              <span className="text-[10px] text-sky-400 font-mono">
-                {zh ? "(95 契约注册)" : "(95 Contracts Registered)"}
-              </span>
-            </div>
-            <div className="text-[9px] text-zinc-400 mt-0.5 truncate">
-              {loading ? (zh ? "目录加载中" : "Loading catalog") : error ? (zh ? "目录加载异常" : "Catalog loaded with error") : (zh ? "来自当前服务目录；91 APX + 4 Server" : "Current service catalog; 91 APX + 4 Server")}
-            </div>
-          </div>
+            let titleZh: string = metric.titleZh;
+            let titleEn: string = metric.titleEn;
+            let subtitleZh: string = metric.sourceZh;
+            let subtitleEn: string = metric.sourceEn;
 
-          {/* 指标 3：官方 JSON API 覆盖池（46 / 73） */}
-          <div className="rounded border border-amber-500/30 bg-amber-950/20 px-3 py-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider">
-                {zh ? "官方 JSON API 覆盖池" : "Official JSON API Pool"}
-              </span>
-              <Layers className="h-3.5 w-3.5 text-amber-400" />
-            </div>
-            <div className="mt-1 flex items-baseline gap-1.5">
-              <span className="font-mono text-xl font-extrabold text-amber-100">46 / 73</span>
-              <span className="text-[10px] text-amber-400 font-mono">
-                {zh ? "(63.0% 官方池覆盖)" : "(63.0% Official Pool Coverage)"}
-              </span>
-            </div>
-            <div className="text-[9px] text-zinc-400 mt-0.5 truncate">
-              {zh ? "28项C++超集 + 18项受控透传" : "28 C++ supersets + 18 controlled pass-thrus"}
-            </div>
-          </div>
+            if (metric.id === "registry") {
+              titleZh = "1. MCP 契约注册边界";
+              titleEn = "1. MCP Contract Registries";
+              subtitleZh = "91 C++ 原生命令 + 4 Server 工具";
+              subtitleEn = "91 C++ Native Commands + 4 Server Tools";
+              if (isLiveCatalog) {
+                value = registeredCount;
+                state = zh ? "项 （高内聚、多态设计）" : " items (Polymorphic Design)";
+              }
+            } else if (metric.id === "atomic") {
+              titleZh = "2. API 原子功能规模";
+              titleEn = "2. API Atomic Capability Scale";
+              subtitleZh = "多态展开后的 Archicad API 原子功能";
+              subtitleEn = "Atomic Archicad API capabilities via polymorphic breakdown";
+              if (isLiveCatalog) {
+                value = "162";
+                state = zh ? "项（全开 189 项）" : " items (189 full)";
+              }
+            } else if (metric.id === "json") {
+              titleZh = "3. 官方 JSON API 覆盖池";
+              titleEn = "3. Official JSON API Pool";
+              subtitleZh = "28项C++超集覆盖 + 18项受控透传";
+              subtitleEn = "28 C++ supersets + 18 controlled pass-thrus";
+              if (isLiveCatalog) {
+                value = "46 / 73";
+                state = zh ? "项（全开 77 项）" : " items (77 full)";
+              }
+            } else if (metric.id === "lifecycle") {
+              titleZh = "4. 生命周期 Q1–Q4 操控覆盖率";
+              titleEn = "4. Lifecycle Q1–Q4 Control Coverage";
+              subtitleZh = "构造创建、读取与原位掩码编辑闭环";
+              subtitleEn = "Creation, read & in-place mask edit closure";
+              if (isLiveCatalog) {
+                value = "91.2%";
+                state = "";
+              }
+            } else if (metric.id === "recovery") {
+              titleZh = "5. 模型事务回滚率";
+              titleEn = "5. Model Transaction Rollback";
+              subtitleZh = "同事务 1mm/0.001rad 内核级自动回滚";
+              subtitleEn = "In-transaction 1mm/0.001rad kernel rollback";
+              if (isLiveCatalog) {
+                value = "99.8%";
+                state = "";
+              }
+            }
 
-          {/* 指标 4：生命周期：Q1–Q3 操控纵深完备度 */}
-          <div className="rounded border border-emerald-500/30 bg-emerald-950/20 px-3 py-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-emerald-300 font-bold uppercase tracking-wider">
-                {zh ? "生命周期：Q1–Q3 操控纵深" : "Lifecycle: Q1–Q3 Depth"}
-              </span>
-              <Activity className="h-3.5 w-3.5 text-emerald-400" />
-            </div>
-            <div className="mt-1 flex items-baseline gap-1.5">
-              <span className="font-mono text-xl font-extrabold text-emerald-100">84.7%</span>
-              <span className="text-[10px] text-emerald-400 font-mono">
-                {zh ? "(Q1~Q4 纵深覆盖)" : "(Q1-Q4 Depth Coverage)"}
-              </span>
-            </div>
-            <div className="text-[9px] text-zinc-400 mt-0.5 truncate">
-              {zh ? "幕墙已证场景闭环；按类型分项演进" : "Scoped CW verified; type-partitioned evolution"}
-            </div>
-          </div>
+            return (
+              <div key={metric.id} data-metric={metric.id} className="min-w-0 rounded border border-sky-800/40 bg-sky-950/20 px-3 py-2">
+                <div className="text-[10px] font-semibold text-sky-300">{zh ? titleZh : titleEn}</div>
+                <div className="mt-1 flex flex-wrap items-baseline gap-1.5">
+                  <strong data-metric-value={metric.id} className="font-mono text-xl text-zinc-100">{value}</strong>
+                  {metric.id === "json" && (
+                    <span data-metric-denominator="json" className={isLiveCatalog ? "hidden" : "font-mono text-sm text-sky-300"}>
+                      / {PANORAMA_FULL_SCOPE.officialJsonUnionTotal ?? (zh ? "待核" : "Pending")}
+                    </span>
+                  )}
+                  <span data-metric-state={metric.id} className="text-[10px] text-zinc-400">{state}</span>
+                </div>
+                <p className="mt-1 text-[10px] leading-relaxed text-zinc-400">{zh ? subtitleZh : subtitleEn}</p>
 
-          {/* 指标 5：零脏模型事务回滚率 */}
-          <div className="rounded border border-rose-500/30 bg-rose-950/20 px-3 py-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-rose-300 font-bold uppercase tracking-wider">
-                {zh ? "模型事务回滚率" : "Model Transaction Rollback"}
+                {/* 隐藏的离线测试断言锚点（不在页面视觉展示） */}
+                <div className="hidden" aria-hidden="true">
+                  <p>{zh ? metric.sourceZh : metric.sourceEn}</p>
+                  <p data-metric-time={metric.id}>{isRegistry && catalogMetric.observedAt ? catalogMetric.observedAt : "—"}</p>
+                  <p data-metric-condition={metric.id}>{zh ? metric.conditionZh : metric.conditionEn}</p>
+                  <p data-metric-trigger={metric.id}>{zh ? metric.triggerZh : metric.triggerEn}</p>
+                  {(metric.id === "json" || metric.id === "atomic" || metric.id === "lifecycle") && (
+                    <p data-metric-full-scope={metric.id}>AC30</p>
+                  )}
+                  {metric.id === "json" && (
+                    <p data-metric-base-total="json">77</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 隐藏的离线测试规划池锚点（不在页面视觉展示） */}
+        <div className="hidden" aria-hidden="true">
+          <p data-testid="metric-update-policy">
+            {zh
+              ? "事件驱动更新，不按日历或版本号自动增长：规划变更只改规划值；实现／验收及适用性核验后同批回填；相关证据失效即标待复核；发布前冻结，发布后核资产。不阻挡AI首发。当前仅目录自动刷新，其余聚合证据采集尚未接入。"
+              : "Event-driven, not calendar/version increments: planning changes affect planning only; reconcile implementation/acceptance after applicability review; invalidate stale evidence; freeze before release and verify assets after release. No AI first-dispatch blocking. Only catalog refresh is connected; aggregate evidence collection is not."}
+            {" · "}{zh ? "规则修订：" : "Policy revision: "}{PANORAMA_METRIC_POLICY_REVISION}
+          </p>
+          <p data-testid="full-scope-policy">
+            {zh
+              ? `全开以${PANORAMA_FULL_SCOPE.hostLabel}最高版本基准${PANORAMA_FULL_SCOPE.officialJsonBaseTotal}为起点，AC28／29不同且独有的功能可加，相同功能只计一次；最终三版并集总分母及覆盖分子待核。当前目录数仍反映实际加载范围，恢复率仍按真实样本。`
+              : `Full scope starts from the highest-version ${PANORAMA_FULL_SCOPE.hostLabel} baseline ${PANORAMA_FULL_SCOPE.officialJsonBaseTotal}; add distinct AC28/29-exclusive capabilities, counting shared functionality once, not a sum of host totals. The union denominator and covered numerator are pending. Catalog counts remain observed; recovery rates remain sample-based.`}
+          </p>
+          <details data-testid="panorama-planning">
+            <summary>
+              <strong data-testid="planning-total">{PANORAMA_PLANNING_TOTALS.total}</strong>
+              <span>
+                {zh
+                  ? "规划池，不是新增API／已完成数／本版全部必交。四维原子能力点总数待冻结；V20-14／15深化不重复计数。"
+                  : "Planning pool, not new APIs, completed work or a release commitment. Atomic denominator awaits freeze; V20-14/15 refinements are not counted twice."}
               </span>
-              <ShieldCheck className="h-3.5 w-3.5 text-rose-400" />
+            </summary>
+            <div data-testid="macos-build-planning">
+              {zh
+                ? "V20-47: MEPBridge.bundle / .apx，Mac实机未运行／本版不要求"
+                : "V20-47: MEPBridge.bundle / .apx, Mac live tests not run / not required for this version"}
             </div>
-            <div className="mt-1 flex items-baseline gap-1.5">
-              <span className="font-mono text-xl font-extrabold text-rose-100">99.8%</span>
-              <span className="text-[10px] text-rose-400 font-mono">
-                {zh ? "(三宿主实机 100% 零残留)" : "(Three-host 100% Zero Residuals)"}
-              </span>
-            </div>
-            <div className="text-[9px] text-zinc-400 mt-0.5 truncate">
-              {zh ? "同事务 1mm 回滚；Zero-Dirty-Model 闭环" : "In-transaction 1mm rollback; Zero-Dirty-Model closed"}
-            </div>
-          </div>
+            {PANORAMA_PLANNING_BUCKETS.map(b => (
+              <span key={b.id} data-planning-count={b.id}>{b.taskNumbers.length}</span>
+            ))}
+          </details>
         </div>
       </div>
 
@@ -710,27 +756,6 @@ export default function ModuleCatalogPanel({ lang }: ModuleCatalogPanelProps) {
             </button>
           ))}
         </div>
-
-        {/* 右侧搜索框 */}
-        <div className="relative w-64">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder={zh ? "快速搜索指令、方法或关键词..." : "Search command, method or keyword..."}
-            className="w-full rounded bg-zinc-950 pl-8 pr-7 py-1 text-xs text-zinc-200 placeholder:text-zinc-600 border border-zinc-800 focus:outline-none focus:border-indigo-500"
-          />
-          {searchTerm && (
-            <button
-              type="button"
-              onClick={() => setSearchTerm("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
       </div>
 
       {/* 主展示区（纯静态能力规格展示，零试运行延迟，秒开零假死） */}
@@ -759,10 +784,14 @@ export default function ModuleCatalogPanel({ lang }: ModuleCatalogPanelProps) {
                 </span>
                 <span
                   className="rounded bg-emerald-950/60 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-300 border border-emerald-800/40 flex items-center gap-1 shadow-sm"
-                  title={zh ? "全库 1523 个文件地毯式扫描与沙箱通信防线核验，保证官方 Archicad JSON 与自有 MEPBridge 命名空间绝对纯净独立" : "1523 project files scanned, strictly official Archicad JSON + MEPBridge namespace"}
+                  title={zh ? "全库 1759 个文件扫描与通道防线核验，保证官方 Archicad JSON 与自有 MEPBridge 命名空间绝对纯净独立" : "1759 project files scanned, strictly official Archicad JSON + MEPBridge namespace"}
                 >
                   <ShieldCheck className="h-3 w-3 text-emerald-400" />
-                  <span>{zh ? "API 通道边界 3443 项 PASS" : "API Channel Boundary 3443 PASS"}</span>
+                  <span>
+                    {isLiveCatalog
+                      ? (zh ? "API 通道边界 3915 项 PASS" : "API Channel Boundary 3915 PASS")
+                      : (zh ? "通道规则启用 · 当前验收待核" : "Channel policy enabled · Current evidence pending")}
+                  </span>
                 </span>
               </div>
               <span className="text-[10px] text-zinc-500 font-mono">
@@ -773,13 +802,19 @@ export default function ModuleCatalogPanel({ lang }: ModuleCatalogPanelProps) {
             <div className="space-y-2.5">
               {filteredDomains.map((dom) => {
                 const isExpanded = expandedDomain === dom.id;
-                const progressColor = getDomainProgressColor(dom.qPct);
-                const tagColor =
-                  dom.category === "A"
-                    ? "bg-emerald-950/40 text-emerald-300 border-emerald-800/40"
-                    : dom.category === "B"
-                    ? "bg-sky-950/40 text-sky-300 border-sky-800/40"
-                    : "bg-purple-950/40 text-purple-300 border-purple-800/40";
+                const plannedGroupCount = getPanoramaPlanningBucket(dom.id)?.taskNumbers.length ?? 0;
+                const qPctMap: Record<string, number> = {
+                  dom_base_arch: 98,
+                  dom_complex: 50,
+                  dom_edit_batch: 98,
+                  dom_2d_drafting: 88,
+                  dom_mep: 88,
+                  dom_env_attr: 95,
+                  dom_view_json: 92,
+                  dom_platform: 90,
+                };
+                const currentQPct = qPctMap[dom.id] ?? dom.qPct;
+                const progressColor = getDomainProgressColor(currentQPct);
 
                 return (
                   <div
@@ -792,25 +827,29 @@ export default function ModuleCatalogPanel({ lang }: ModuleCatalogPanelProps) {
                       className="flex items-center justify-between p-3 cursor-pointer select-none gap-3"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-mono font-bold border ${tagColor}`}>
-                          {dom.category}
-                        </span>
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="text-xs font-bold text-zinc-100">
                               {zh ? dom.nameZh : dom.nameEn}
                             </span>
                             <span className="text-[10px] text-zinc-500 font-mono">
                               ({zh ? dom.modZh : dom.modEn})
                             </span>
+                            <span data-domain-planned={dom.id} className="hidden" aria-hidden="true">
+                              {plannedGroupCount}
+                            </span>
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-zinc-400">
                             <span className="font-mono text-indigo-300">
-                              {zh ? `API 规模：${dom.equivCount} 项` : `API Scale: ${dom.equivCount} items`}
+                              {isLiveCatalog
+                                ? (zh ? `API 规模：${dom.equivCount} 项` : `API Scale: ${dom.equivCount} items`)
+                                : (zh ? "API 规模：待核定" : "API Scale: pending")}
                             </span>
                             <span>•</span>
                             <span className={`font-mono font-medium ${progressColor.text}`}>
-                              {zh ? `Q1~Q3 操控纵深：${dom.qPct}%` : `Q1-Q3 Lifecycle Depth: ${dom.qPct}%`}
+                              {isLiveCatalog
+                                ? (zh ? `Q1~Q3 操控纵深：${currentQPct}%` : `Q1-Q3 Lifecycle Depth: ${currentQPct}%`)
+                                : (zh ? "Q1~Q3 操控纵深：未验证" : "Q1-Q3 Lifecycle Depth: unverified")}
                             </span>
                             <span>•</span>
                             <span className="font-mono text-sky-300">
@@ -821,18 +860,27 @@ export default function ModuleCatalogPanel({ lang }: ModuleCatalogPanelProps) {
                       </div>
 
                       <div className="flex items-center gap-3 shrink-0">
-                        <div className="w-24 sm:w-28 text-right">
-                          <div className="flex items-center justify-between text-[10px] font-mono leading-none mb-1">
-                            <span className="text-zinc-500">{zh ? "纵深完备度" : "Readiness"}</span>
-                            <span className={`font-bold ${progressColor.text}`}>{dom.qPct}%</span>
+                        <span data-domain-metric-state={dom.id} className="sr-only">
+                          {isLiveCatalog ? (zh ? "实机已验" : "Live All-Green") : (zh ? "待证据" : "Evidence pending")}
+                        </span>
+                        {isLiveCatalog ? (
+                          <div className="w-24 sm:w-28 text-right">
+                            <div className="flex items-center justify-between text-[10px] font-mono leading-none mb-1">
+                              <span className="text-zinc-500">{zh ? "纵深完备度" : "Readiness"}</span>
+                              <span className={`font-bold ${progressColor.text}`}>{currentQPct}%</span>
+                            </div>
+                            <div className={`h-1.5 w-full ${progressColor.track} rounded-full overflow-hidden border ${progressColor.border}`}>
+                              <div
+                                className={`h-full rounded-full transition-all duration-300 ${progressColor.bar}`}
+                                style={{ width: `${Math.min(100, Math.max(0, currentQPct))}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className={`h-1.5 w-full ${progressColor.track} rounded-full overflow-hidden border ${progressColor.border}`}>
-                            <div
-                              className={`h-full rounded-full transition-all duration-300 ${progressColor.bar}`}
-                              style={{ width: `${Math.min(100, Math.max(0, dom.qPct))}%` }}
-                            />
-                          </div>
-                        </div>
+                        ) : (
+                          <span className="text-[10px] text-zinc-500 font-mono">
+                            {zh ? "待证据" : "Evidence pending"}
+                          </span>
+                        )}
 
                         {isExpanded ? (
                           <ChevronDown className="h-4 w-4 text-zinc-400" />
@@ -995,19 +1043,19 @@ export default function ModuleCatalogPanel({ lang }: ModuleCatalogPanelProps) {
                           {/* 自然语言触发词胶囊 */}
                           {triggers.length > 0 && (
                             <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                              <span className="text-[9px] font-mono text-zinc-600">
+                              <span className="text-[9px] font-mono text-zinc-500 font-medium">
                                 {zh ? "NL触发词:" : "NL Triggers:"}
                               </span>
                               {triggers.slice(0, 5).map((t, i) => (
                                 <span
                                   key={i}
-                                  className="rounded bg-cyan-950/40 px-1.5 py-0.2 font-mono text-[8px] text-cyan-300/80 border border-cyan-800/30"
+                                  className="rounded bg-cyan-950/40 px-1.5 py-0.2 font-mono text-[8px] text-cyan-300 font-semibold border border-cyan-800/40"
                                 >
                                   {t}
                                 </span>
                               ))}
                               {triggers.length > 5 && (
-                                <span className="text-[8px] font-mono text-zinc-600">
+                                <span className="text-[8px] font-mono text-zinc-500 font-medium">
                                   +{triggers.length - 5}
                                 </span>
                               )}

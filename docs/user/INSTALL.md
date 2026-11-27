@@ -1,10 +1,10 @@
-# MEPbridge ACAIstr v0.1.9 Installation
+# MEPbridge ACAIstr v0.2.0 Installation
 
-> This guide covers v0.1.9. Download the approved ZIP from the GitHub Release. The complete package carries `RELEASE_MANIFEST.json` and `SHA256SUMS.txt` for payload verification.
+> v0.2.0 is Windows x64 only; no macOS asset is delivered. Archicad 30 passed the selected v0.2.0 acceptance scope. The Archicad 28 and 29 binaries are built and referenced, but their affected v0.2.0 cases were **not run**; installation does not by itself certify any binary.
 
 This guide applies to Archicad 28, 29, and 30 on Windows x64.
 
-For a first installation or cross-component upgrade, download the single bilingual `MACAI-Workbench-v0.1.9-win64.zip`. Do not use an APX update ZIP or GitHub-generated source archive as a full installer.
+For a first installation or cross-component upgrade, use the single bilingual `MACAI-Workbench-v0.2.0-win64.zip`. Do not use an APX update ZIP or GitHub-generated source archive as a full installer.
 
 ## Requirements
 
@@ -36,9 +36,9 @@ runtime\runtime-manifest.json
 The installer deploys the matching APX. Existing complete installations may use these APX update ZIPs only when the Release explicitly allows an APX-only update:
 
 ```text
-MEPbridge-apx-AC28-v0.1.9-win64.zip
-MEPbridge-apx-AC29-v0.1.9-win64.zip
-MEPbridge-apx-AC30-v0.1.9-win64.zip
+MEPbridge-apx-AC28-v0.2.0-win64.zip
+MEPbridge-apx-AC29-v0.2.0-win64.zip
+MEPbridge-apx-AC30-v0.2.0-win64.zip
 ```
 
 Each update ZIP contains one root-level `MEPBridge.apx` and no Workbench, runtime, dependencies, or installer. First installations must use the full package.
@@ -249,8 +249,8 @@ Example:
 {
   "mcpServers": {
     "mepbridge-acaistr": {
-      "command": "D:\\MACAI-Workbench-v0.1.9-win64\\runtime\\node\\node.exe",
-      "args": ["D:\\MACAI-Workbench-v0.1.9-win64\\tools\\mepbridge-mcp-server.js"],
+      "command": "D:\\MACAI-Workbench-v0.2.0-win64\\runtime\\node\\node.exe",
+      "args": ["D:\\MACAI-Workbench-v0.2.0-win64\\tools\\mepbridge-mcp-server.js"],
       "env": {
         "MEPBRIDGE_ENDPOINT": "http://127.0.0.1:19780"
       }
@@ -263,7 +263,7 @@ Example:
 
 `D:\MEPbridge-ACAIstr\` in the example is a placeholder. Replace it with your own extraction
 directory, for example
-`D:\\MACAI-Workbench-v0.1.9-win64\\tools\\mepbridge-mcp-server.js` (use the actual
+`D:\\MACAI-Workbench-v0.2.0-win64\\tools\\mepbridge-mcp-server.js` (use the actual
 extracted folder name). Note that Windows
 backslashes inside JSON must be escaped as `\\`.
 
@@ -316,6 +316,19 @@ User templates, custom commands, LLM configuration, learning memory, and audit d
 
 Use `MEPBRIDGE_DATA_DIR` to select another writable location. Do not store user data in the Archicad installation folder or extracted release directory.
 
+## Language and LLM behavior
+
+- English is the default UI language; Chinese can be switched in the interface and the choice is remembered.
+- LLM connectivity state and the saved endpoint/configuration are displayed separately. A connected state does not prove that the saved endpoint is the endpoint currently used.
+- Without an LLM connection, Manual mode, imported templates, and configured local custom commands remain available.
+
+## Local Add-On safeguard
+
+If the installer finds a MEPBridge Add-On at a non-canonical or user-local location, it stops instead of
+overwriting it and reports `MANUAL_LOCAL_MEPBRIDGE_ACTION_REQUIRED` together with the exact path and
+SHA-256. Close Archicad, archive or remove that exact `MEPBridge.apx` manually, then rerun the installer.
+Neither the installer nor the uninstaller automatically overwrites, migrates, or deletes a Local Add-On.
+
 ## Uninstall
 
 1. Save your work and close Archicad.
@@ -326,7 +339,7 @@ The default uninstall removes the APX but preserves user data. Workbench menu co
 
 ## Version Update
 
-**Upgrading from v0.1.8 or earlier to v0.1.9 requires a full-package update.** v0.1.9 introduces the single bilingual package, bundled runtime, and AC30 asset. Do not update only the APX or overwrite an old extraction directory.
+**Upgrading from v0.1.9 or earlier to v0.2.0 requires a full-package update.** v0.2.0 updates the Workbench UI, Server, descriptor boundary metadata, and Add-On binaries. Do not update only the APX or overwrite an old extraction directory.
 
 Users with a previous version installed can update as follows:
 
@@ -334,7 +347,7 @@ Users with a previous version installed can update as follows:
 
 Use this when the Server, UI, MCP Server, or dependencies have changed.
 
-1. Download `MACAI-Workbench-v0.1.9-win64.zip` from the GitHub Release. After extraction, retain and use the included `RELEASE_MANIFEST.json` and `SHA256SUMS.txt` for payload verification.
+1. Download `MACAI-Workbench-v0.2.0-win64.zip` from the GitHub Release. After extraction, retain and use the included `RELEASE_MANIFEST.json` and `SHA256SUMS.txt` for payload verification.
 2. Save your work and close Archicad.
 3. Extract the new ZIP to a fresh directory (keep the old directory for rollback).
 4. Double-click `Install-MEPBridge.cmd` in the new directory.
@@ -382,6 +395,9 @@ User data is generally compatible across versions; if a data format incompatibil
 
 Use a test or backed-up PLN before running write, delete, batch, or geometry-changing commands.
 
-## v0.1.9 capability limitation
+## v0.2.0 known limitations
 
-v0.1.9 does **not support height edits of existing curtain walls**. Height-only or combined height/grid requests are rejected before writing, with no automatic delete/recreate fallback. **Creation height and verified grid edits remain available.** Installing a separate Node.js runtime or DevKit does not enable this capability.
+- Height edits of existing curtain walls are **not supported**: height-only or combined height/grid requests are rejected before writing, with no automatic delete/recreate fallback. **Creation height and verified grid edits remain available.** Installing a separate Node.js runtime or DevKit does not enable this capability.
+- Lamp GDL parameter writes and advanced MEP writes are deferred and rejected before dispatch; existing stable operations and read-only analysis remain available.
+- No compliance certification is claimed, and no production automatic professional model-audit definition is included; approved check definitions remain 0.
+- G5 rollback probes, internal test builds, and source archives are not delivery assets.

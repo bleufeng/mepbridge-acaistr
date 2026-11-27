@@ -56,7 +56,12 @@ class ModelAuditStore {
     const key=projectKey(project);if(!run||run.projectKey!==require('./model-audit-engine').identity(project)||typeof run.runId!=='string'||!['COMPLETED','PARTIAL','CANCELLED'].includes(run.taskState)||!Array.isArray(run.results))throw Error('AUDIT_INVALID_RUN');
     return this._change(state=>{if(state.runs.some(entry=>entry.run.runId===run.runId))throw Error('AUDIT_RUN_ALREADY_STORED');state.runs.push({projectFingerprint:key,sessionId:project.sessionId,run:clone(run)});return{stored:true};});
   }
-  evidence(project,runId) {const key=projectKey(project),state=this._read();return{run:clone(review.findRun(state,key,runId)),review:clone(review.reviewView(state,key,runId))};}
+  evidence(project,runId) {
+    const key=projectKey(project),state=this._read();
+    const run=clone(review.findRun(state,key,runId));
+    if(run&&Array.isArray(run.results)){for(const r of run.results)if(!r.requirementLevel)r.requirementLevel='UNRECORDED';}
+    return{run,review:clone(review.reviewView(state,key,runId))};
+  }
   recordReview(project,{runId,guid,ruleId,evidenceHash,resultHash,expectedRevision,disposition,reviewerLabel,reason,confirmed}={}) {
     const key=projectKey(project);
     if(confirmed!==true||!Number.isSafeInteger(expectedRevision)||expectedRevision<0||!review.DISPOSITIONS.includes(disposition)||!review.text(reviewerLabel,200)||!review.text(reason,4000))throw Error('AUDIT_REVIEW_CONFIRMATION_AND_REASON_REQUIRED');
@@ -69,6 +74,13 @@ class ModelAuditStore {
       return review.reviewView(state,key,runId);
     });
   }
-  history(project) {const key=projectKey(project);return this._read().runs.filter(entry=>entry.projectFingerprint===key).map(entry=>({...clone(entry.run),historicalSession:entry.sessionId!==project.sessionId,historyStored:true}));}
+  history(project) {
+    const key=projectKey(project);
+    return this._read().runs.filter(entry=>entry.projectFingerprint===key).map(entry=>{
+      const run=clone(entry.run);
+      if(run&&Array.isArray(run.results)){for(const r of run.results)if(!r.requirementLevel)r.requirementLevel='UNRECORDED';}
+      return{...run,historicalSession:entry.sessionId!==project.sessionId,historyStored:true};
+    });
+  }
 }
 module.exports={ModelAuditStore,projectKey};
