@@ -31,7 +31,7 @@
 
 ## 发布范围与版本演进
 
-- 版本：`v0.2.0`（**Windows x64 构建与打包已完成，尚未发布**）。[v0.1.9 安装版本](https://github.com/bleufeng/mepbridge-acaistr/releases/tag/v0.1.9)仍可下载。
+- 版本：`v0.2.0`（**已于 2026-11-27 发布，Windows x64**）。可下载 [v0.2.0 安装版本](https://github.com/bleufeng/mepbridge-acaistr/releases/tag/v0.2.0)；[v0.1.9 安装版本](https://github.com/bleufeng/mepbridge-acaistr/releases/tag/v0.1.9)仍可下载。
 - **当前验收边界**：Archicad 30 已通过 v0.2.0 选定范围的实机验收，包含主体基础建筑和固定分格幕墙编辑。Archicad 28／29 已完成对应构建并有引用证据，未执行全量原生实机验收。本版不提供 macOS 构建，macOS 支持延期。既有幕墙高度编辑仍不支持。
 - **能力规模演进**：契约覆盖能力从 v0.1.0 约 20 项、v0.1.6 80+ 项，跃升至当前 **162 项官方原子功能规模**；
 - **事务安全演化**：从初期基础调用无回滚，演化为统一内核 RAII 守卫与 **99.8% 事务回滚防线**；

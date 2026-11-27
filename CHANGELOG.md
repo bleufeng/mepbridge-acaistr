@@ -4,9 +4,13 @@ Public user-facing changes. Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-11-10
+### Documentation
 
-**Development version increment — not a published Release.** The maintainer authorized the source version to advance from 0.1.9 to 0.2.0 before the next build (minor impact). VERSION, package/lockfile metadata, command-boundary metadata, bilingual guides and current version hints are synchronized; this change does not compile or deploy an Add-On.
+- README release status now points to the published v0.2.0 Release (Windows x64, 2026-11-27); the v0.1.9 installation release remains available.
+
+## [0.2.0] - 2026-11-27
+
+**Published 2026-11-27 for Windows x64.** The source version advanced from 0.1.9 to 0.2.0 (minor impact): VERSION, package/lockfile metadata, command-boundary metadata, bilingual guides and current version hints are synchronized, and the Windows x64 package with matching Archicad 28/29/30 APXs is released.
 
 ### Source changes under qualification
 
