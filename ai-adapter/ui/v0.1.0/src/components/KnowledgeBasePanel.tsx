@@ -10,7 +10,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
-type Category = "buildingCode" | "mepStandard" | "material";
+type PhysicalCategory = "buildingCode" | "mepStandard" | "material";
+type Category = PhysicalCategory | "mandatory";
 
 interface Rule {
   id: string;
@@ -38,6 +39,8 @@ interface Rule {
   disabledAt?: string;
   addedAt?: string;
   updatedAt?: string;
+  requirementLevel?: "MANDATORY" | "RECOMMENDED" | "REFERENCE" | "UNCLASSIFIED";
+  requirementBasis?: string | null;
 }
 
 interface KnowledgeBasePanelProps {
@@ -50,6 +53,7 @@ const CATEGORY_LABELS: Record<Category, { zh: string; en: string; color: string 
   buildingCode: { zh: "建筑规范", en: "Building Code", color: "amber" },
   mepStandard: { zh: "MEP 标准", en: "MEP Standard", color: "cyan" },
   material: { zh: "材料规格", en: "Material Spec", color: "emerald" },
+  mandatory: { zh: "强制项", en: "Mandatory", color: "rose" },
 };
 
 export default function KnowledgeBasePanel({ lang = "zh-CN", embedded = false, onDirtyChange }: KnowledgeBasePanelProps) {
@@ -83,6 +87,17 @@ export default function KnowledgeBasePanel({ lang = "zh-CN", embedded = false, o
   useEffect(() => { if(typeof window === "undefined") return; const guard=(event:BeforeUnloadEvent)=>{if(editingRule || isAddingNew){event.preventDefault();event.returnValue="";}};window.addEventListener("beforeunload",guard);return()=>window.removeEventListener("beforeunload",guard); },[editingRule,isAddingNew]);
   const tr = (zh: string, en: string) => lang === "zh-CN" ? zh : en;
 
+  const resolveTargetCategory = (cat: Category, rule?: Rule | null): PhysicalCategory => {
+    if (cat !== "mandatory") return cat as PhysicalCategory;
+    if (rule?.category && (rule.category === "buildingCode" || rule.category === "mepStandard" || rule.category === "material")) {
+      return rule.category as PhysicalCategory;
+    }
+    if (rule?.id?.startsWith("BC-")) return "buildingCode";
+    if (rule?.id?.startsWith("MEP-")) return "mepStandard";
+    if (rule?.id?.startsWith("MAT-")) return "material";
+    return "buildingCode";
+  };
+
   // 加载分类数据
   const loadCategory = useCallback(async (cat: Category) => {
     const request = ++epoch.current;
@@ -92,7 +107,16 @@ export default function KnowledgeBasePanel({ lang = "zh-CN", embedded = false, o
       const data = await res.json();
       if (data.ok && request === epoch.current && mounted.current && Number.isSafeInteger(data.revision) && data.revision >= acceptedRevision.current) {
         acceptedRevision.current = data.revision;
-        setRules(data[cat] || []);
+        if (cat === "mandatory") {
+          const aggregated: Rule[] = [
+            ...(data.buildingCode || []).map((r: Rule) => ({ ...r, category: "buildingCode" })),
+            ...(data.mepStandard || []).map((r: Rule) => ({ ...r, category: "mepStandard" })),
+            ...(data.material || []).map((r: Rule) => ({ ...r, category: "material" })),
+          ].filter((r: Rule) => r.requirementLevel === "MANDATORY");
+          setRules(aggregated);
+        } else {
+          setRules(data[cat] || []);
+        }
         setTotals(data.totals);
         setLibraryState((previous: any) => previous?.revision > data.revision ? previous : data);
       }
@@ -142,7 +166,9 @@ export default function KnowledgeBasePanel({ lang = "zh-CN", embedded = false, o
       id: "",
       rule: "",
       source: "",
-      severity: "warning",
+      severity: activeCategory === "mandatory" ? "error" : "warning",
+      category: activeCategory === "mandatory" ? "buildingCode" : activeCategory,
+      requirementLevel: activeCategory === "mandatory" ? "MANDATORY" : "RECOMMENDED",
       isUserAdded: true,
     });
     setIsAddingNew(true);
@@ -152,9 +178,10 @@ export default function KnowledgeBasePanel({ lang = "zh-CN", embedded = false, o
   const handleSave = async (rule: Rule) => {
     if (!beginMutation()) return;
     try {
+      const targetCat = resolveTargetCategory(activeCategory, rule);
       if (isAddingNew) {
         const { id, isUserAdded, addedAt, ...ruleData } = rule;
-        const res = await fetch(`/api/knowledge-base/${activeCategory}`, {
+        const res = await fetch(`/api/knowledge-base/${targetCat}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...ruleData, expectedRevision: libraryState?.revision }),
@@ -169,7 +196,7 @@ export default function KnowledgeBasePanel({ lang = "zh-CN", embedded = false, o
           return;
         }
       } else {
-        const res = await fetch(`/api/knowledge-base/${activeCategory}/${rule.id}`, {
+        const res = await fetch(`/api/knowledge-base/${targetCat}/${rule.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...rule, expectedRevision: libraryState?.revision }),
@@ -197,7 +224,8 @@ export default function KnowledgeBasePanel({ lang = "zh-CN", embedded = false, o
     if (!confirm(`${tr("确认操作条目", "Confirm rule operation")} ${rule.id}?`)) return;
     if (!beginMutation()) return;
     try {
-      const res = await fetch(`/api/knowledge-base/${activeCategory}/${rule.id}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedRevision: libraryState?.revision }) });
+      const targetCat = resolveTargetCategory(activeCategory, rule);
+      const res = await fetch(`/api/knowledge-base/${targetCat}/${rule.id}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedRevision: libraryState?.revision }) });
       const data = await res.json();
       if (data.ok) {
         setStatusMsg((lang: "zh-CN" | "en-US") => { const tr = (zh: string, en: string) => lang === "zh-CN" ? zh : en; return `✅ ${data.action === "deleted" ? tr("已删除", "Deleted") : tr("已禁用", "Disabled")}: ${rule.id}`; });
@@ -215,7 +243,8 @@ export default function KnowledgeBasePanel({ lang = "zh-CN", embedded = false, o
   const handleEnable = async (rule: Rule) => {
     if (!beginMutation()) return;
     try {
-      const res = await fetch(`/api/knowledge-base/${activeCategory}/${rule.id}/enable`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedRevision: libraryState?.revision }) });
+      const targetCat = resolveTargetCategory(activeCategory, rule);
+      const res = await fetch(`/api/knowledge-base/${targetCat}/${rule.id}/enable`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedRevision: libraryState?.revision }) });
       const data = await res.json();
       if (data.ok) {
         setStatusMsg((lang: "zh-CN" | "en-US") => { const tr = (zh: string, en: string) => lang === "zh-CN" ? zh : en; return `✅ ${tr("已恢复", "Enabled")}: ${rule.id}`; });
@@ -335,6 +364,36 @@ export default function KnowledgeBasePanel({ lang = "zh-CN", embedded = false, o
     finally { endMutation(); }
   };
 
+  // 切换 [拦截/提醒] 开关
+  const toggleValidation = async () => {
+    if (busy || !beginMutation()) return;
+    const currentOn = libraryState?.automaticPlanValidation === "ON";
+    const nextVal = currentOn ? "OFF" : "ON";
+    try {
+      const res = await fetch("/api/knowledge-base/validation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: nextVal === "ON", expectedRevision: libraryState?.revision })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setStatusMsg((lang: "zh-CN" | "en-US") => {
+          const tr = (zh: string, en: string) => lang === "zh-CN" ? zh : en;
+          return nextVal === "ON"
+            ? tr("✅ [拦截/提醒] 已开启：计划参数阻断强制项、操作提醒一般项、不拦截参考项", "✅ Interception/Alerts ON: block on mandatory, warn on recommended, pass reference")
+            : tr("✅ [拦截/提醒] 已关闭：全部不拦截及提醒", "✅ Interception/Alerts OFF: no blocking or warnings");
+        });
+        await loadTotals();
+      } else {
+        setStatusMsg(`❌ ${data.code || data.error}`);
+      }
+    } catch (e: any) {
+      setStatusMsg(`❌ ${e.message}`);
+    } finally {
+      endMutation();
+    }
+  };
+
   // 3 秒后清除状态消息
   useEffect(() => {
     if (statusMsg) {
@@ -372,6 +431,48 @@ export default function KnowledgeBasePanel({ lang = "zh-CN", embedded = false, o
         </div>
       </div>
 
+      {/* 全局 [拦截/提醒] 总开关卡片 */}
+      <div className="px-4 py-2 border-b border-zinc-800 bg-zinc-900/40 text-[11px] flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-zinc-300">🛡️ {tr("[拦截/提醒] 开关", "[Interception/Alert] Toggle")}:</span>
+          <span className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold ${
+            libraryState?.automaticPlanValidation === "ON"
+              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+              : "bg-zinc-800 text-zinc-500 border border-zinc-700"
+          }`}>
+            {libraryState?.automaticPlanValidation === "ON" ? tr("开启中 (ON)", "ENABLED (ON)") : tr("已关闭 (OFF)", "DISABLED (OFF)")}
+          </span>
+          <span className="text-[10px] text-zinc-400">
+            {libraryState?.automaticPlanValidation === "ON"
+              ? tr("规则联动：计划参数阻断（强制项）/ 操作提醒（一般项）/ 不拦截（参考项）", "Active: Block (Mandatory) / Warn (Recommended) / Pass (Reference)")
+              : tr("全部不拦截及提醒", "All checks bypassed (no blocking or warnings)")}
+          </span>
+        </div>
+        <button
+          disabled={busy}
+          onClick={toggleValidation}
+          className={`px-3 py-1 rounded text-[10px] font-semibold transition-colors cursor-pointer border ${
+            libraryState?.automaticPlanValidation === "ON"
+              ? "bg-amber-900/30 text-amber-300 border-amber-800/50 hover:bg-amber-900/50"
+              : "bg-emerald-600/30 text-emerald-300 border-emerald-500/50 hover:bg-emerald-600/50"
+          }`}
+        >
+          {libraryState?.automaticPlanValidation === "ON"
+            ? tr("关闭拦截与提醒", "Turn OFF Interception")
+            : tr("开启拦截与提醒", "Turn ON Interception")}
+        </button>
+      </div>
+
+      {/* 条文分级汇总统计 */}
+      {totals?.requirementLevels && (
+        <div className="px-4 py-1 border-b border-zinc-800/80 bg-zinc-950/60 text-[10px] font-mono text-zinc-400 flex flex-wrap gap-x-4 gap-y-1 items-center">
+          <span>{tr("强制项: ", "Mandatory: ")}<strong className="text-rose-400">{totals.requirementLevels.MANDATORY}</strong></span>
+          <span>{tr("一般项: ", "Recommended: ")}<strong className="text-amber-400">{totals.requirementLevels.RECOMMENDED}</strong></span>
+          <span>{tr("参考项: ", "Reference: ")}<strong className="text-cyan-400">{totals.requirementLevels.REFERENCE}</strong></span>
+          <span>{tr("待确认: ", "Unclassified: ")}<strong className="text-zinc-500">{totals.requirementLevels.UNCLASSIFIED}</strong></span>
+        </div>
+      )}
+
       <div className="px-4 py-2 border-b border-zinc-800 text-[10px] space-y-1">
         <div className="flex gap-2 items-center">
           <span>{tr("活动规范库", "Active library")}</span>
@@ -380,7 +481,7 @@ export default function KnowledgeBasePanel({ lang = "zh-CN", embedded = false, o
           </select>
           <button disabled={busy} onClick={chooseLibrary}>{tr("加载规范库JSON", "Load library JSON")}</button>
         </div>
-        <div>{tr("库修订", "Revision")}: {libraryState?.revision ?? "UNKNOWN"} · {tr("计划自动拦截", "Automatic plan validation")}: {libraryState?.automaticPlanValidation || "UNKNOWN"} · {tr("模型审核", "Model audit")}: {tr("尚未实现", "Not implemented")}</div>
+        <div>{tr("库修订", "Revision")}: {libraryState?.revision ?? "UNKNOWN"} · {tr("计划自动拦截", "Automatic plan validation")}: {libraryState?.automaticPlanValidation || "UNKNOWN"} · {tr("模型审核", "Model audit")}: {tr("清单关联就绪（自动检查定义待核准）", "Checklist link ready (Definitions pending approval)")}</div>
         {candidate && <div className="p-2 border border-zinc-700">
           <div>{candidate.library.name} [{candidate.library.region}/{candidate.library.contentLanguage}] v{candidate.library.version}</div>
           <div>{candidate.library.sources.join("; ")}</div>
@@ -407,7 +508,7 @@ export default function KnowledgeBasePanel({ lang = "zh-CN", embedded = false, o
               {lang === "zh-CN" ? label.zh : label.en}
               {totals && (
                 <span className="ml-1 text-[9px] opacity-60">
-                  {totals[cat]}
+                  {cat === "mandatory" ? (totals.requirementLevels?.MANDATORY ?? 0) : totals[cat]}
                 </span>
               )}
             </button>
@@ -492,6 +593,7 @@ export const RuleCard: React.FC<{
   rule, category, lang, onEdit, onDelete, onEnable, busy
 }) => {
   const isDisabled = !!rule.disabled;
+  const effectiveCategory = category === "mandatory" ? (rule.category || (rule.id?.startsWith("MAT-") ? "material" : rule.id?.startsWith("MEP-") ? "mepStandard" : "buildingCode")) : category;
   const severityColor =
     rule.severity === "error" ? "text-red-400 bg-red-500/10" :
     rule.severity === "warning" ? "text-amber-400 bg-amber-500/10" :
@@ -506,11 +608,31 @@ export const RuleCard: React.FC<{
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">
             <span className="text-[9px] font-mono text-zinc-500">{rule.id}</span>
-            {rule.severity && (
-              <span className={`text-[8px] px-1 rounded font-mono ${severityColor}`}>
-                {rule.severity === "error" ? (lang === "zh-CN" ? "⚠必须" : "Required") : rule.severity === "warning" ? (lang === "zh-CN" ? "建议" : "Recommended") : (lang === "zh-CN" ? "提示" : "Info")}
+            {category === "mandatory" && (
+              <span className="text-[8px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-300 font-mono">
+                {effectiveCategory === "buildingCode" ? (lang === "zh-CN" ? "建筑" : "Building") :
+                 effectiveCategory === "mepStandard" ? "MEP" :
+                 (lang === "zh-CN" ? "材料" : "Material")}
               </span>
             )}
+            {(() => {
+              const level = rule.requirementLevel || "UNCLASSIFIED";
+              const badgeCls =
+                level === "MANDATORY" ? "bg-rose-500/20 text-rose-400 border border-rose-500/30" :
+                level === "RECOMMENDED" ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" :
+                level === "REFERENCE" ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30" :
+                "bg-zinc-700/50 text-zinc-400 border border-zinc-600/30";
+              const label =
+                level === "MANDATORY" ? (lang === "zh-CN" ? "强制项" : "Mandatory") :
+                level === "RECOMMENDED" ? (lang === "zh-CN" ? "一般项" : "Recommended") :
+                level === "REFERENCE" ? (lang === "zh-CN" ? "参考项" : "Reference") :
+                (lang === "zh-CN" ? "待确认" : "Unclassified");
+              return (
+                <span className={`text-[8px] px-1.5 py-0.2 rounded font-mono font-semibold ${badgeCls}`}>
+                  {label}
+                </span>
+              );
+            })()}
             {rule.isUserAdded && (
               <span className="text-[8px] px-1 rounded bg-violet-500/20 text-violet-400 font-mono">{lang === "zh-CN" ? "用户" : "User"}</span>
             )}
@@ -522,8 +644,13 @@ export const RuleCard: React.FC<{
           {subText && (
             <div className="text-[9px] text-zinc-500 mt-0.5">{lang === "zh-CN" ? "来源: " : "Source: "}{subText}</div>
           )}
+          {rule.requirementBasis && (
+            <div className="text-[9px] text-zinc-400 mt-0.5 font-mono">
+              <span className="text-zinc-500">{lang === "zh-CN" ? "依据: " : "Basis: "}</span>{rule.requirementBasis}
+            </div>
+          )}
           {/* 材料类额外字段 */}
-          {category === "material" && (
+          {effectiveCategory === "material" && (
             <div className="text-[9px] text-zinc-500 mt-0.5 flex gap-2 flex-wrap">
               {rule.thickness && <span>{lang === "zh-CN" ? "厚度: " : "Thickness: "}{rule.thickness}</span>}
               {rule.fireRating && <span>{lang === "zh-CN" ? "防火" : "Fire rating"}: {rule.fireRating}</span>}
@@ -531,7 +658,7 @@ export const RuleCard: React.FC<{
             </div>
           )}
           {/* 规范类额外字段 */}
-          {category !== "material" && rule.field && (
+          {effectiveCategory !== "material" && rule.field && (
             <div className="text-[9px] text-zinc-500 mt-0.5">
               {lang === "zh-CN" ? "字段" : "Field"}: {rule.field}
               {rule.minValue !== undefined && ` ≥ ${rule.minValue}`}
@@ -586,17 +713,31 @@ export function RuleEditor({
   const [formData, setFormData] = useState<Rule>({ ...rule });
 
   const handleFieldChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const next = { ...prev, [field]: value };
+      if (field === "requirementLevel") {
+        if (value === "MANDATORY") next.severity = "error";
+        else if (value === "RECOMMENDED") next.severity = "warning";
+        else if (value === "REFERENCE") next.severity = "info";
+      }
+      return next;
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if ((formData.requirementLevel === "MANDATORY" || formData.requirementLevel === "RECOMMENDED") &&
+        (!formData.requirementBasis || !formData.requirementBasis.trim())) {
+      alert(lang === "zh-CN" ? "强制项和一般项需要填写非空分级依据（如条款引用或项目约定说明）" : "Mandatory and Recommended rules require a non-empty requirement basis.");
+      return;
+    }
     if (!busy) onSave(formData);
   };
 
   // New rules default to current library; explicit shared scope is independent of UI locale.
   // 根据分类显示不同字段
-  const isMaterial = category === "material";
+  const effectiveCategory = category === "mandatory" ? (formData.category || (formData.id?.startsWith("MAT-") ? "material" : formData.id?.startsWith("MEP-") ? "mepStandard" : "buildingCode")) : category;
+  const isMaterial = effectiveCategory === "material";
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onCancel}>
@@ -604,12 +745,53 @@ export function RuleEditor({
         className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 w-[480px] max-h-[80vh] overflow-y-auto custom-scrollbar"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-sm font-semibold text-zinc-200 mb-3">
+        <h3 className="text-sm font-semibold text-zinc-200 mb-1">
           {isNew ? (lang === "zh-CN" ? "新增条目" : "Add Rule") : (lang === "zh-CN" ? "编辑条目" : "Edit Rule")}
           {!isNew && <span className="ml-2 text-[10px] font-mono text-zinc-500">{rule.id}</span>}
         </h3>
+        <p className="text-[10px] text-zinc-400 mb-3">
+          {lang === "zh-CN"
+            ? "💡 全局 [拦截/提醒] 开启时：强制项违规将触发【计划参数阻断】，一般项违规将触发【操作提醒】，参考项【不拦截】。仅校验支持的计划参数，不执行全模型审查；开关修改从下一任务生效。"
+            : "💡 When [Interception/Alert] is ON: Mandatory rules trigger Plan Parameter Block, Recommended rules trigger Operation Alert, Reference rules are not blocked. Only supported plan parameters are checked, not the whole model; toggle changes apply to subsequent tasks."}
+        </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-2"><fieldset disabled={busy} className="contents">
+          {category === "mandatory" && isNew && (
+            <Field label={lang === "zh-CN" ? "归属专业分类" : "Target Domain"}>
+              <select
+                value={formData.category || "buildingCode"}
+                onChange={(e) => handleFieldChange("category", e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-violet-500 focus:outline-none"
+              >
+                <option value="buildingCode">{lang === "zh-CN" ? "建筑规范" : "Building Code"}</option>
+                <option value="mepStandard">{lang === "zh-CN" ? "MEP 标准" : "MEP Standard"}</option>
+                <option value="material">{lang === "zh-CN" ? "材料规格" : "Material Spec"}</option>
+              </select>
+            </Field>
+          )}
+              <div className="grid grid-cols-2 gap-2">
+                <Field label={lang === "zh-CN" ? "条文级别" : "Requirement Level"}>
+                  <select
+                    value={formData.requirementLevel || "UNCLASSIFIED"}
+                    onChange={(e) => handleFieldChange("requirementLevel", e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-violet-500 focus:outline-none"
+                  >
+                    <option value="UNCLASSIFIED">{lang === "zh-CN" ? "待确认 (UNCLASSIFIED)" : "Unclassified"}</option>
+                    <option value="MANDATORY">{lang === "zh-CN" ? "强制项 (MANDATORY)" : "Mandatory"}</option>
+                    <option value="RECOMMENDED">{lang === "zh-CN" ? "一般项 (RECOMMENDED)" : "Recommended"}</option>
+                    <option value="REFERENCE">{lang === "zh-CN" ? "参考项 (REFERENCE)" : "Reference"}</option>
+                  </select>
+                </Field>
+                <Field label={lang === "zh-CN" ? "分级依据 (强制/一般必填)" : "Requirement Basis"}>
+                  <input
+                    type="text"
+                    value={formData.requirementBasis || ""}
+                    onChange={(e) => handleFieldChange("requirementBasis", e.target.value)}
+                    placeholder={lang === "zh-CN" ? "条款引用 / 项目约定" : "Clause / Project convention"}
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-violet-500 focus:outline-none"
+                  />
+                </Field>
+              </div>
           {!isMaterial ? (
             <>
               <Field label={lang === "zh-CN" ? "作用域" : "Scope"}>
@@ -627,28 +809,15 @@ export function RuleEditor({
                   className="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-violet-500 focus:outline-none"
                 />
               </Field>
-              <div className="grid grid-cols-2 gap-2">
-                <Field label={lang === "zh-CN" ? "来源" : "Source"}>
-                  <input
-                    type="text"
-                    value={formData.source || ""}
-                    onChange={(e) => handleFieldChange("source", e.target.value)}
-                    placeholder="GB 50096"
-                    className="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-violet-500 focus:outline-none"
-                  />
-                </Field>
-                <Field label={lang === "zh-CN" ? "严重级别" : "Severity"}>
-                  <select
-                    value={formData.severity || "warning"}
-                    onChange={(e) => handleFieldChange("severity", e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-violet-500 focus:outline-none"
-                  >
-                    <option value="error">{lang === "zh-CN" ? "必须" : "Required"}</option>
-                    <option value="warning">{lang === "zh-CN" ? "建议" : "Recommended"}</option>
-                    <option value="info">{lang === "zh-CN" ? "提示" : "Info"}</option>
-                  </select>
-                </Field>
-              </div>
+              <Field label={lang === "zh-CN" ? "来源" : "Source"}>
+                <input
+                  type="text"
+                  value={formData.source || ""}
+                  onChange={(e) => handleFieldChange("source", e.target.value)}
+                  placeholder="GB 50096"
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-violet-500 focus:outline-none"
+                />
+              </Field>
               <div className="grid grid-cols-2 gap-2">
                 <Field label={lang === "zh-CN" ? "校验字段" : "Field"}>
                   <input
@@ -669,7 +838,7 @@ export function RuleEditor({
                   />
                 </Field>
               </div>
-              {category === "mepStandard" && (
+              {effectiveCategory === "mepStandard" && (
                 <Field label={lang === "zh-CN" ? "关联命令" : "Command Action"}>
                   <input
                     type="text"

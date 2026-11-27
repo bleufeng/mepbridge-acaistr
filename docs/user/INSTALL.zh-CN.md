@@ -1,10 +1,10 @@
-# MEPbridge ACAIstr v0.1.9 安装说明
+# MEPbridge ACAIstr v0.2.0 安装说明
 
-> 本文适用于 v0.1.9。请从 GitHub Release 下载获批 ZIP。完整包内含 `RELEASE_MANIFEST.json` 与 `SHA256SUMS.txt`，用于载荷校验。
+> v0.2.0 仅提供 Windows x64 版本，不含 macOS 资产。Archicad 30 已通过 v0.2.0 选定验收范围；Archicad 28／29 产物已构建并登记引用，但其 v0.2.0 受影响用例**未执行**；安装本身不代表任何二进制已通过验收。
 
 本说明适用于 Windows x64 上的 Archicad 28、29 和 30。
 
-首次安装或涉及 Workbench 组件的升级，请下载唯一的双语完整包 `MACAI-Workbench-v0.1.9-win64.zip`。不要把 APX 更新 ZIP、GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz` 当作完整安装包。
+首次安装或涉及 Workbench 组件的升级，请使用唯一的双语完整包 `MACAI-Workbench-v0.2.0-win64.zip`。不要把 APX 更新 ZIP、GitHub 自动生成的 `Source code.zip` 或 `Source code.tar.gz` 当作完整安装包。
 
 ## 环境要求
 
@@ -38,9 +38,9 @@ runtime\runtime-manifest.json
 以下 APX 单件更新包仅适用于已有完整安装、且 Release 明确允许只更新 APX 的用户：
 
 ```text
-MEPbridge-apx-AC28-v0.1.9-win64.zip
-MEPbridge-apx-AC29-v0.1.9-win64.zip
-MEPbridge-apx-AC30-v0.1.9-win64.zip
+MEPbridge-apx-AC28-v0.2.0-win64.zip
+MEPbridge-apx-AC29-v0.2.0-win64.zip
+MEPbridge-apx-AC30-v0.2.0-win64.zip
 ```
 
 每个更新 ZIP 根目录只包含一个 `MEPBridge.apx`，不包含 Server、UI、MCP Server、便携运行时、生产依赖或安装脚本。首次安装必须使用完整包。
@@ -232,8 +232,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Start-BaseWorkbench.ps
 {
   "mcpServers": {
     "mepbridge-acaistr": {
-      "command": "D:\\MACAI-Workbench-v0.1.9-win64\\runtime\\node\\node.exe",
-      "args": ["D:\\MACAI-Workbench-v0.1.9-win64\\tools\\mepbridge-mcp-server.js"],
+      "command": "D:\\MACAI-Workbench-v0.2.0-win64\\runtime\\node\\node.exe",
+      "args": ["D:\\MACAI-Workbench-v0.2.0-win64\\tools\\mepbridge-mcp-server.js"],
       "env": {
         "MEPBRIDGE_ENDPOINT": "http://127.0.0.1:19780"
       }
@@ -245,7 +245,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Start-BaseWorkbench.ps
 ### 把路径换成自己的解压目录
 
 示例中的 `D:\MEPbridge-ACAIstr\` 仅是占位写法。请替换为你自己的解压目录，例如
-`D:\\MACAI-Workbench-v0.1.9-win64\\tools\\mepbridge-mcp-server.js`（文件夹名以实际解压结果为准）。注意：JSON 里的
+`D:\\MACAI-Workbench-v0.2.0-win64\\tools\\mepbridge-mcp-server.js`（文件夹名以实际解压结果为准）。注意：JSON 里的
 Windows 反斜杠必须写成 `\\`。
 
 ### 常见 MCP 客户端的配置位置
@@ -294,6 +294,16 @@ MCP 能力为准。
 
 可使用 `MEPBRIDGE_DATA_DIR` 指定其他可写目录。不要将用户数据写入 Archicad 安装目录或只读发布目录。
 
+## 语言与 LLM 行为
+
+- 界面默认英文，可切换中文并记忆选择。
+- LLM 连通状态与已保存端点／配置分别显示；显示已连接不代表当前使用的就是已保存端点。
+- 未连接 LLM 时，Manual 模式、已导入模板和已配置的本地自定义命令仍可使用。
+
+## Local Add-On 人工处置
+
+安装程序发现非规范位置或用户 Local 位置的 MEPBridge Add-On 时停止覆盖，并报告 `MANUAL_LOCAL_MEPBRIDGE_ACTION_REQUIRED` 及精确路径与 SHA-256。请关闭 Archicad，人工归档或移除该精确 `MEPBridge.apx` 后重新运行安装。安装与卸载程序都不会自动覆盖、迁移或删除 Local Add-On。
+
 ## 卸载
 
 1. 保存工作并关闭 Archicad。
@@ -304,7 +314,7 @@ MCP 能力为准。
 
 ## 版本更新
 
-**从 v0.1.8 或更早版本升级到 v0.1.9 必须使用完整包更新。** v0.1.9 引入单一双语包、包内便携运行时和 AC30 资产；不要只换 APX，也不要把新文件覆盖进旧版本解压目录。
+**从 v0.1.9 或更早版本升级到 v0.2.0 必须使用完整包更新。** v0.2.0 更新 Workbench UI、Server、descriptor 边界元数据和 Add-On 二进制；不要只换 APX，也不要把新文件覆盖进旧版本解压目录。
 
 已安装旧版本的用户，按以下方式更新：
 
@@ -312,7 +322,7 @@ MCP 能力为准。
 
 适用于 Server、UI、MCP Server 或依赖有改动的版本。
 
-1. 从 GitHub Release 下载 `MACAI-Workbench-v0.1.9-win64.zip`。解压后保留并使用包内 `RELEASE_MANIFEST.json` 与 `SHA256SUMS.txt` 校验载荷。
+1. 从 GitHub Release 下载 `MACAI-Workbench-v0.2.0-win64.zip`。解压后保留并使用包内 `RELEASE_MANIFEST.json` 与 `SHA256SUMS.txt` 校验载荷。
 2. 保存工作并关闭 Archicad。
 3. 将新 ZIP 解压到一个新目录（建议保留旧目录以便回滚）。
 4. 双击新目录中的 `Install-MEPBridge.cmd`。
@@ -359,6 +369,9 @@ MCP 能力为准。
 
 执行写入、删除、批量或几何修改前，应使用测试或已备份的 PLN。
 
-## v0.1.9 已知能力限制
+## v0.2.0 已知能力限制
 
-v0.1.9不支持**既有幕墙高度编辑**；高度或高度＋分格组合请求会在写入前拒绝，不会自动删除重建。**新建幕墙时设置高度、已验证的分格编辑仍保留**。这与安装环境无关，另装Node.js或DevKit不会启用该能力。
+- **既有幕墙高度编辑不支持**：高度或高度＋分格组合请求会在写入前拒绝，不会自动删除重建。**新建幕墙时设置高度、已验证的分格编辑仍保留**。这与安装环境无关，另装 Node.js 或 DevKit 不会启用该能力。
+- 灯具 GDL 参数写与 MEP 高级写入延期，并在分派前拒绝；既有稳定操作与只读分析保留。
+- 不声明合规认证，不含生产级自动专业模型审核定义；已批准的自动检查定义仍为 0。
+- G5 回滚探针、内部测试构建与源码归档不是交付资产。

@@ -6,6 +6,7 @@ const {getArchicadEndpoint,endpointForPort}=require('./archicad-endpoint');
 const {normalizeCommandSafetyParameters,getCommandSafetyCapabilities}=require('./command-capabilities');
 const {resolveTargetInstance}=require('./instance-targeting');
 const {validateCommandSemanticFidelity}=require('./semantic-fidelity-gate');
+const {preflightCommandParameters}=require('./command-parameter-diagnostics');
 const {getOfficialApiCapabilities}=require('./official-api-capabilities');
 const {getExecutionCoordinator,captureTarget,mutation,operationId,endpointPort}=require('./execution-coordinator');
 const {hasResultFailure}=require('./bounded-result-summary');
@@ -55,16 +56,29 @@ class ArchicadClient {
       const parameters=payload.parameters?.addOnCommandParameters||payload.parameters||{};
       const semanticFidelity=validateCommandSemanticFidelity(action,parameters,context);
       if(!semanticFidelity.allowed)return{success:false,error:semanticFidelity.message,errorType:semanticFidelity.errorType,statusCode:422,semanticFidelity};
+      // C09 (W1 §48 U02): apply the existing automatic-mode defaults BEFORE
+      // the preflight, so the preflight validates the FINAL native parameters
+      // the add-on will receive. Manual explicit controls are untouched and no
+      // new confirmation / operationId gate is introduced.
+      const isAuto = isAutomaticExecution(options);
+      if(isMutation){
+        const nativeParams = payload.parameters?.addOnCommandParameters || parameters;
+        if (nativeParams && typeof nativeParams === 'object') {
+          const caps = getCommandSafetyCapabilities(action);
+          if (caps.dryRun && nativeParams.dryRun === undefined && isAuto) nativeParams.dryRun = false;
+          if (caps.confirmRequired && nativeParams.confirmRequired === undefined && (isAuto || nativeParams.dryRun === false)) nativeParams.confirmRequired = true;
+        }
+      }
+      // OFF-02 (GEN-RT-DIAGNOSTICS): deterministic parameter preflight with JSON-pointer
+      // diagnostics. Only reproduces hard C++ constraints; never blocks a payload the
+      // add-on would accept, so the native schema remains the single source of truth.
+      const parameterPreflight=preflightCommandParameters(action,parameters);
+      if(!parameterPreflight.ok){
+        return{success:false,error:parameterPreflight.message,errorType:parameterPreflight.errorType,
+          statusCode:parameterPreflight.statusCode,parameterDiagnostics:parameterPreflight.parameterDiagnostics};
+      }
       let data,execution=null;
       if(isMutation){
-        const isAuto = isAutomaticExecution(options);
-        const addOnParams = payload.parameters?.addOnCommandParameters;
-        if (addOnParams && typeof addOnParams === 'object') {
-          const cmdName = payload.parameters?.addOnCommandId?.commandName;
-          const caps = getCommandSafetyCapabilities(cmdName);
-          if (caps.dryRun && addOnParams.dryRun === undefined && isAuto) addOnParams.dryRun = false;
-          if (caps.confirmRequired && addOnParams.confirmRequired === undefined && (isAuto || addOnParams.dryRun === false)) addOnParams.confirmRequired = true;
-        }
         const result=await this.coordinator().execute({id:executionId,command:payload,endpoint,target:binding,allowUnresolved:isAuto});
         execution=result.execution;
         if(result.error){

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 'use strict';
 const CATEGORIES = Object.freeze(['buildingCode', 'mepStandard', 'material']);
+const REQUIREMENT_LEVELS = Object.freeze(['MANDATORY', 'RECOMMENDED', 'REFERENCE', 'UNCLASSIFIED']);
 const MAX_BYTES = 2 * 1024 * 1024, MAX_RULES = 500;
 const BAD_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
@@ -23,16 +24,31 @@ function rule(input, category, { requireId = false } = {}) {
   if (!r || Array.isArray(r) || typeof r !== 'object') throw new Error('KB_INVALID_RULE');
   if (requireId && (typeof r.id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,100}$/.test(r.id))) throw new Error('KB_INVALID_RULE_ID');
   if (typeof (r.rule || r.material) !== 'string' || !(r.rule || r.material).trim()) throw new Error('KB_RULE_TEXT_REQUIRED');
-  for (const k of ['rule','material','source','field','commandAction','subType','category','domain','type','thickness','fireRating','libraryId'])
+  for (const k of ['rule','material','source','field','commandAction','subType','category','domain','type','thickness','fireRating','libraryId','requirementBasis'])
     if (r[k] !== undefined && r[k] !== null && typeof r[k] !== 'string') throw new Error('KB_INVALID_RULE_FIELD:' + k);
   if (r.severity !== undefined && !['error','warning','info'].includes(r.severity)) throw new Error('KB_INVALID_SEVERITY');
   if (r.scope !== undefined && !['shared','library'].includes(r.scope)) throw new Error('KB_INVALID_SCOPE');
+  if (r.requirementLevel !== undefined && r.requirementLevel !== null) {
+    if (!REQUIREMENT_LEVELS.includes(r.requirementLevel)) throw new Error('KB_INVALID_REQUIREMENT_LEVEL');
+  }
+  if (r.requirementBasis !== undefined && r.requirementBasis !== null) {
+    if (typeof r.requirementBasis !== 'string' || r.requirementBasis.length > 1000) throw new Error('KB_INVALID_REQUIREMENT_BASIS');
+  }
+  if (r.requirementLevel === 'MANDATORY' || r.requirementLevel === 'RECOMMENDED') {
+    if (!r.requirementBasis || typeof r.requirementBasis !== 'string' || !r.requirementBasis.trim()) {
+      throw new Error('KB_REQUIREMENT_BASIS_REQUIRED');
+    }
+  }
   for (const k of ['minValue','maxValue','recommendedValue','thermalConductivity'])
     if (r[k] !== undefined && (typeof r[k] !== 'number' || !Number.isFinite(r[k]))) throw new Error('KB_INVALID_NUMBER:' + k);
   if (r.minRange !== undefined && (!Array.isArray(r.minRange) || r.minRange.length !== 2 || r.minRange.some(x => typeof x !== 'number' || !Number.isFinite(x)) || r.minRange[0] > r.minRange[1])) throw new Error('KB_INVALID_RANGE');
   if (r.minValue !== undefined && r.maxValue !== undefined && r.minValue > r.maxValue) throw new Error('KB_INVALID_RANGE');
   if (r.disabled !== undefined && typeof r.disabled !== 'boolean') throw new Error('KB_INVALID_DISABLED');
   if (!CATEGORIES.includes(category)) throw new Error('KB_INVALID_CATEGORY');
+  // Explicit requirement level is authoritative; legacy severity is preserved
+  // only for unclassified/older rules, not used to manufacture classification.
+  const levelSeverity = { MANDATORY: 'error', RECOMMENDED: 'warning', REFERENCE: 'info' };
+  if (levelSeverity[r.requirementLevel]) r.severity = levelSeverity[r.requirementLevel];
   delete r.expectedRevision;
   return r;
 }
@@ -49,7 +65,9 @@ function library(input) {
     if (!Array.isArray(lib.rules[cat])) throw new Error('KB_INVALID_CATEGORY:' + cat);
     const ids = new Set(); lib.rules[cat] = lib.rules[cat].map(item => {
       const r = rule(item, cat, { requireId: true });
-      if (!r.source || (cat !== 'material' && !['error','warning'].includes(r.severity))) throw new Error('KB_RULE_SOURCE_OR_SEVERITY_REQUIRED');
+      const allowedSeverities = ['REFERENCE', 'UNCLASSIFIED'].includes(r.requirementLevel)
+        ? ['error', 'warning', 'info'] : ['error', 'warning'];
+      if (!r.source || !r.source.trim() || (cat !== 'material' && !allowedSeverities.includes(r.severity))) throw new Error('KB_RULE_SOURCE_OR_SEVERITY_REQUIRED');
       if (ids.has(r.id)) throw new Error('KB_DUPLICATE_RULE_ID'); ids.add(r.id);
       if (++count > MAX_RULES) throw new Error('KB_TOO_MANY_RULES');
       delete r.isUserAdded; delete r.isBuiltinOverride; r.scope = 'library'; r.libraryId = lib.libraryId;
@@ -61,4 +79,4 @@ function library(input) {
     region: lib.region === 'INT' ? 'INTL' : lib.region, contentLanguage: lib.contentLanguage, version: lib.version,
     updatedAt: lib.updatedAt, sources: lib.sources, rules: lib.rules };
 }
-module.exports = { CATEGORIES, MAX_BYTES, MAX_RULES, clone, data, rule, library };
+module.exports = { CATEGORIES, REQUIREMENT_LEVELS, MAX_BYTES, MAX_RULES, clone, data, rule, library };

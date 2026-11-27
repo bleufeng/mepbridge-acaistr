@@ -3,7 +3,7 @@
 > MEPbridge ACAIstr (MACAI) bridges large language models (GPT / Claude / Gemini / Deepseek, etc.) and Archicad industrial-grade 3D design software for safe two-way interaction and an AI Loop collaborative workbench. It provides `CollabAI Smart` (natural-language task planning and autonomous loops) and `Manual` (precise workflow control) entry points.
 
 [![Archicad](https://img.shields.io/badge/Archicad-28%20%7C%2029%20%7C%2030-blue.svg)](docs/user/INSTALL.md)
-[![Version](https://img.shields.io/badge/version-0.1.9-orange.svg)](https://github.com/bleufeng/mepbridge-acaistr/releases/tag/v0.1.9)
+[![Version](https://img.shields.io/badge/version-0.2.0-orange.svg)](CHANGELOG.md)
 [![Tools](https://img.shields.io/badge/MCP%20Tools-95%20Total-0F766E.svg)](ai-adapter/tool-descriptors.json)
 [![API Scale](https://img.shields.io/badge/Atomic%20APIs-162%20Covered-2563EB.svg)](ai-adapter/command-boundary.json)
 [![Rollback Rate](https://img.shields.io/badge/Atomic%20Rollback-99.8%25%20(Zero--Dirty)-7C3AED.svg)](CHANGELOG.md)
@@ -20,39 +20,19 @@ Natural-language tasks and extensible user templates pass through safety orchest
 
 ## Capability Panorama Dashboard
 
-<table>
-  <tr>
-    <td><strong>Contract Tools</strong></td>
-    <td><code>████████████████████</code> <strong>95 Items</strong></td>
-    <td>91 C++ native Add-On commands + 4 Server tools</td>
-  </tr>
-  <tr>
-    <td><strong>Atomic API Scale</strong></td>
-    <td><code>█████████████████░░░</code> <strong>162 APIs</strong> (Full 189)</td>
-    <td>95 unified contracts polymorphically covering 162 Archicad official atomic capabilities</td>
-  </tr>
-  <tr>
-    <td><strong>Official JSON API</strong></td>
-    <td><code>█████████████░░░░░░░</code> <strong>46 / 77 Items</strong> (60%)</td>
-    <td>28 C++ supersets + 18 whitelisted proxies (AC30 base)</td>
-  </tr>
-  <tr>
-    <td><strong>Lifecycle Depth</strong></td>
-    <td><code>████████████████░░░░</code> <strong>Q1 ～ Q4</strong></td>
-    <td>Construction, inspection, in-place mutation & topology</td>
-  </tr>
-  <tr>
-    <td><strong>Transaction Safety</strong></td>
-    <td><code>████████████████████</code> <strong>99.8%</strong></td>
-    <td>1mm rollback tolerance, 147 live tests 100% zero-dirty</td>
-  </tr>
-</table>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/capability-panorama-bento-en-dark.svg">
+    <img src=".github/assets/capability-panorama-bento-en-light.svg" alt="MEPbridge v0.2.0 capability panorama: 95 contract tools (91 C++ native Add-On commands + 4 Server tools); atomic API scale 162 of 189 (86%); official JSON API 46 of 73 items (63%, full 77); Q1-Q4 lifecycle coverage 91.2% (v0.1.9 89.1%); 99.8% transaction safety with 1mm rollback tolerance." width="100%">
+  </picture>
+</p>
 
 > Note — Relationship to the official 2,179 DevKit C/C++ APIs: rather than a 1:1 exhaustive exposure, this project uses 95 unified tools to deliver highly cohesive, polymorphic coverage of the 162 atomic capabilities that are most frequently used and most valuable in engineering practice across the official building, MEP, property, and view domains, avoiding the decision hallucinations that large models face when presented with thousands of fragmented interfaces.
 
 ## Release Scope & Evolution Milestones
 
-- Version: `v0.1.9` (expanded from single-version support to **full coverage of Archicad 28, 29, and 30**);
+- Version: `v0.2.0` (**built and packaged for Windows x64; not yet published**). The [v0.1.9 installation release](https://github.com/bleufeng/mepbridge-acaistr/releases/tag/v0.1.9) remains available.
+- **Current qualification boundary**: Archicad 30 passed native acceptance for the selected v0.2.0 scope, including core building workflows and fixed-grid curtain-wall editing. Archicad 28/29 builds are complete and backed by reference evidence; full native acceptance was not run on either version. No macOS build is included; macOS support is deferred. Editing the height of an existing curtain wall remains unsupported.
 - **Capability Scale Evolution**: Grew from ~20 APIs in v0.1.0 and 80+ in v0.1.6 to **162 official atomic API capabilities** today;
 - **Transaction Safety Evolution**: Upgraded from raw calls without rollback to unified RAII guards and a **99.8% transaction rollback guard**;
 - **Spatial Inspection Precision**: Introduced **0.1mm quantized spatial model snapshots**, A/B diff inspection, and automated revision clouding;

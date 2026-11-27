@@ -154,13 +154,46 @@ function checkSemanticFidelity({ sourceType, targetCommand, targetType, allowPro
  */
 // Resolve the exact PlanChain payload once; never validate a parallel params object.
 function resolvePlanCommand(step) {
-  const payload = step.commandJson || {
-    command: 'API.ExecuteAddOnCommand',
-    parameters: {
-      addOnCommandId: { commandNamespace: step.commandNamespace || 'MEPBridge', commandName: step.action },
-      addOnCommandParameters: step.params || {}
+  let payload;
+  if (step.commandJson) {
+    payload = JSON.parse(JSON.stringify(step.commandJson));
+    if (payload.parameters && step.params && typeof step.params === 'object') {
+      payload.parameters.addOnCommandParameters = {
+        ...(payload.parameters.addOnCommandParameters || {}),
+        ...step.params
+      };
     }
-  };
+  } else {
+    payload = {
+      command: 'API.ExecuteAddOnCommand',
+      parameters: {
+        addOnCommandId: { commandNamespace: step.commandNamespace || 'MEPBridge', commandName: step.action },
+        addOnCommandParameters: step.params || {}
+      }
+    };
+  }
+
+  // 命令专属参数契约卫生清洗：防止跨步回灌产生的附加字段违反 Archicad 的 additionalProperties: false
+  if (payload?.parameters?.addOnCommandParameters) {
+    const params = payload.parameters.addOnCommandParameters;
+    if (step.action === 'GetElementGeometry') {
+      if (!params.elementGuid && params.guid) params.elementGuid = params.guid;
+      delete params.guid;
+    } else if (step.action === 'GetElementProperties') {
+      if (!params.elementGuid && params.guid) params.elementGuid = params.guid;
+      delete params.guid;
+      if (typeof params.routeGuid === 'string' && (!params.routeGuid || params.routeGuid.includes('guid') || params.routeGuid.includes('${'))) {
+        delete params.routeGuid;
+      }
+    } else if (step.action === 'GetMEPElementInfo') {
+      if (!params.routeGuid && (params.elementGuid || params.guid)) {
+        params.routeGuid = params.elementGuid || params.guid;
+      }
+      delete params.elementGuid;
+      delete params.guid;
+    }
+  }
+
   return JSON.parse(JSON.stringify(payload));
 }
 // Keep the step envelope separate from the exact command envelope: conflicting

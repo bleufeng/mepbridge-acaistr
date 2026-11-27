@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MEPBridge ACAIstr (Archicad AI Stream · MCP Server) - Internal</title>
+  <style>
+    :root {
+      --bg-page: #090d16;
+      --bg-card: #111827;
+      --bg-card-hover: #1e293b;
+      --border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-purple: #c084fc;
+      --accent-rose: #f43f5e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg-page);
+      color: var(--text-main);
+      line-height: 1.5;
+      padding-bottom: 60px;
+    }
+    header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 22px 36px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.55);
+    }
+    .brand h1 {
+      font-size: 21px;
+      font-weight: 800;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand p.subtitle {
+      font-size: 13px;
+      color: var(--accent-blue);
+      font-weight: 600;
+      margin-top: 4px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+    .brand p.subdesc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .badge {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid #10b981;
+      font-size: 12px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+    .lang-toggle {
+      background: #1e293b;
+      border: 1px solid var(--accent-blue);
+      color: var(--text-main);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .lang-toggle:hover { background: var(--accent-blue); color: #090d16; }
+    .container { max-width: 1560px; margin: 0 auto; padding: 26px 36px; }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 768px) { .stats-grid { grid-template-columns: 1fr; } }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; }
+    .stat-card.c1::before { background: var(--accent-blue); }
+    .stat-card.c2::before { background: var(--accent-emerald); }
+    .stat-card.c3::before { background: var(--accent-amber); }
+    .stat-card.c4::before { background: var(--accent-purple); }
+    .stat-card.c5::before { background: var(--accent-rose); }
+    .stat-title { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+    .stat-value { font-size: 26px; font-weight: 800; margin-top: 6px; color: #fff; }
+    .stat-desc { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
+    .toolbar {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .filter-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .filter-btn {
+      background: #090d16;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-btn:hover { color: #fff; border-color: var(--accent-blue); }
+    .filter-btn.active { background: var(--accent-blue); color: #090d16; border-color: transparent; }
+    .search-box {
+      background: #090d16;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 14px;
+      color: #fff;
+      font-size: 13px;
+      width: 280px;
+    }
+    .table-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .table-header-bar {
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .table-header-bar h2 { font-size: 15px; font-weight: 700; }
+    table.coverage-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12.5px; }
+    table.coverage-table th {
+      background: #090d16;
+      padding: 12px 16px;
+      font-weight: 700;
+      color: var(--text-muted);
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+    }
+    table.coverage-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+      vertical-align: middle;
+    }
+    table.coverage-table tr { cursor: pointer; transition: background 0.15s; }
+    table.coverage-table tr:hover { background: var(--bg-card-hover); }
+    table.coverage-table tr.active-row {
+      background: rgba(56, 189, 248, 0.12);
+      border-left: 4px solid var(--accent-blue);
+    }
+    .caps-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(56, 189, 248, 0.14);
+      color: var(--accent-blue);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      padding: 5px 11px;
+      border-radius: 7px;
+      font-weight: 700;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .caps-btn:hover {
+      background: var(--accent-blue);
+      color: #090d16;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
+    }
+    .progress-bar-wrap { display: flex; align-items: center; gap: 8px; width: 160px; }
+    .p-bar { flex: 1; height: 7px; background: #090d16; border-radius: 999px; overflow: hidden; }
+    .p-fill { height: 100%; border-radius: 999px; }
+    .p-text { font-weight: 700; font-size: 11.5px; min-width: 34px; text-align: right; }
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-right: 4px;
+    }
+    .tag-a { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .tag-b { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .tag-c { background: rgba(192, 132, 252, 0.15); color: #c084fc; border: 1px solid rgba(192, 132, 252, 0.3); }
+    .tag-status { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .detail-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px;
+    }
+    .detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 14px; }
+    @media (max-width: 900px) { .detail-grid { grid-template-columns: 1fr; } }
+    .detail-box { background: #090d16; border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+    .detail-box h4 { font-size: 12.5px; color: var(--accent-blue); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .code-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .api-pill {
+      background: #1e293b;
+      border: 1px solid var(--border);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 11px;
+      color: #38bdf8;
+    }
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(9, 13, 22, 0.82);
+      backdrop-filter: blur(5px);
+      z-index: 200;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-content {
+      background: var(--bg-card);
+      border: 1px solid var(--accent-blue);
+      border-radius: 14px;
+      max-width: 1040px;
+      width: 100%;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+      overflow: hidden;
+    }
+    .modal-header {
+      padding: 16px 22px;
+      background: #0f172a;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-header h3 { font-size: 16px; color: #fff; }
+    .modal-close {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .modal-close:hover { color: #fff; border-color: var(--accent-rose); }
+    .modal-body { padding: 18px 22px; overflow-y: auto; }
+    table.caps-modal-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    table.caps-modal-table th {
+      background: #090d16;
+      padding: 10px 12px;
+      text-align: left;
+      color: var(--accent-blue);
+      border-bottom: 1px solid var(--border);
+    }
+    table.caps-modal-table td { padding: 10px 12px; border-bottom: 1px solid rgba(51,65,85,0.45); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <h1>🏗️ MEPBridge ACAIstr (Archicad AI Stream · MCP Server)</h1>
+      <p class="subtitle">Native GSAPI Add‑on | Bidirectional MCP Stream for AI-driven BIM Operations</p>
+      <p class="subdesc" id="hdrSub">基于 Archicad DevKit (GSAPI) C++ 族谱绑定、原子 API 功能拆解与 Q1～Q4 工业级生命周期四象限评估（内部自用完整版）</p>
+    </div>
+    <div class="header-actions">
+      <span class="badge" id="hdrBadge">v0.2.0 正式基线 (W1闭合签署) (95 注册项 / 可见 94)</span>
+      <button class="lang-toggle" onclick="toggleLanguage()" id="langBtn">🌐 Switch to English</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-card c1">
+        <div class="stat-title" id="st1Title">1. MCP 契约注册边界</div>
+        <div class="stat-value">95 <span style="font-size:13px; color:var(--text-muted);" id="st1Sub">项 （高内聚、多态设计）</span></div>
+        <div class="stat-desc" id="st1Desc">91 C++ 原生命令 + 4 Server 工具</div>
+      </div>
+      <div class="stat-card c2">
+        <div class="stat-title" id="st2Title">2. API 原子功能规模</div>
+        <div class="stat-value">162 <span style="font-size:13px; color:var(--text-muted);" id="st2Sub">项（全开 189 项）</span></div>
+        <div class="stat-desc" id="st2Desc">多态展开后的 Archicad API 原子功能</div>
+      </div>
+      <div class="stat-card c3">
+        <div class="stat-title" id="st3Title">3. 官方 JSON API 覆盖池</div>
+        <div class="stat-value">46 / 73 <span style="font-size:13px; color:var(--text-muted);" id="st3Sub">项（全开 77 项）</span></div>
+        <div class="stat-desc" id="st3Desc">28项C++超集覆盖 + 18项受控透传</div>
+      </div>
+      <div class="stat-card c4">
+        <div class="stat-title" id="st4Title">4. 生命周期 Q1–Q4 操控覆盖率</div>
+        <div class="stat-value">91.2%</div>
+        <div class="stat-desc" id="st4Desc">构造创建、读取与原位掩码编辑闭环</div>
+      </div>
+      <div class="stat-card c5">
+        <div class="stat-title" id="st5Title">5. 模型事务回滚率</div>
+        <div class="stat-value">99.8%</div>
+        <div class="stat-desc" id="st5Desc">同事务 1mm/0.001rad 内核级自动回滚</div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="filter-group">
+        <button class="filter-btn active" data-cat="ALL" onclick="filterCategory('ALL', this)" id="btnAll">全部功能域 (All)</button>
+        <button class="filter-btn" data-cat="A" onclick="filterCategory('A', this)" id="btnCatA">A 类: 原生几何与复杂构件</button>
+        <button class="filter-btn" data-cat="B" onclick="filterCategory('B', this)" id="btnCatB">B 类: 属性、视图与 JSON 透传</button>
+        <button class="filter-btn" data-cat="C" onclick="filterCategory('C', this)" id="btnCatC">C 类: 快照、算量与智能翻模</button>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header-bar">
+        <h2 id="tblTitle">Archicad 官方功能域与 GSAPI 族谱覆盖矩阵（点击行查看抽屉，点击「API 功能按钮」弹出明细表）</h2>
+        <span style="font-size: 11.5px; color: var(--text-muted);" id="tblGate">API 通道边界 3915 项 PASS | 证据门禁：L1(编译构建) · L2(静态契约) · L3(三版实机全绿)</span>
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="coverage-table">
+          <thead>
+            <tr>
+              <th id="th1">Archicad 官方功能域 (模块映射与分类)</th>
+              <th id="th3">Archicad API 原子功能 (点击查看)</th>
+              <th id="th4">GSAPI / DevKit C++ 族谱绑定</th>
+              <th id="th5">Q1-Q3 生命周期完备度</th>
+              <th id="th6">Q4 事务回滚与安全防线</th>
+              <th id="th7">证据门禁与状态概要</th>
+            </tr>
+          </thead>
+          <tbody id="coverageTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="detail-panel" id="detailPanel"></div>
+  </div>
+
+  <!-- Caps Detail Modal -->
+  <div class="modal-backdrop" id="capsModal" onclick="if(event.target===this) closeCapsModal()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitle">Archicad API 原子功能映射拆解清单</h3>
+        <button class="modal-close" onclick="closeCapsModal()">✕ ESC / Close</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    const I18N = {
+      zh: {
+        hdrSub: "基于 Archicad DevKit (GSAPI) C++ 族谱绑定、原子 API 功能拆解与 Q1～Q4 工业级生命周期四象限评估（内部自用完整版）",
+        hdrBadge: "v0.2.0 正式基线 (W1闭合签署) (95 注册项 / 可见 94)",
+        langBtn: "🌐 Switch to English",
+        st1Title: "1. MCP 契约注册边界", st1Sub: "项 （高内聚、多态设计）", st1Desc: "91 C++ 原生命令 + 4 Server 工具",
+        st2Title: "2. API 原子功能规模", st2Sub: "项（全开 189 项）", st2Desc: "多态展开后的 Archicad API 原子功能",
+        st3Title: "3. 官方 JSON API 覆盖池", st3Desc: "28项C++超集覆盖 + 18项受控透传",
+        st4Title: "4. 生命周期 Q1–Q4 操控覆盖率", st4Desc: "构造创建、读取与原位掩码编辑闭环",
+        st5Title: "5. 模型事务回滚率", st5Desc: "同事务 1mm/0.001rad 内核级自动回滚",
+        btnAll: "全部功能域 (All)", btnCatA: "A 类: 原生几何与复杂构件", btnCatB: "B 类: 属性、视图与 JSON 透传", btnCatC: "C 类: 快照、算量与智能翻模",
+        searchPlaceholder: "🔍 搜索功能域、GSAPI、原子能力...",
+        tblTitle: "Archicad 官方功能域与 GSAPI 族谱覆盖矩阵（点击行查看抽屉，点击「API 功能按钮」弹出明细表）",
+        tblGate: "API 通道边界 3915 项 PASS | 证据门禁：L1(编译构建) · L2(静态契约) · L3(AC28/29/30三版实机全绿)",
+        th1: "Archicad 官方功能域 (模块映射与分类)", th3: "Archicad API 原子功能 (点击查看)", th4: "GSAPI / DevKit C++ 族谱绑定", th5: "Q1-Q3 生命周期完备度", th6: "Q4 事务回滚与安全防线", th7: "证据门禁与状态概要",
+        capsBtnUnit: "项 API 功能 (点击列出)",
+        capsSubHint: "Archicad API 原子粒度展开",
+        classPrefix: "类别：",
+        boxCmd: "📦 注册命令与多态子类型清单", boxApi: "⚡ 绑定 GSAPI / DevKit C++ 与 Memo 掩码", boxNotes: "🛡️ 工程架构说明与事务安全护栏",
+        drawerScaleLabel: "Archicad API 原子功能数",
+        modalColIdx: "#", modalColCap: "Archicad API 原子功能项", modalColCmd: "承载的 MEPBridge 命令 / 多态参数", modalColGsapi: "底层 GSAPI / 通道绑定"
+      },
+      en: {
+        hdrSub: "Based on Archicad DevKit (GSAPI) C++ family bindings, atomic API capability breakdown, and Q1-Q4 industrial lifecycle assessment (Internal Full Edition)",
+        hdrBadge: "v0.2.0 Formal Baseline (W1 Signed) (95 Registries / 94 Visible)",
+        langBtn: "🌐 切换中文",
+        st1Title: "1. MCP Contract Registries", st1Sub: "items (Polymorphic Design)", st1Desc: "91 C++ Native Commands + 4 Server Tools",
+        st2Title: "2. API Atomic Capability Scale", st2Sub: "items (189 full)", st2Desc: "Atomic Archicad API capabilities via polymorphic breakdown",
+        st3Title: "3. Official JSON API Pool", st3Desc: "28 C++ supersets + 18 controlled pass-thrus",
+        st4Title: "4. Lifecycle Q1–Q4 Control Coverage", st4Desc: "Creation, read & in-place mask edit closure",
+        st5Title: "5. Model Transaction Rollback", st5Desc: "In-transaction 1mm/0.001rad kernel rollback",
+        btnAll: "All Functional Domains", btnCatA: "Class A: Native Geometry & Complex", btnCatB: "Class B: Attributes, View & JSON", btnCatC: "Class C: Snapshot, QTO & CAD Reverse",
+        searchPlaceholder: "🔍 Search domain, GSAPI, atomic capability...",
+        tblTitle: "Archicad Functional Domains & GSAPI Coverage Matrix (Click row for drawer, click 'Caps' button to list atomic functions)",
+        tblGate: "API Channel Boundary 3915 PASS | Gates: L1 (Build) · L2 (Contract) · L3 (Dual Real-Machine)",
+        th1: "Archicad Functional Domain (Module & Class)", th3: "Archicad API Capabilities (Click to List)", th4: "GSAPI / DevKit C++ Family Binding", th5: "Q1-Q3 Lifecycle Completeness", th6: "Q4 Rollback & Safety Defense", th7: "Evidence Gate & Status Summary",
+        capsBtnUnit: "Archicad API Caps (List)",
+        capsSubHint: "Archicad API Atomic Granularity",
+        classPrefix: "Class ",
+        boxCmd: "📦 Registered Commands & Polymorphic Subtypes", boxApi: "⚡ Bound GSAPI / DevKit C++ & Memo Masks", boxNotes: "🛡️ Engineering Architecture Notes & Transaction Safety",
+        drawerScaleLabel: "Archicad API Atomic Capabilities",
+        modalColIdx: "#", modalColCap: "Archicad API Atomic Capability", modalColCmd: "MEPBridge Command / Polymorphic Param", modalColGsapi: "Underlying GSAPI / Channel"
+      }
+    };
+
+    let currentLang = 'zh';
+
+    const COVERAGE_DATA = [
+      {
+        id: "dom_base_arch",
+        category: "A",
+        nameZh: "1. 基础建筑与空间构件域", nameEn: "1. Basic Architecture & Structural Elements",
+        modZh: "A2 基础构建 (13项核心 C++)", modEn: "A2 Core Building (13 Core C++)",
+        textZh: "创建 + 读取 + 原位Mask编辑 (墙/柱/梁/板/屋顶/楼梯等)", textEn: "Create + Read + Mask Edit (Wall/Col/Beam/Slab/Roof/Stair)",
+        rollZh: "95% (同事务1mm回滚，楼梯debugRetain)", rollEn: "95% (In-trans 1mm rollback, Stair debugRetain)",
+        gateZh: "L3 双版实机已验", gateEn: "L3 Dual Real-Machine",
+        statusZh: "全周期已闭环 (含坡度回读与柱楼层防溢出)", statusEn: "Fully Closed (Slope readback & floor guard)",
+        equivCount: 18,
+        devkitFamily: "ACAPI_Element_Create, Get, Change, Delete, CalcBounds",
+        qPct: 98,
+        ratio162: "11.1%",
+        commands: ["CreateWall", "CreateColumn", "CreateBeam", "CreateSlab", "CreateRoof", "CreateStair", "CreateDoor", "CreateWindow", "CreateObject", "CreateLamp", "CreateMesh", "CreateMorph", "CreateZone"],
+        apiDetails: ["ACAPI_Element_Create", "ACAPI_Element_Get", "ACAPI_Element_Change", "ACAPI_Element_Delete", "ACAPI_Element_CalcBounds", "ACAPI_Element_GetMemo"],
+        notesZh: "原生封装墙内外皮/中心线对齐、梁顶偏移、柱floorIndex溢出保护与楼梯求解器防锁死。v0.1.8实现同事务1mm内核回滚。",
+        notesEn: "Native encapsulation of wall skin/centerline alignment, beam topOffset, column floorIndex overflow protection, and stair solver lock. v0.1.8 implements in-transaction 1mm kernel rollback.",
+        capsList: [
+          { capZh: "直墙与偏置墙创建 (含基准线内外皮偏置 & bottomOffset)", capEn: "Linear & Offset Wall Creation (skin/centerline & bottomOffset)", cmd: "CreateWall", gsapi: "API_WallID + ACAPI_Element_Create" },
+          { capZh: "弧形墙与多段墙创建", capEn: "Curved & Trapezoid/Poly Wall Creation", cmd: "CreateWall (arcAngle / poly)", gsapi: "API_WallID + APIMemoMask_Polygon" },
+          { capZh: "结构柱创建 (含 floorIndex 防 short 窄化溢出核验)", capEn: "Column Creation (with floorIndex 16-bit overflow guard)", cmd: "CreateColumn", gsapi: "API_ColumnID + ValidateAndCastFloorIndex" },
+          { capZh: "结构梁创建 (含 topOffset 降板/找坡顶偏移)", capEn: "Structural Beam Creation (with topOffset vertical control)", cmd: "CreateBeam", gsapi: "API_BeamID + ACAPI_Element_Create" },
+          { capZh: "多边形楼板创建 (自动闭合去重 + 显式厚度写入)", capEn: "Polygon Slab Creation (auto-close & explicit thickness)", cmd: "CreateSlab", gsapi: "API_SlabID + ElemMemoGuard" },
+          { capZh: "单坡/多边形屋顶创建与坡度回读", capEn: "PlaneRoof Creation & Slope Readback", cmd: "CreateRoof", gsapi: "API_RoofID + planeRoof.angle" },
+          { capZh: "参数化直跑楼梯创建 (锁定 stepNum/totalHeight + debugRetain)", capEn: "Stair Creation (solver lock & debugRetainOnMismatch)", cmd: "CreateStair", gsapi: "API_StairID + Stair Solver Lock" },
+          { capZh: "宿主墙体关联门构件创建", capEn: "Host-linked Door Creation", cmd: "CreateDoor", gsapi: "API_DoorID + owner GUID" },
+          { capZh: "宿主墙体关联窗构件创建", capEn: "Host-linked Window Creation", cmd: "CreateWindow", gsapi: "API_WindowID + owner GUID" },
+          { capZh: "GDL 通用对象部件放置", capEn: "GDL Object Placement", cmd: "CreateObject", gsapi: "API_ObjectID + libInd" },
+          { capZh: "照明灯具部件放置 (v0.1.8 标准样本转 PASS)", capEn: "Lighting Lamp Placement (v0.1.8 verified)", cmd: "CreateLamp", gsapi: "API_LampID + libInd" },
+          { capZh: "地形网格 (Mesh) 创建", capEn: "Topography Mesh Creation", cmd: "CreateMesh", gsapi: "API_MeshID + APIMemoMask_MeshPolyZ" },
+          { capZh: "自由体 (Morph) 显式顶点/面拓扑创建 (共面三角化)", capEn: "Freeform Morph Creation (coplanar triangulation)", cmd: "CreateMorph", gsapi: "API_MorphID + body memo" },
+          { capZh: "空间功能区 (Zone) 创建", capEn: "Spatial Zone Creation", cmd: "CreateZone", gsapi: "API_ZoneID + APIMemoMask_Polygon" },
+          { capZh: "构件 2D 轴对齐包围盒查询 (超集替代官方 Get2DBoundingBoxes)", capEn: "2D AABB Query (Superset of Official JSON)", cmd: "GetElementGeometry", gsapi: "ACAPI_Element_CalcBounds (2D)" },
+          { capZh: "构件 3D 轴对齐包围盒查询 (超集替代官方 Get3DBoundingBoxes)", capEn: "3D AABB Query (Superset of Official JSON)", cmd: "GetElementGeometry", gsapi: "ACAPI_Element_CalcBounds (3D)" },
+          { capZh: "构件楼层与标高范围 (elevationRange) 精确回读", capEn: "Story & Elevation Range Readback", cmd: "GetElementGeometry / GetElementsByType", gsapi: "ACAPI_Element_GetHeader + StorySettings" },
+          { capZh: "GDL 内部参数字典读取与覆写 (v0.1.9 P0 底座)", capEn: "GDL Internal AddPars Dictionary Read/Write (v0.1.9 P0)", cmd: "GetElementGeometry(includeGdlParams)", gsapi: "APIMemoMask_AddPars" }
+        ]
+      },
+      {
+        id: "dom_complex",
+        category: "A",
+        nameZh: "2. 复杂系统构件与主从拓扑域", nameEn: "2. Complex Systems & Topology (CW/Shell/Railing/Skylight)",
+        modZh: "A3 复杂构件 (CreateComplexElement)", modEn: "A3 Complex Elements (CreateComplexElement)",
+        textZh: "创建已解封；幕墙原位编辑闭环", textEn: "Creation Unlocked; Curtain Wall In-Place Edit Closed",
+        rollZh: "幕墙 Q3 闭环；壳体/栏杆/天窗延期转后续", rollEn: "Curtain Wall Q3 closed; Shell/Railing/Skylight deferred",
+        gateZh: "生命周期按构件拆分：幕墙 CURRENT；其余三类 PLANNED_V020", gateEn: "Lifecycle split by element: Curtain Wall CURRENT; other three PLANNED_V020",
+        statusZh: "幕墙原位深化闭环 (三类延期)", statusEn: "Curtain Wall in-place closed (3 deferred)",
+        equivCount: 8,
+        devkitFamily: "ACAPI_Element_Create, APIMemoMask_CWall*, shellShapes, railingNodes",
+        qPct: 50,
+        ratio162: "4.9%",
+        commands: ["CreateComplexElement [CurtainWall]", "CreateComplexElement [ExtrudedShell]", "CreateComplexElement [Railing]", "CreateComplexElement [Skylight]", "[v0.1.9] CW/Shell/Railing/Skylight Edit"],
+        apiDetails: ["ACAPI_Element_Create", "APIMemoMask_CWallFrames", "APIMemoMask_CWallPanels", "APIMemoMask_Polygon", "ValidateHostElement"],
+        notesZh: "v0.1.8全解封4类复杂构件创建，配天窗宿主2D AABB预检与子类型动态门禁。v0.1.9重点闭环CW-W2/SHELL-W2掩码编辑。",
+        notesEn: "v0.1.8 unblocked all 4 complex element creations with host 2D AABB pre-validation and subtype dynamic gating. v0.1.9 focuses on CW-W2/SHELL-W2 mask editing closure.",
+        capsList: [
+          { capZh: "建筑幕墙系统创建 (CurtainWall 路径 + 高度核验)", capEn: "Curtain Wall System Creation (pathCoords + height check)", cmd: "CreateComplexElement(type='CurtainWall')", gsapi: "API_CurtainWallID + RawHandleGuard" },
+          { capZh: "拉伸壳体创建 (ExtrudedShell 闭合截面 + shellShapes/pends 配对)", capEn: "Extruded Shell Creation (closed profile + shellShapes)", cmd: "CreateComplexElement(type='ExtrudedShell')", gsapi: "API_ShellID + shellShapes[0]" },
+          { capZh: "直线/折线栏杆创建 (Railing 路径节点与段拓扑初始化)", capEn: "Railing System Creation (nodes & segments topology)", cmd: "CreateComplexElement(type='Railing')", gsapi: "API_RailingID + railingNodes/Segments" },
+          { capZh: "屋顶/壳体天窗创建 (含 ValidateHostElement 宿主 2D AABB 预检)", capEn: "Skylight Creation (with host Roof/Shell 2D AABB check)", cmd: "CreateComplexElement(type='Skylight')", gsapi: "API_SkylightID + ValidateHostElement" },
+          { capZh: "幕墙主从复合树深度读取 (Frames / Panels / Scheme)", capEn: "Curtain Wall Hierarchy Deep Read (v0.1.9 P0)", cmd: "GetElementGeometry / GetComplexElementHierarchy", gsapi: "APIMemoMask_CWallFrames | CWallPanels" },
+          { capZh: "幕墙分格模数与高度原位掩码编辑 (CW-W2)", capEn: "Curtain Wall In-Place Mask Edit (CW-W2, v0.1.9 P0)", cmd: "EditBuildingElement (CurtainWall)", gsapi: "ACAPI_Element_Change + CWallSegments" },
+          { capZh: "壳体与栏杆原位参数掩码编辑 (SHELL-W2 / RAIL-W2)", capEn: "Shell & Railing In-Place Mask Edit (v0.1.9 P0)", cmd: "EditBuildingElement (Shell / Railing)", gsapi: "ACAPI_Element_Change + Memo Mask" },
+          { capZh: "全塔双跑楼梯核心筒复合构建系统 (273 构件跨层协同)", capEn: "Full-Tower Double-Flight Stair Core Compound System", cmd: "stair_system_compound (C4 Skill)", gsapi: "Multi-Command Orchestration" }
+        ]
+      },
+      {
+        id: "dom_edit_batch",
+        category: "A",
+        nameZh: "3. 几何变换、实体布尔与双模批量域", nameEn: "3. Geometric Transforms, Solid Operations & Batching",
+        modZh: "A4 变换、编辑与批量 (17项)", modEn: "A4 Edit, Transform & Batch (17 Commands)",
+        textZh: "刚体变换 + SEO布尔 + 双档批量(500上限)", textEn: "Rigid transforms + SEO boolean + Dual-tier Batching (500 limit)",
+        rollZh: "100% (strict_all_or_nothing 与 element_isolated)", rollEn: "100% (strict_all_or_nothing & element_isolated)",
+        gateZh: "L3 双版实机已验", gateEn: "L3 Dual Real-Machine",
+        statusZh: "全周期已闭环 (双模批量500)", statusEn: "Fully Closed (Dual-mode Batch 500)",
+        equivCount: 24,
+        devkitFamily: "ACAPI_Element_Move, Rotate, Mirror, SolidOperation_Create, Trim_Elements",
+        qPct: 98,
+        ratio162: "14.8%",
+        commands: ["EditBuildingElement", "BatchCreateElements", "DeleteElements", "ChangeElementGeometry", "ChangeOpeningGeometry", "CreateSolidOperation", "TrimElements", "MoveBuildingElements", "Rotate", "Mirror", "Copy", "Multiply"],
+        apiDetails: ["ACAPI_Element_Move", "ACAPI_Element_Rotate", "ACAPI_Element_Mirror", "ACAPI_Element_SolidOperation_Create", "ACAPI_Element_Trim_Elements"],
+        notesZh: "提供严格原子回滚(strict_all_or_nothing)用于AI对话建模，以及单件隔离模式(element_isolated)用于CAD翻模。",
+        notesEn: "Provides strict atomic rollback for AI chat modeling and isolated batching for large-scale CAD reverse modeling.",
+        capsList: [
+          { capZh: "墙体原位掩码编辑 (厚度/高度/偏移零漂移修改)", capEn: "Wall In-Place Mask Edit (thickness/height/offset)", cmd: "EditBuildingElement (Wall)", gsapi: "ACAPI_Element_Change (Wall Mask)" },
+          { capZh: "结构柱与结构梁原位掩码编辑", capEn: "Column & Beam In-Place Mask Edit", cmd: "EditBuildingElement (Column/Beam)", gsapi: "ACAPI_Element_Change (Col/Beam Mask)" },
+          { capZh: "楼板厚度与标高原位掩码编辑", capEn: "Slab Thickness & Level In-Place Mask Edit", cmd: "EditBuildingElement (Slab)", gsapi: "ACAPI_Element_Change (Slab Mask)" },
+          { capZh: "单坡屋顶坡度角、标高与枢轴线原位掩码编辑 (V18-NAT-05)", capEn: "PlaneRoof Slope, Level & Pivot Line Mask Edit", cmd: "EditBuildingElement (PlaneRoof)", gsapi: "ACAPI_Element_Change (Roof Mask)" },
+          { capZh: "多边形构件轮廓顶点级几何修改", capEn: "Polygon Vertex-level Geometry Modification", cmd: "ChangeElementGeometry", gsapi: "ACAPI_Element_ChangeMemo (Polygon)" },
+          { capZh: "门窗洞口宽高与窗台高几何修改 (带 B3-3 回读门禁)", capEn: "Door/Window Opening Geometry Modification", cmd: "ChangeOpeningGeometry", gsapi: "ACAPI_Element_Change (Opening)" },
+          { capZh: "三维向量保持原 GUID 真移动", capEn: "3D Vector True Move (preserving GUID)", cmd: "MoveBuildingElements", gsapi: "ACAPI_Element_Edit (APIEdit_Drag)" },
+          { capZh: "构件绕基准点旋转变换", capEn: "Element Rotation Transform", cmd: "Rotate", gsapi: "ACAPI_Element_Edit (APIEdit_Rotate)" },
+          { capZh: "构件跨轴线镜像变换", capEn: "Element Mirror Transform", cmd: "Mirror", gsapi: "ACAPI_Element_Edit (APIEdit_Mirror)" },
+          { capZh: "构件单次复制与双向向量矩阵阵列", capEn: "Element Copy & 2D Vector Array Multiply", cmd: "Copy / Multiply", gsapi: "ACAPI_Element_Edit (Multiply)" },
+          { capZh: "实体布尔运算：差集/交集/并集/向上向下拉伸剪切 (SEO)", capEn: "Solid Element Operations: Subtract/Intersect/Add (5 modes)", cmd: "CreateSolidOperation", gsapi: "ACAPI_Element_SolidOperation_Create" },
+          { capZh: "屋顶与壳体修剪墙柱构件 (KeepInside / KeepOutside)", capEn: "Roof/Shell Trim Elements (KeepInside/Outside)", cmd: "TrimElements", gsapi: "ACAPI_Element_Trim_Elements" },
+          { capZh: "全回滚原子批量创建模式 (AI 对话交互建模 ≤500)", capEn: "Strict All-or-Nothing Atomic Batch Creation (≤500)", cmd: "BatchCreateElements(strict_all_or_nothing)", gsapi: "UndoableTransactionGuard (Batch)" },
+          { capZh: "单件隔离容错批量创建模式 (CAD 底图大批量翻模 ≤500)", capEn: "Element-Isolated Fault-Tolerant Batch Creation (≤500)", cmd: "BatchCreateElements(element_isolated)", gsapi: "CompensateDeleteElement (Single)" },
+          { capZh: "带 dryRun 预演与 >50 项 acknowledgeCount 防呆回抄的安全删除", capEn: "Safe Deletion with dryRun & >50 acknowledgeCount Guard", cmd: "DeleteElements (BATCH-4)", gsapi: "ACAPI_Element_Delete" }
+        ]
+      },
+      {
+        id: "dom_2d_drafting",
+        category: "A",
+        nameZh: "4. 2D 施工图感知与文档注释域", nameEn: "4. 2D Drafting Perception & Annotation Docs",
+        modZh: "A1 2D感知 (CMD-1 / ReadDraftingElements)", modEn: "A1 2D Perception (CMD-1 / ReadDraftingElements)",
+        textZh: "6类图元(含PolyLine/Hatch) + Worksheet + SP-1探针", textEn: "6 primitives (Line/PolyLine/Hatch) + Worksheet + SP-1 probe",
+        rollZh: "90% (ScopedDatabaseGuard 自动恢复上下文)", rollEn: "90% (ScopedDatabaseGuard auto-restore context)",
+        gateZh: "L2/L3 混合就绪", gateEn: "L2/L3 Ready",
+        statusZh: "生产就绪 (覆盖6类图元、工作图穿透与防篡改指纹)", statusEn: "Production Ready (6 primitives & Worksheet pierce)",
+        equivCount: 14,
+        devkitFamily: "ACAPI_Database_ChangeCurrentDatabase, APIMemoMask_DrawingData, API_*ID",
+        qPct: 88,
+        ratio162: "8.6%",
+        commands: ["ReadDraftingElements (CMD-1)", "CreateText", "CreateDimension", "CreateLabel", "GetDocumentationElements", "[v0.1.9] CreateDraftingLines (CMD-2)"],
+        apiDetails: ["ACAPI_Database_ChangeCurrentDatabase", "APIMemoMask_DrawingData", "API_LineID", "API_PolyLineID", "API_HatchID", "API_TextID"],
+        notesZh: "v0.1.8新增王牌2D底座 ReadDraftingElements，穿透平面图与Worksheet提取6类图元(含Hatch填充)、FNV-1a指纹与远原点守卫。",
+        notesEn: "v0.1.8 introduces ReadDraftingElements to pierce Floor Plan & Worksheet extracting 6 primitives (inc. Hatch), FNV-1a fingerprint & origin guard.",
+        capsList: [
+          { capZh: "2D 直线段 (Line) 坐标与图层/线型提取", capEn: "2D Line Segment Extraction", cmd: "ReadDraftingElements(elementTypes=['Line'])", gsapi: "API_LineID" },
+          { capZh: "2D 多段线 (PolyLine) 顶点序列与弧段 (polyArcs) 提取", capEn: "2D PolyLine Vertices & polyArcs Extraction", cmd: "ReadDraftingElements(elementTypes=['PolyLine'])", gsapi: "API_PolyLineID + APIMemoMask_Polygon" },
+          { capZh: "2D 圆弧 (Arc) 与完整圆 (Circle) 几何提取", capEn: "2D Arc & Circle Geometry Extraction", cmd: "ReadDraftingElements(elementTypes=['Arc','Circle'])", gsapi: "API_ArcID / API_CircleID" },
+          { capZh: "2D 图纸文字 (Text) 内容与锚点坐标提取 (轴号/构件编号识别)", capEn: "2D Text Content & Anchor Extraction", cmd: "ReadDraftingElements(elementTypes=['Text'])", gsapi: "API_TextID + textContent" },
+          { capZh: "2D 填充多边形 (Hatch) 外轮廓提取 (钢筋混凝土柱/剪力墙识别)", capEn: "2D Hatch Boundary Polygon Extraction (RC Column/Wall)", cmd: "ReadDraftingElements(elementTypes=['Hatch'])", gsapi: "API_HatchID + APIMemoMask_Polygon" },
+          { capZh: "平面图 (FloorPlan) 视口数据库 2D 图元扫描", capEn: "FloorPlan Window Database 2D Scanning", cmd: "ReadDraftingElements(windowType='floorPlan')", gsapi: "APIWind_FloorPlanID" },
+          { capZh: "工作图 (Worksheet) 与详图 (Detail) 跨数据库穿透读取", capEn: "Worksheet & Detail Cross-Database Piercing Read", cmd: "ReadDraftingElements(windowType='worksheet'|'detail')", gsapi: "ACAPI_Database_ChangeCurrentDatabase" },
+          { capZh: "SP-1 绘图页内部矢量流 (APIMemoMask_DrawingData) 双通道探针", capEn: "SP-1 Drawing Memo Internal Vector Stream Probe", cmd: "ReadDraftingElements(sourceMode='drawing_memo')", gsapi: "API_DrawingID + APIMemoMask_DrawingData" },
+          { capZh: "FNV-1a 防篡改底图指纹与 5km 国家大地坐标远原点预警", capEn: "FNV-1a Source Fingerprint & 5km Far-From-Origin Check", cmd: "ReadDraftingElements (originCheck/sourceFingerprint)", gsapi: "Native C++ Hash & BBox Guard" },
+          { capZh: "创建 2D 文字注释、线性尺寸标注与构件关联标签 (3 项)", capEn: "Create 2D Text, Linear Dimension & Associative Label (3 Caps)", cmd: "CreateText / CreateDimension / CreateLabel", gsapi: "API_TextID / DimensionID / LabelID" },
+          { capZh: "读取文档注释元素 & 生成 2D 辅助参考线 (CMD-2)", capEn: "Read Documentation Elements & Create Drafting Lines (CMD-2)", cmd: "GetDocumentationElements / CreateDraftingLines", gsapi: "ACAPI_Element_GetElemList / Create" }
+        ]
+      },
+      {
+        id: "dom_mep",
+        category: "A",
+        nameZh: "5. MEP 机电管网与拓扑求解域", nameEn: "5. MEP Piping, Ducting & Topology Solver",
+        modZh: "A5 原生机电 (17项)", modEn: "A5 Native MEP (17 Commands)",
+        textZh: "管道/风管/桥架创建 + SolveConnections配件求解", textEn: "Pipe/Duct/CableCarrier creation + SolveConnections fittings",
+        rollZh: "85% (标准错误信封与参数校验护栏)", rollEn: "85% (Standard error envelopes & param guards)",
+        gateZh: "L3 双版实机已验 (AC28/AC29)", gateEn: "L3 Verified (AC28/29)",
+        statusZh: "生产就绪 (含转折配件求解与梁板柱碰撞预检)", statusEn: "Production Ready (Fitting solver & clash pre-scan)",
+        equivCount: 20,
+        devkitFamily: "ACAPI::MEP::v1::ElementDefault, Piping, Ducting, CableCarrier, RoutingElement",
+        qPct: 88,
+        ratio162: "12.3%",
+        commands: ["CreatePipe", "CreateDuct", "CreateCableCarrier", "CreateMEPRoute", "ChangeMEPRouteProperties", "SolveConnections", "CreateTakeOff", "CreateFlexibleSegment", "ScanStructuralElements"],
+        apiDetails: ["ACAPI::MEP::v1::ElementDefault", "ACAPI::MEP::v1::RoutingElement", "ACAPI::MEP::v1::Port", "ACAPI::MEP::v1::SolveConnections"],
+        notesZh: "深度覆盖水、风、桥架创建及 SolveConnections 转折交叉配件自动求解、ScanStructuralElements 结构 AABB 碰撞预检。",
+        notesEn: "Deep coverage of pipe, duct, cable carrier creation, SolveConnections cross fitting solver, and ScanStructuralElements AABB clash pre-check.",
+        capsList: [
+          { capZh: "水暖管段 (Pipe) 创建与标准管径校核", capEn: "Piping Segment Creation & Standard Diameter Check", cmd: "CreatePipe", gsapi: "ACAPI::MEP::v1::Piping" },
+          { capZh: "暖通矩形/圆形风管 (Duct) 创建", capEn: "HVAC Rectangular/Circular Duct Creation", cmd: "CreateDuct", gsapi: "ACAPI::MEP::v1::Ducting" },
+          { capZh: "电气电缆桥架 (CableCarrier) 创建", capEn: "Electrical Cable Carrier Creation", cmd: "CreateCableCarrier", gsapi: "ACAPI::MEP::v1::CableCarrier" },
+          { capZh: "多节点连续机电路由 (MEPRoute) 创建", capEn: "Multi-node Continuous MEP Routing Creation", cmd: "CreateMEPRoute", gsapi: "ACAPI::MEP::v1::RoutingElement" },
+          { capZh: "机电路由管径、保温层与节点 Z 标高偏移修改", capEn: "MEP Route Properties & Node Z-Offset Modification", cmd: "ChangeMEPRouteProperties", gsapi: "RoutingElement / RoutingNode Modify" },
+          { capZh: "管段转折弯头、三通与四通交叉配件自动求解装配", capEn: "Automatic Elbow, Tee & Cross Fitting Connection Solver", cmd: "SolveConnections", gsapi: "ACAPI::MEP::v1::Port / Fitting" },
+          { capZh: "风管/水管支管接头 (TakeOff) 与软管 (FlexibleSegment) 创建", capEn: "TakeOff & Flexible Segment Creation", cmd: "CreateTakeOff / CreateFlexibleSegment", gsapi: "ACAPI::MEP::v1::TakeOff / Flexible" },
+          { capZh: "机电布管前梁、板、柱结构构件 AABB 碰撞扫描预检", capEn: "Structural Beam/Slab/Column AABB Clash Pre-Scan", cmd: "ScanStructuralElements", gsapi: "ACAPI_Element_CalcBounds (Structural)" },
+          { capZh: "MEP 终端设备、阀门配件、端口连通性查询与系统分组管理 (12 项细粒度能力)", capEn: "MEP Terminals, Fittings, Port Connectivity & System Queries (12 Caps)", cmd: "17 Native MEP Commands Suite", gsapi: "ACAPI::MEP::v1::*" }
+        ]
+      },
+      {
+        id: "dom_env_attr",
+        category: "B",
+        nameZh: "6. 楼层空间、属性族与分类体系域", nameEn: "6. Stories, Attribute Families & Classification Systems",
+        modZh: "B1 & B2 环境与属性 (22项)", modEn: "B1 & B2 Environment & Attributes (22 Commands)",
+        textZh: "Stories增删改 + 9大属性族 + 截面与分类", textEn: "Stories CRUD + 9 Attribute Families + Profiles",
+        rollZh: "90% (DeleteStory强门禁，Ensure隔离)", rollEn: "90% (DeleteStory guard, Ensure isolation)",
+        gateZh: "L3 双版实机已验", gateEn: "L3 Dual Real-Machine",
+        statusZh: "生产就绪 (9大属性族全覆盖与属性完整性对账)", statusEn: "Production Ready (9 families & property reconciliation)",
+        equivCount: 38,
+        devkitFamily: "ACAPI_Environment (StorySettings), ACAPI_Attribute_Get, ACAPI_Element_GetPropertyObjects",
+        qPct: 95,
+        ratio162: "23.5%",
+        commands: ["GetAttributes [9 Families]", "GetStories", "CreateStory", "DeleteStory", "ChangeStorySettings", "SetActiveStory", "GetElementProperties", "SetElementProperties", "GetClassifications", "AssignClassification", "GetProfiles", "EnsurePropertyDefinitions"],
+        apiDetails: ["ACAPI_Environment", "ACAPI_Attribute_Get", "ACAPI_Attribute_GetNum", "ACAPI_Element_GetPropertyObjects", "ACAPI_Element_GetClassificationItems"],
+        notesZh: "完整覆盖 Archicad 全部 9 大属性族查询与构件属性读写。EnsurePropertyDefinitions 维持 MCP 层内部 isolation 隔离态。",
+        notesEn: "Complete read coverage across all 9 attribute families with strict property write reconciliation. EnsurePropertyDefinitions stays isolated.",
+        capsList: [
+          { capZh: "属性族 1～9 全量查询：图层 / 建筑材料 / 复合结构 / 表面材质 / 填充 / 线型 / 画笔 / 区域类别 / MEP系统 (9 项)", capEn: "All 9 Attribute Families Read: Layers/Materials/Composites/Surfaces/Fills/Lines/Pens/Zones/MEP (9 Caps)", cmd: "GetAttributes (family enum 1..9)", gsapi: "ACAPI_Attribute_Get / GetNum" },
+          { capZh: "楼层生命周期管理：查询 / 插入新楼层 / 安全删除楼层 / 修改层高标高 / 切换激活层 (5 项)", capEn: "Stories Lifecycle: Get / Create / Safe Delete / Change Elevation / Set Active (5 Caps)", cmd: "GetStories / CreateStory / DeleteStory / ChangeStorySettings / SetActiveStory", gsapi: "APIEnv_Get/ChangeStorySettingsID" },
+          { capZh: "构件属性完整性对账读取与逐项安全回退写入 (4 项)", capEn: "Element Properties Read (with completeness check) & Write (4 Caps)", cmd: "GetElementProperties / SetElementProperties", gsapi: "ACAPI_Element_Get/SetPropertyValues" },
+          { capZh: "分类体系树查询、构件分类赋值与复杂截面 (Profiles) 读取 (4 项)", capEn: "Classification Tree Read, Assignment & Complex Profiles Read (4 Caps)", cmd: "GetClassifications / AssignClassification / GetProfiles", gsapi: "ACAPI_Classification / Profile API" },
+          { capZh: "工程全局信息、轴网 (Grid) AABB 与热链接 (Hotlinks) 模块读取 (4 项)", capEn: "Project Info, Grid Elements AABB & Hotlinks Module Read (4 Caps)", cmd: "GetProjectInfo / GetGridElements / GetHotlinks", gsapi: "ACAPI_Environment / Hotlink API" },
+          { capZh: "超集覆盖 10 项官方基础属性/分类 JSON API + 6 项白名单透传 (12 项)", capEn: "Superset of 10 Official Property JSON APIs + 6 Whitelisted Pass-Thru (12 Caps)", cmd: "Native B1/B2 + Official JSON Whitelist", gsapi: "GSAPI + Official JSON Bridge" }
+        ]
+      },
+      {
+        id: "dom_view_json",
+        category: "B",
+        nameZh: "7. 视图、收藏夹与 JSON 透传域", nameEn: "7. Viewports, Favorites & Official JSON API Whitelist",
+        modZh: "B3 视图与官方透传 (16 C++ + 18 JSON)", modEn: "B3 Views & Official JSON Pass-Thru (16 C++ + 18 JSON)",
+        textZh: "Favorites预设 + ViewportCapture + 白名单透传", textEn: "Favorites preset + ViewportCapture + Whitelisted JSON",
+        rollZh: "95% (严格白名单门禁，未授权接口100%拦截)", rollEn: "95% (Strict whitelist guard, unauthorized block)",
+        gateZh: "L3 实机已验", gateEn: "L3 Verified",
+        statusZh: "受控白名单透传 (17只读+1写，可批开剩余只读池)", statusEn: "Whitelisted Pass-Thru (17R + 1W controlled)",
+        equivCount: 28,
+        devkitFamily: "ACAPI_Favorite_Get/Create, ACAPI_Selection_Get/Set, Official JSON API",
+        qPct: 92,
+        ratio162: "17.3%",
+        commands: ["GetFavorites", "ApplyFavorite", "CreateFavorite", "SaveFavorite", "GetSelectedElements", "SetSelectedElements", "ViewportCapture", "GetGsmObjectCatalog", "FindElementsByProperty", "Ping", "Official JSON Whitelist (17R + 1W)"],
+        apiDetails: ["ACAPI_Favorite_Get", "ACAPI_Favorite_Apply", "ACAPI_Selection_Get", "ACAPI_Selection_Set", "API.ExecuteAddOnCommand (Official JSON)"],
+        notesZh: "严格的官方 JSON 白名单透传契约锁，拦截未授权接口，提供 ViewportCapture 视口截图与 Favorites 收藏夹预设管理。",
+        notesEn: "Strict official JSON whitelist contract lock, blocking unauthorized commands, offering ViewportCapture & Favorites preset management.",
+        capsList: [
+          { capZh: "收藏夹预设全周期：查询列表 / 套用至构件 / 基于构件创建 / 导出保存 (5 项)", capEn: "Favorites Lifecycle: Get / Apply / Create / Save / CreateFromFavorite (5 Caps)", cmd: "GetFavorites / ApplyFavorite / CreateFavorite / SaveFavorite", gsapi: "ACAPI_Favorite_*" },
+          { capZh: "选择集双向交互：读取当前高亮选择集 GUID / 反向高亮指定构件 / 清空选区 (3 项)", capEn: "Selection Bidirectional: Get Selected / Set Highlighted / Deselect (3 Caps)", cmd: "GetSelectedElements / SetSelectedElements", gsapi: "ACAPI_Selection_Get / Set" },
+          { capZh: "视口图像截图捕获 (ViewportCapture)、GDL 库目录检索与按属性条件查找构件 (4 项)", capEn: "Viewport Image Capture, GSM Catalog Search & Find Elements by Property (4 Caps)", cmd: "ViewportCapture / GetGsmObjectCatalog / FindElementsByProperty", gsapi: "APIDb_DrawStoryControlID / LibPart" },
+          { capZh: "图层显隐/锁定状态批量控制与标准 Descriptor 级 Ping 连通探针 (4 项)", capEn: "Batch Layer Visibility/Lock Control & Descriptor-routed Ping Probe (4 Caps)", cmd: "SetLayerBatch / mepbridge_ping", gsapi: "ACAPI_Attribute_Modify (Layer)" },
+          { capZh: "Official JSON 白名单受控透传池 (12 项视图/图册/目录非几何查询，全开后扩至 39 项)", capEn: "Official JSON Whitelisted Pass-Thru Pool (12 View/Layout/Catalog Caps, 39 when full)", cmd: "Official JSON Bridge (17R + 1W)", gsapi: "Official JSON API Whitelist" }
+        ]
+      },
+      {
+        id: "dom_platform",
+        category: "C",
+        nameZh: "8. 跨实例快照、算量与智能翻模域", nameEn: "8. Multi-Instance Snapshot, QTO & Smart Reverse Modeling",
+        modZh: "C1~C4 平台与 Server 扩展 (4 Server)", modEn: "C1~C4 Platform & Server Extensions (4 Server)",
+        textZh: "多实例探测 + aud4-1 Building JSON + C-CAD + C4", textEn: "Multi-instance discovery + aud4-1 Building JSON + C-CAD",
+        rollZh: "95% (受控补偿：BATCH-4回抄 + BATCH-5分块清理)", rollEn: "95% (Controlled compensation: BATCH-4 ack + BATCH-5 clean)",
+        gateZh: "L2/L3 持续演进", gateEn: "L2/L3 Evolving",
+        statusZh: "平台扩展就绪 (未验收 UI Tab 维持 disabled 灰显)", statusEn: "Active Platform Extension (Unverified UI Tabs disabled)",
+        equivCount: 12,
+        devkitFamily: "Server Orchestration, D-1~D-4 Snapshot/Replay, aud4-1 SHA-256, C-CAD",
+        qPct: 90,
+        ratio162: "7.4%",
+        commands: ["list_archicad_instances (D-0/D-1)", "snapshot_elements (D-2)", "compare_snapshot (D-3)", "replay_snapshot (D-4)", "[Platform] C-CAD Wall/Column Reverse Modeling", "[C4 Matrix] Compound Skill Matrix Execution"],
+        apiDetails: ["Server Node.js Bridge", "HTTP targetPort Routing", "aud4-1 SHA-256 Generator", "Batch-5 Chunked DeleteEngine"],
+        notesZh: "多实例探测、aud4-1 Building JSON 结构化导出、C-CAD 底图翻模与 C4 工法矩阵，实现跨工程无 GUID 容差配对与分块逆序清理。",
+        notesEn: "Multi-instance discovery, aud4-1 Building JSON export, C-CAD reverse modeling, and C4 skill matrix with non-GUID tolerance matching & chunked cleanup.",
+        capsList: [
+          { capZh: "本地多 Archicad 实例端口扫描、心跳探测与会话工程身份绑定 (D-0/D-1)", capEn: "Multi-Instance Port Discovery, Heartbeat & Session Identity Binding", cmd: "list_archicad_instances", gsapi: "Server Port Pool + GetProjectInfo" },
+          { capZh: "全模型/按层构件几何与标高范围 (elevationRange) 快照采集 (D-2)", capEn: "Model Element Geometry & elevationRange Snapshot Capture", cmd: "snapshot_elements", gsapi: "d2-snapshot-service.js" },
+          { capZh: "跨工程无 GUID 锚点容差配对与双向 Stale 校验差异比对 (D-3)", capEn: "Cross-Project Non-GUID Tolerance Matching & Diff Engine", cmd: "compare_snapshot", gsapi: "ab-diff-engine.js" },
+          { capZh: "跨实例快照差异回放写入与超时先查后写守卫 (D-4)", capEn: "Cross-Instance Snapshot Replay & Timeout Verify-Before-Retry Guard", cmd: "replay_snapshot", gsapi: "snapshot-replay.js" },
+          { capZh: "BATCH-5 跨步失败按 200 构件上限逆序分块补偿清理引擎", capEn: "BATCH-5 Reverse Chunked (≤200) Compensation Cleanup Engine", cmd: "replay_snapshot / skill_rollback", gsapi: "Chunked DeleteElements" },
+          { capZh: "aud4-1 标准 Building JSON 导出 (含 SHA-256 防篡改摘要)", capEn: "aud4-1 Standard Building JSON Export (with SHA-256 digest)", cmd: "C-BJSON Service", gsapi: "building-json-service.js" },
+          { capZh: "确定性工程量聚合引擎 (Q-1~Q-3 按层/类统计数量、长度、面积、体积)", capEn: "Deterministic QTO Aggregation Engine (count/length/area/volume)", cmd: "Q-1 ~ Q-3 QTO Engine", gsapi: "Local Deterministic Aggregator" },
+          { capZh: "C-CAD 平台智能翻模：28 类院标图层映射识别 (GetLayers 优先)", capEn: "C-CAD Platform Reverse Modeling: 28-Category Layer Recognition", cmd: "C-CAD-03 Layer Recognition", gsapi: "cad-layer-recognition.js" },
+          { capZh: "C-CAD 联合门窗图层桥接掩码双线墙拟合与正交轴线/Hatch 建柱 (2 项)", capEn: "C-CAD Door/Window Bridge-Mask Wall Fitting & Axis/Hatch Column (2 Caps)", cmd: "C-CAD Wall/Column Engine", gsapi: "CMD-1 + BatchCreate(element_isolated)" },
+          { capZh: "C4 复合工法矩阵：官方可靠模板复用与用户从零自开发/导入 JSON 工法 (2 项)", capEn: "C4 Skill Matrix: Official Templates & User Custom JSON Skill Authoring (2 Caps)", cmd: "mepbridge_skill_catalog / save / execute", gsapi: "controller-composite / plan-chain" }
+        ]
+      }
+    ];
+
+    let selectedId = COVERAGE_DATA[0].id;
+
+    function toggleLanguage() {
+      currentLang = currentLang === 'zh' ? 'en' : 'zh';
+      applyLanguage();
+      renderTable();
+    }
+
+    function applyLanguage() {
+      const t = I18N[currentLang];
+      document.getElementById("hdrSub").innerText = t.hdrSub;
+      document.getElementById("hdrBadge").innerText = t.hdrBadge;
+      document.getElementById("langBtn").innerText = t.langBtn;
+      document.getElementById("st1Title").innerText = t.st1Title;
+      document.getElementById("st1Sub").innerText = t.st1Sub;
+      document.getElementById("st1Desc").innerText = t.st1Desc;
+      document.getElementById("st2Title").innerText = t.st2Title;
+      document.getElementById("st2Sub").innerText = t.st2Sub;
+      document.getElementById("st2Desc").innerText = t.st2Desc;
+      document.getElementById("st3Title").innerText = t.st3Title;
+      document.getElementById("st3Desc").innerText = t.st3Desc;
+      document.getElementById("st4Title").innerText = t.st4Title;
+      document.getElementById("st4Desc").innerText = t.st4Desc;
+      document.getElementById("st5Title").innerText = t.st5Title;
+      document.getElementById("st5Desc").innerText = t.st5Desc;
+      document.getElementById("btnAll").innerText = t.btnAll;
+      document.getElementById("btnCatA").innerText = t.btnCatA;
+      document.getElementById("btnCatB").innerText = t.btnCatB;
+      document.getElementById("btnCatC").innerText = t.btnCatC;
+      document.getElementById("searchInput").placeholder = t.searchPlaceholder;
+      document.getElementById("tblTitle").innerText = t.tblTitle;
+      document.getElementById("tblGate").innerText = t.tblGate;
+      document.getElementById("th1").innerText = t.th1;
+      document.getElementById("th3").innerText = t.th3;
+      document.getElementById("th4").innerText = t.th4;
+      document.getElementById("th5").innerText = t.th5;
+      document.getElementById("th6").innerText = t.th6;
+      document.getElementById("th7").innerText = t.th7;
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById("coverageTableBody");
+      const categoryFilter = document.querySelector(".filter-btn.active").getAttribute("data-cat") || "ALL";
+      const searchInput = document.getElementById("searchInput");
+      const keyword = searchInput ? searchInput.value.trim().toLowerCase() : "";
+      const t = I18N[currentLang];
+
+      const filtered = COVERAGE_DATA.filter(item => {
+        if (categoryFilter !== "ALL" && item.category !== categoryFilter) return false;
+        if (!keyword) return true;
+        const nameStr = currentLang === 'zh' ? item.nameZh : item.nameEn;
+        const modStr = currentLang === 'zh' ? item.modZh : item.modEn;
+        const capsStr = item.capsList.map(c => c.capZh + " " + c.capEn + " " + c.cmd).join(" ");
+        const target = [nameStr, modStr, item.devkitFamily, item.commands.join(" "), capsStr].join(" ").toLowerCase();
+        return target.includes(keyword);
+      });
+
+      tbody.innerHTML = filtered.map(item => {
+        const isSel = item.id === selectedId ? "active-row" : "";
+        const barColor = item.qPct >= 85 ? "var(--accent-emerald)" : item.qPct >= 65 ? "var(--accent-blue)" : "var(--accent-amber)";
+
+        const nameStr = currentLang === 'zh' ? item.nameZh : item.nameEn;
+        const modStr = currentLang === 'zh' ? item.modZh : item.modEn;
+        const textStr = currentLang === 'zh' ? item.textZh : item.textEn;
+        const rollStr = currentLang === 'zh' ? item.rollZh : item.rollEn;
+        const gateStr = currentLang === 'zh' ? item.gateZh : item.gateEn;
+        const statusStr = currentLang === 'zh' ? item.statusZh : item.statusEn;
+
+        return `
+          <tr class="${isSel}" onclick="selectItem('${item.id}')">
+            <td>
+              <div style="font-weight: 700; color: #fff; margin-bottom: 4px;">${nameStr}</div>
+              <span style="font-size: 11.5px; color: var(--text-muted);">${modStr}</span>
+            </td>
+            <td>
+              <button class="caps-btn" onclick="event.stopPropagation(); openCapsModal('${item.id}')">
+                🔍 ${item.equivCount} ${t.capsBtnUnit}
+              </button>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${t.capsSubHint}</div>
+            </td>
+            <td style="font-family: monospace; font-size: 11.5px; color: #cbd5e1; max-width: 260px;">
+              ${item.devkitFamily}
+            </td>
+            <td>
+              <div class="progress-bar-wrap">
+                <div class="p-bar"><div class="p-fill" style="width: ${item.qPct}%; background: ${barColor};"></div></div>
+                <span class="p-text" style="color: ${barColor};">${item.qPct}%</span>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">${textStr}</div>
+            </td>
+            <td style="font-size: 12px; color: #e2e8f0;">
+              ${rollStr}
+            </td>
+            <td>
+              <span class="tag tag-status">${gateStr}</span>
+              <div style="font-size: 11.5px; color: #cbd5e1; margin-top: 4px;">${statusStr}</div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      renderDetail();
+    }
+
+    function selectItem(id) {
+      selectedId = id;
+      renderTable();
+    }
+
+    function filterCategory(cat, btnEl) {
+      document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+      btnEl.classList.add("active");
+      btnEl.setAttribute("data-cat", cat);
+      renderTable();
+    }
+
+    function renderDetail() {
+      const panel = document.getElementById("detailPanel");
+      const item = COVERAGE_DATA.find(x => x.id === selectedId) || COVERAGE_DATA[0];
+      const t = I18N[currentLang];
+
+      const nameStr = currentLang === 'zh' ? item.nameZh : item.nameEn;
+      const modStr = currentLang === 'zh' ? item.modZh : item.modEn;
+      const notesStr = currentLang === 'zh' ? item.notesZh : item.notesEn;
+      const gateStr = currentLang === 'zh' ? item.gateZh : item.gateEn;
+      const statusStr = currentLang === 'zh' ? item.statusZh : item.statusEn;
+
+      panel.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
+          <div>
+            <h3 style="font-size: 17px; color: #fff; display: inline-block;">${nameStr}</h3>
+          </div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <button class="caps-btn" onclick="openCapsModal('${item.id}')">📋 ${item.equivCount} ${t.capsBtnUnit}</button>
+            <span class="tag tag-status">${gateStr} · ${statusStr}</span>
+          </div>
+        </div>
+        <p style="font-size: 12.5px; color: var(--text-muted);">
+          <strong>${modStr}</strong> | ${t.drawerScaleLabel}: <strong>${item.equivCount}</strong>
+        </p>
+
+        <div class="detail-grid">
+          <div class="detail-box">
+            <h4>${t.boxCmd} (${item.commands.length})</h4>
+            <div class="code-list" style="margin-top: 8px;">
+              ${item.commands.map(c => `<span class="api-pill">${c}</span>`).join("")}
+            </div>
+          </div>
+          <div class="detail-box">
+            <h4>${t.boxApi}</h4>
+            <div class="code-list" style="margin-top: 8px;">
+              ${item.apiDetails.map(a => `<span class="api-pill" style="color: #34d399;">${a}</span>`).join("")}
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-box" style="margin-top: 14px;">
+          <h4>${t.boxNotes}</h4>
+          <p style="font-size: 12px; color: #cbd5e1; margin-top: 6px; line-height: 1.6;">
+            ${notesStr}
+          </p>
+        </div>
+      `;
+    }
+
+    function openCapsModal(domainId) {
+      const item = COVERAGE_DATA.find(x => x.id === domainId) || COVERAGE_DATA[0];
+      const t = I18N[currentLang];
+      const nameStr = currentLang === 'zh' ? item.nameZh : item.nameEn;
+
+      document.getElementById("modalTitle").innerText = `${nameStr} — ${item.equivCount} ${t.drawerScaleLabel}`;
+      const body = document.getElementById("modalBody");
+
+      body.innerHTML = `
+        <table class="caps-modal-table">
+          <thead>
+            <tr>
+              <th style="width:46px;">${t.modalColIdx}</th>
+              <th>${t.modalColCap}</th>
+              <th>${t.modalColCmd}</th>
+              <th>${t.modalColGsapi}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${item.capsList.map((row, idx) => `
+              <tr>
+                <td style="color:var(--text-muted); font-weight:700;">#${idx + 1}</td>
+                <td style="font-weight:600; color:#f8fafc;">${currentLang === 'zh' ? row.capZh : row.capEn}</td>
+                <td><span class="api-pill">${row.cmd}</span></td>
+                <td style="font-family:monospace; color:#34d399; font-size:11.5px;">${row.gsapi}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+      document.getElementById("capsModal").classList.add("open");
+    }
+
+    function closeCapsModal() {
+      document.getElementById("capsModal").classList.remove("open");
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeCapsModal();
+    });
+
+    applyLanguage();
+    renderTable();
+  </script>
+</body>
+</html>

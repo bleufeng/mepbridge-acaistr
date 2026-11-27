@@ -13,6 +13,7 @@
 //       → on failure: LLM 分析重试 / 回滚 / 暂停
 
 const axios = require('axios');
+const targetBindings = require('./plan-target-bindings');
 const { isMutationStep, isUncertainExecution } = require('./execution-receipt-store');
 const { getArchicadEndpoint, endpointForPort } = require('./archicad-endpoint');
 const { normalizeUiLocale, isEnglishUiLocale } = require('./ui-locale');
@@ -32,9 +33,9 @@ const EXECUTE_ENDPOINT = `${SERVER_ENDPOINT}/api/execute`;
 // 期待结果回灌把它替换成真实值。回灌曾是死代码（见 _refineRemainingSteps 注释），
 // 于是占位符被原样送去执行 —— 审计日志有实证。
 //
-// 匹配 ${...} 与 {{...}} 两种常见写法。递归遍历 params/commandJson，返回首个命中
+// 匹配 ${...} 与 {{...}} 以及 <...> 等常见写法。递归遍历 params/commandJson，返回首个命中
 // 及其路径，便于失败信息定位到具体字段而非只说"有占位符"。
-const PLACEHOLDER_PATTERN = /\$\{[^}]*\}|\{\{[^}]*\}\}/;
+const PLACEHOLDER_PATTERN = /\$\{[^}]*\}|\{\{[^}]*\}\}|<[^>]*[^\w\s-][^>]*>|（[^）]*取自[^）]*）|\([^)]*取自[^)]*\)/;
 
 function findUnresolvedPlaceholder(value, path = 'step', depth = 0) {
   if (depth > 8 || value == null) return null;
@@ -197,6 +198,7 @@ class PlanChain {
     }
 
     // 规范化每步：确保有完整元数据
+    this._targetResults = new Map();
     const normalizedSteps = steps.map((step, idx) => this._normalizeStep(step, idx));
 
     // Complete built-in templates keep the fast path: their later steps do not
@@ -427,6 +429,7 @@ class PlanChain {
   async executeStep(stepIndex) {
     const step = this.chain.steps[stepIndex];
     if (!step) return { status: 'failed', error: `步骤 ${stepIndex} 不存在` };
+    this._bindStepTargets(stepIndex);
     const idToIndex = new Map(this.chain.steps.map((candidate, index) => [candidate.id || `step_${index}`, index]));
     const failedDependency = (step.dependsOn || []).map(id => idToIndex.get(id)).find(index =>
       Number.isInteger(index) && ['failed','cancelled','skipped'].includes(this.chain.steps[index]?.status));
@@ -783,6 +786,9 @@ class PlanChain {
       return { pass: false, reason: '缺少 commandNamespace' };
     }
 
+    const targetConflict = targetBindings.conflict(step) || step._targetBindingError;
+    if (targetConflict) return { pass: false, reason: targetConflict, errorType: targetConflict };
+
     // 未解析的模板占位符必须在此拦截。审计日志实证过 "${上一步获得的各柱GUID}" 被原样
     // 送去执行 —— 根因是结果回灌为死代码（已修），但即便回灌正常，LLM 也可能给出
     // 无法解析的占位符。此处是最后一道防线：占位符是"数据未就绪"的信号，不是有效参数。
@@ -908,6 +914,9 @@ class PlanChain {
         error: 'Durable receipts require a separately qualified host/session binding adapter.', noMutationDispatched: true };
     }
 
+    const binding = targetBindings.resolve(step, this.chain?.steps?.indexOf(step) ?? -1, this.chain?.steps || [], this._targetResults || new Map());
+    const targetError = targetBindings.conflict(step) || step._targetBindingError || (!binding.ok ? binding.code : null);
+    if (targetError) return { ok: false, errorType: targetError, noMutationDispatched: true };
     const payload = resolvePlanCommand(step);
     // Recheck after any approval/refinement and before mutation safety injection.
     const semanticFidelity = validatePlanStepSemanticFidelity({ ...step, commandJson: payload });
@@ -1111,16 +1120,27 @@ class PlanChain {
       try {
         const remainingSteps = this.chain.steps.slice(stepIndex);
         const refinement = await this.llm.refineStepWithResult(
-          step,
+          JSON.parse(JSON.stringify(step)),
           execResult.error || JSON.stringify(execResult.response).slice(0, 500),
-          remainingSteps,
+          JSON.parse(JSON.stringify(remainingSteps)),
           { knowledgeSnapshot: this.knowledgeSnapshot, userIntent: this.chain.userIntent }
         );
 
         if (refinement.refined && refinement.step && !refinement.skip) {
-          // 应用精炼后的参数到当前步骤
-          Object.assign(step.params, refinement.step.params || {});
-          if (refinement.step.commandJson) step.commandJson = refinement.step.commandJson;
+          // Retry proposals use the same target/command protection as successful
+          // result refinement. No new target may be invented after a failure.
+          const candidate = JSON.parse(JSON.stringify(step));
+          Object.assign(candidate.params, refinement.step.params || {});
+          if (refinement.step.commandJson) candidate.commandJson = JSON.parse(JSON.stringify(refinement.step.commandJson));
+          const oldPayload = resolvePlanCommand(step), newPayload = resolvePlanCommand(candidate);
+          const targetError = targetBindings.protectedChange(step, candidate);
+          const binding = targetBindings.resolve(candidate, stepIndex, this.chain.steps, this._targetResults || new Map());
+          if (targetError || !binding.ok || oldPayload.command !== newPayload.command ||
+              JSON.stringify(oldPayload.parameters?.addOnCommandId) !== JSON.stringify(newPayload.parameters?.addOnCommandId)) {
+            return { fatal: true, reason: targetError || binding.code || 'REFINEMENT_COMMAND_CHANGE_REJECTED' };
+          }
+          step.params = candidate.params;
+          step.commandJson = candidate.commandJson;
           step.description += ` [精炼重试#${step._retryCount}]`;
 
           // V19-EXEC-01: 校验重发安全性与幂等凭据
@@ -1308,31 +1328,46 @@ class PlanChain {
     }
   }
 
-  // ── 内部方法：H2.4 结果回灌 ──
-  //
-  // 曾是功能死代码：原实现用 setImmediate 调用 refineStepWithResult 且**完全不接收返回值**，
-  // 而该方法返回新对象 {refined, step, reasoning, skip}、不原地修改入参 —— 于是每步都真实
-  // 花掉一次 LLM 调用、结果被丢弃，GUID 绑定永不发生。审计日志实证：字面量占位符
-  // "${上一步获得的各柱GUID}" 未解析即被送去执行。
-  //
-  // 正确消费模板见失败重试路径（refinement.refined && !refinement.skip → Object.assign）。
-  // 此处按同一模式回写到下一步，并消费此前从未被读取的 skip 字段。
-  //
-  // 同时去掉 setImmediate：它使回写发生在下一步已开始执行之后，即便接收返回值也来不及。
+  // ── H2.4 Result feedback ──
+  // Resolve targets only from their producer at consumer time. LLM proposals
+  // remain optional/nonblocking and cannot overwrite explicit or bound targets.
+  // Original target references and command identity remain protected on retries.
+
+  _bindStepTargets(index) {
+    const step = this.chain.steps[index];
+    if (!step) return;
+    this._targetResults ||= new Map();
+    const binding = targetBindings.resolve(step, index, this.chain.steps, this._targetResults);
+    delete step._targetBindingError;
+    if (step._skipSource !== undefined) { delete step._skipped; delete step._skipReason; delete step._skipSource; }
+    if (!binding.ok) {
+      if (binding.code === 'TARGET_SELECTION_EMPTY') {
+        step._skipped = true; step._skipSource = binding.emptySource;
+        step._skipReason = 'Referenced selection result is empty';
+      } else step._targetBindingError = binding.code;
+    }
+  }
 
   async _refineRemainingSteps(completedStepIndex, execResult) {
+    const nextIndex = completedStepIndex + 1;
+    const completedStep = this.chain.steps[completedStepIndex];
+    const remainingSteps = this.chain.steps.slice(nextIndex);
+    if (!remainingSteps.length) return;
+
+    // Store only the real producer outcome. Bind the immediate consumer, never
+    // all future steps (a later Create may own their placeholder).
+    this._targetResults ||= new Map();
+    this._targetResults.set(completedStepIndex, execResult);
+    this._bindStepTargets(nextIndex);
+
     if (!this.llm) return;
 
-    const nextIndex = completedStepIndex + 1;
     const nextStep = this.chain.steps[nextIndex];
     if (!nextStep) return;
 
-    const completedStep = this.chain.steps[completedStepIndex];
-    const remainingSteps = this.chain.steps.slice(nextIndex);
-
     let refinement;
     try {
-      refinement = await this.llm.refineStepWithResult(completedStep, execResult, remainingSteps, { knowledgeSnapshot: this.knowledgeSnapshot, userIntent: this.chain.userIntent });
+      refinement = await this.llm.refineStepWithResult(JSON.parse(JSON.stringify(completedStep)), JSON.parse(JSON.stringify(execResult)), JSON.parse(JSON.stringify(remainingSteps)), { knowledgeSnapshot: this.knowledgeSnapshot, userIntent: this.chain.userIntent });
     } catch (e) {
       // 回灌失败不中断链：下一步保留原参数继续，未解析占位符会在 Gate1 被拦截
       console.warn('[PlanChain] Refinement call failed:', e.message);
@@ -1342,7 +1377,8 @@ class PlanChain {
     if (!refinement || typeof refinement !== 'object') return;
 
     // skip：LLM 判断该步已无必要（例如其依赖的前一步失败）。此前该字段从未被消费。
-    if (refinement.skip) {
+    if (refinement.skip && (execResult?.ok === false || nextStep._skipSource === completedStepIndex) &&
+        (nextStep.dependsOn || []).includes(completedStep.id)) {
       nextStep._skipped = true;
       nextStep._skipReason = refinement.reasoning || 'LLM refinement requested skip';
       console.log(`[PlanChain] Step ${nextIndex} marked skip by refinement: ${nextStep._skipReason}`);
@@ -1351,14 +1387,27 @@ class PlanChain {
 
     if (!refinement.refined || !refinement.step) return;
 
-    // 只回写 params 与 commandJson。不接受 LLM 改动 action / riskLevel 等安全字段 ——
-    // 那是 P1-04（Gate1 安全字段可被 LLM 覆盖）的同类风险，不在此处引入新入口。
-    if (refinement.step.params && typeof refinement.step.params === 'object') {
-      nextStep.params = { ...(nextStep.params || {}), ...refinement.step.params };
+    // LLM proposals cannot retarget an explicit/safely bound operation. Work on
+    // a copy, also protecting against callback mutation and carrier conflicts.
+    const candidate = JSON.parse(JSON.stringify(nextStep));
+    if (refinement.step.params && typeof refinement.step.params === 'object' && !Array.isArray(refinement.step.params)) {
+      candidate.params = { ...(candidate.params || {}), ...refinement.step.params };
+      if (candidate.commandJson?.parameters?.addOnCommandParameters)
+        Object.assign(candidate.commandJson.parameters.addOnCommandParameters, refinement.step.params);
     }
-    if (refinement.step.commandJson) {
-      nextStep.commandJson = refinement.step.commandJson;
+    if (refinement.step.commandJson) candidate.commandJson = JSON.parse(JSON.stringify(refinement.step.commandJson));
+    const previousCommand = resolvePlanCommand(nextStep), proposedCommand = resolvePlanCommand(candidate);
+    if (previousCommand.command !== proposedCommand.command ||
+        JSON.stringify(previousCommand.parameters?.addOnCommandId) !== JSON.stringify(proposedCommand.parameters?.addOnCommandId)) {
+      nextStep._refineRejected = 'REFINEMENT_COMMAND_CHANGE_REJECTED'; return;
     }
+    const targetError = targetBindings.protectedChange(nextStep, candidate);
+    if (targetError) { nextStep._refineRejected = targetError; return; }
+    const candidateBinding = targetBindings.resolve(candidate, nextIndex, this.chain.steps, this._targetResults);
+    if (!candidateBinding.ok) { nextStep._refineRejected = candidateBinding.code; return; }
+    nextStep.params = candidate.params;
+    nextStep.commandJson = candidate.commandJson;
+    this._bindStepTargets(nextIndex);
     nextStep._refined = true;
     if (refinement.reasoning) nextStep._refineReason = refinement.reasoning;
   }
@@ -1395,6 +1444,7 @@ class PlanChain {
     return {
       ...step,                   // 无害元数据（title/description/dependsOn/expected…）
       id: `step_${idx + 1}`,
+      _sourceStepId: step.id || `step_${idx + 1}`,
       action,
       ...(this.receiptTarget ? {
         ...JSON.parse(JSON.stringify(this.receiptTarget)),

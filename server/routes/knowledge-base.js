@@ -23,6 +23,7 @@ const knowledgeBase = require('../services/knowledge-base');
 const VALID_CATEGORIES = ['buildingCode', 'mepStandard', 'material'];
 function reply(res, result, fallback = 400) { return res.status(result.ok ? 200 : result.code === 'KB_REVISION_CONFLICT' ? 409 : result.code === 'KB_PERSISTENCE_FAILED' || result.code === 'KB_LOAD_FAILED' ? 503 : fallback).json(result); }
 router.get('/status', (req, res) => res.json({ ok: true, ...knowledgeBase.getStatus() }));
+router.post('/validation', (req, res) => reply(res, knowledgeBase.setPlanValidation(req.body?.enabled, req.body?.expectedRevision)));
 router.post('/libraries/preview', (req, res) => reply(res, knowledgeBase.previewLibrary(req.body?.library)));
 router.post('/libraries/load', (req, res) => reply(res, knowledgeBase.loadLibrary(req.body?.library, req.body?.expectedRevision)));
 

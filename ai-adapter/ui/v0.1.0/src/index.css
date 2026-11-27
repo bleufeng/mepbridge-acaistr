@@ -22,3 +22,206 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(161, 161, 170, 0.4);
 }
+
+/* Light Theme Variables Override */
+:root[data-theme="light"],
+[data-theme="light"] {
+  --color-zinc-950: #f1f5f9; /* Slate 100 page canvas */
+  --color-zinc-900: #ffffff; /* Crisp white card surface */
+  --color-zinc-850: #f8fafc; /* Slate 50 container */
+  --color-zinc-800: #e2e8f0; /* Slate 200 border */
+  --color-zinc-705: #cbd5e1; /* Slate 300 border */
+  --color-zinc-700: #cbd5e1; /* Slate 300 hover border */
+  --color-zinc-600: #94a3b8; /* Slate 400 icons */
+  --color-zinc-500: #64748b; /* Slate 500 muted text */
+  --color-zinc-400: #475569; /* Slate 600 secondary text */
+  --color-zinc-300: #334155; /* Slate 700 body text */
+  --color-zinc-200: #1e293b; /* Slate 800 headings */
+  --color-zinc-150: #0f172a; /* Slate 900 primary bold text */
+  --color-zinc-100: #0f172a; /* Slate 900 titles */
+  --color-indigo-200: #4f46e5; /* Adjusted for light text gradient */
+}
+
+/* Light Theme High-Contrast Text Adjustments for Central Extended Panels */
+[data-theme="light"] .text-amber-200,
+[data-theme="light"] .text-amber-300,
+[data-theme="light"] .text-amber-400 {
+  color: #b45309 !important; /* Amber-700: 5.8:1 contrast on white */
+}
+
+[data-theme="light"] .text-yellow-200,
+[data-theme="light"] .text-yellow-300,
+[data-theme="light"] .text-yellow-400 {
+  color: #a16207 !important; /* Yellow-700: 5.5:1 contrast */
+}
+
+[data-theme="light"] .text-lime-200,
+[data-theme="light"] .text-lime-300,
+[data-theme="light"] .text-lime-400 {
+  color: #3f6212 !important; /* Lime-800: 6.5:1 contrast (replaces washed-out neon green) */
+}
+
+[data-theme="light"] .text-emerald-200,
+[data-theme="light"] .text-emerald-300,
+[data-theme="light"] .text-emerald-400 {
+  color: #047857 !important; /* Emerald-700: 6.8:1 contrast on white */
+}
+
+[data-theme="light"] .text-emerald-500,
+[data-theme="light"] .text-emerald-600 {
+  color: #065f46 !important; /* Emerald-800: 7.8:1 contrast */
+}
+
+[data-theme="light"] .text-green-300,
+[data-theme="light"] .text-green-400,
+[data-theme="light"] .text-green-500 {
+  color: #15803d !important; /* Green-700: 6.2:1 contrast */
+}
+
+[data-theme="light"] .text-teal-300,
+[data-theme="light"] .text-teal-400,
+[data-theme="light"] .text-teal-500 {
+  color: #0f766e !important; /* Teal-700: 6.3:1 contrast */
+}
+
+/* Left & Right Sidebars Emerald Status Dots & Indicators (Archicad Connected, Live ping, Manual Mode) */
+[data-theme="light"] .bg-emerald-400,
+[data-theme="light"] .bg-emerald-500 {
+  background-color: #059669 !important; /* Emerald-600: punchy, solid, high-visibility dot */
+}
+
+[data-theme="light"] .bg-emerald-400\/80 {
+  background-color: rgba(5, 150, 105, 0.85) !important;
+}
+
+[data-theme="light"] .text-cyan-200,
+[data-theme="light"] .text-cyan-300,
+[data-theme="light"] .text-cyan-400,
+[data-theme="light"] [class*="text-cyan"] {
+  color: #0e7490 !important; /* Cyan-700: 6.2:1 contrast */
+}
+
+[data-theme="light"] [class*="border-cyan"] {
+  border-color: #a5f3fc !important;
+}
+
+[data-theme="light"] .text-sky-200,
+[data-theme="light"] .text-sky-300,
+[data-theme="light"] .text-sky-400 {
+  color: #0369a1 !important; /* Sky-700: 6.4:1 contrast */
+}
+
+[data-theme="light"] .text-pink-200,
+[data-theme="light"] .text-pink-300,
+[data-theme="light"] .text-pink-400 {
+  color: #4338ca !important; /* Aligned with Indigo Scheme A, 7.5:1 contrast */
+}
+
+[data-theme="light"] .text-rose-200,
+[data-theme="light"] .text-rose-300,
+[data-theme="light"] .text-rose-400 {
+  color: #be123c !important; /* Rose-700: 6.2:1 contrast */
+}
+
+[data-theme="light"] .text-violet-200,
+[data-theme="light"] .text-violet-300,
+[data-theme="light"] .text-violet-400 {
+  color: #6d28d9 !important; /* Violet-700: 6.5:1 contrast */
+}
+
+[data-theme="light"] .text-indigo-200,
+[data-theme="light"] .text-indigo-300,
+[data-theme="light"] .text-indigo-400 {
+  color: #4338ca !important; /* Indigo-700: 7.5:1 contrast */
+}
+
+/* Light Theme Badge & Pill Clean Engineering Refinement (removes dark blotches) */
+[data-theme="light"] [class*="bg-sky-950"] {
+  background-color: #f0f9ff !important;
+  border-color: #bae6fd !important;
+}
+
+[data-theme="light"] [class*="bg-emerald-950"],
+[data-theme="light"] [class*="bg-emerald-900"],
+[data-theme="light"] [class*="bg-emerald-600/20"],
+[data-theme="light"] [class*="bg-emerald-500/10"],
+[data-theme="light"] [class*="bg-emerald-500/15"],
+[data-theme="light"] [class*="bg-emerald-500/20"] {
+  background-color: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+}
+
+[data-theme="light"] [class*="border-emerald-500"],
+[data-theme="light"] [class*="border-emerald-600"] {
+  border-color: #a7f3d0 !important;
+}
+
+[data-theme="light"] [class*="bg-amber-950"] {
+  background-color: #fffbeb !important;
+  border-color: #fde68a !important;
+}
+
+[data-theme="light"] [class*="bg-lime-950"] {
+  background-color: #f7fee7 !important;
+  border-color: #d9f99d !important;
+}
+
+[data-theme="light"] [class*="bg-cyan-950"],
+[data-theme="light"] [class*="bg-cyan-900"] {
+  background-color: #ecfeff !important;
+  border-color: #a5f3fc !important;
+}
+
+[data-theme="light"] [class*="bg-indigo-950"],
+[data-theme="light"] [class*="bg-indigo-900"] {
+  background-color: #eef2ff !important;
+  border-color: #c7d2fe !important;
+}
+
+[data-theme="light"] [class*="bg-purple-950"],
+[data-theme="light"] [class*="bg-purple-900"] {
+  background-color: #faf5ff !important;
+  border-color: #e9d5ff !important;
+}
+
+[data-theme="light"] [class*="bg-rose-950"],
+[data-theme="light"] [class*="bg-rose-900"] {
+  background-color: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+}
+
+[data-theme="light"] [class*="bg-pink-950"],
+[data-theme="light"] [class*="bg-pink-900"],
+[data-theme="light"] [class*="bg-pink-600"] {
+  background-color: #eef2ff !important;
+  border-color: #c7d2fe !important;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: rgba(226, 232, 240, 0.6);
+}
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+}
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
+}
+
+/* Maintain CAD High-Contrast Dark Workspace inside 3D Viewport in Light Mode */
+[data-theme="light"] .cad-dark-viewport,
+[data-theme="light"] [data-cad-viewport="true"] {
+  --color-zinc-950: #09090b !important;
+  --color-zinc-900: #18181b !important;
+  --color-zinc-850: #27272a !important;
+  --color-zinc-800: #27272a !important;
+  --color-zinc-700: #3f3f46 !important;
+  --color-zinc-600: #52525b !important;
+  --color-zinc-500: #71717a !important;
+  --color-zinc-400: #a1a1aa !important;
+  --color-zinc-300: #d4d4d8 !important;
+  --color-zinc-200: #e4e4e7 !important;
+  --color-zinc-150: #f4f4f5 !important;
+  --color-zinc-100: #fafafa !important;
+  background-color: #09090b !important;
+  color: #f4f4f5 !important;
+}

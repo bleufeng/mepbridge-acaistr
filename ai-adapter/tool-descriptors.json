@@ -1,6 +1,250 @@
 {
   "schemaVersion": "2026-06-d3-p1-1",
   "description": "MEP Bridge lightweight tool descriptor registry for AI Adapter, Workbench, SDK and CLI discovery.",
+  "responseContracts": {
+    "meta": {
+      "id": "OFF-07-RESPONSE-CONTRACTS",
+      "date": "2026-11-10",
+      "status": "OFFLINE_DOCUMENTATION_ONLY_NOT_LIVE_EVIDENCE",
+      "rule": "Success responses must report values read from the NATIVE element/memo inside the same undoable transaction. Request echoes may appear only in dry-run previews or in an explicitly labelled changes object. Derived values must be listed under derivedFields and never be presented as native readback.",
+      "dryRunContract": {
+        "id": "OFF-10-DRY-RUN-HONESTY",
+        "status": "OFFLINE_SOURCE_CONTRACT_NOT_LIVE_EVIDENCE",
+        "sharedHelper": "Sources/FavoriteCommandHelpers.hpp AddDryRunInspection (single definition used by all seven entries)",
+        "requiredFields": {
+          "inspectionDepth": "preflight-only for every dry-run",
+          "writeAPIinvoked": "false for every zero-write dry-run",
+          "readbackPerformed": "false for every dry-run",
+          "readbackVerified": "false for every dry-run",
+          "geometryVerified": "false for every dry-run",
+          "previewSource": "request-echo (single create) | parsed-model (batch create / SetLayerBatch dry-run) | changes-only (edit) | native-readback (applied SetLayerBatch)",
+          "unverifiedFields": "array of fields NOT verified because no native write was dispatched"
+        },
+        "entries": [
+          "CreateColumn",
+          "CreateWall",
+          "CreateBeam",
+          "CreateSlab",
+          "BatchCreateElements",
+          "EditBuildingElement single",
+          "EditBuildingElement batch",
+          "SetLayerBatch"
+        ],
+        "forbidden": [
+          "dry-run claiming an actual write PASS",
+          "readbackVerified=true or geometryVerified=true in a dry-run",
+          "automatic UNKNOWN replay / cleanup / GUID reissue",
+          "changing default operationId silent completion or AI-first auto mode"
+        ],
+        "preserved": [
+          "query/settle surfaces",
+          "bounded diagnostics",
+          "OFF-03 SetLayerBatch preflight-only wording and zero-write LAYER_* rejections"
+        ],
+        "note": "SetLayerBatch already carried inspectionDepth/readbackVerified/readbackPerformed since OFF-03; OFF-10 only completes the remaining envelope fields there. BatchCreateElements now actually emits the previewSource=parsed-model label that GEN-RB-HONEST-READBACK promised."
+      },
+      "independentReadback": {
+        "status": "REQUIRED_AT_LIVE_NOT_RUN_OFFLINE",
+        "readerCommand": "GetElementGeometry",
+        "note": "OFF-07 is an offline work package. An external independent reader supplement (post-create/post-edit GetElementGeometry by GUID, plus absence proof after cleanup) belongs to the OFF-14 central live acceptance package and requires separate compile/deploy/model authorization. No host was contacted and no such evidence is claimed here.",
+        "spec": "outputs/v020-off07-readback-schema-descriptor-20261110-vH2pK7/independent-reader-supplement-spec.json"
+      }
+    },
+    "commands": [
+      {
+        "command": "CreateColumn",
+        "source": "ACAPI_Element_Get + ACAPI_Element_GetMemo(APIMemoMask_ColumnSegment) inside ExecuteUndoableTransaction",
+        "actualFields": [
+          "elementGuid",
+          "position",
+          "height",
+          "rotationAngle",
+          "coreAnchor",
+          "floorIndex",
+          "bottomOffset",
+          "section",
+          "layerIndex",
+          "profileApplied"
+        ],
+        "derivedFields": [
+          "homeStoryLevel",
+          "baseZ",
+          "topZ"
+        ],
+        "derivedFrom": "homeStoryLevel + native bottomOffset/height; unavailable story level reports elevationReadbackAvailable=false instead of inventing Z",
+        "notEchoed": [
+          "structureRequest.mode",
+          "hasProfile"
+        ],
+        "schemaFlags": [
+          "layerReadbackPerformed",
+          "geometryVerified=transaction outcome"
+        ]
+      },
+      {
+        "command": "CreateWall",
+        "source": "ACAPI_Element_Get inside ExecuteUndoableTransaction",
+        "actualFields": [
+          "wallGuid",
+          "start",
+          "end",
+          "thickness",
+          "height",
+          "bottomOffset",
+          "floorIndex",
+          "arcAngle",
+          "structureType",
+          "refLinePosition",
+          "refLineOffset",
+          "referenceLineLocation",
+          "layerIndex",
+          "buildingMaterialIndex",
+          "compositeIndex",
+          "profileIndex",
+          "profileApplied"
+        ],
+        "derivedFields": [
+          "length"
+        ],
+        "derivedFrom": "hypot of native begC/endC",
+        "notEchoed": [
+          "request start/end",
+          "refLinePosText",
+          "structureRequest.mode"
+        ],
+        "schemaFlags": [
+          "layerReadbackPerformed",
+          "geometryVerified=transaction outcome"
+        ]
+      },
+      {
+        "command": "CreateBeam",
+        "source": "ACAPI_Element_Get + ACAPI_Element_GetMemo(APIMemoMask_BeamSegment) inside ExecuteUndoableTransaction",
+        "actualFields": [
+          "elementGuid",
+          "start",
+          "end",
+          "floorIndex",
+          "topOffset",
+          "anchorPoint",
+          "axisOffset",
+          "section",
+          "layerIndex",
+          "profileApplied"
+        ],
+        "derivedFields": [
+          "length"
+        ],
+        "derivedFrom": "hypot of native begC/endC; beam baseZ is deliberately NOT reported (needs section depth + anchor state)",
+        "notEchoed": [
+          "hasProfile"
+        ],
+        "schemaFlags": [
+          "layerReadbackPerformed",
+          "geometryVerified=transaction outcome"
+        ]
+      },
+      {
+        "command": "CreateSlab",
+        "source": "ACAPI_Element_Get + ACAPI_Element_GetMemo(APIMemoMask_Polygon) inside ExecuteUndoableTransaction",
+        "actualFields": [
+          "elementGuid",
+          "vertexCount",
+          "subPolygonCount",
+          "arcCount",
+          "coordCount",
+          "structureType",
+          "thickness",
+          "level",
+          "floorIndex",
+          "layerIndex"
+        ],
+        "boundaryReadback": "SlabBoundary::MatchesReadback compares every ring coordinate, closing point, contour end (pends) and arc (parcs); single-create depth now matches BatchCreateElements",
+        "derivedFields": [],
+        "derivedFrom": "none; every reported count, thickness, level, story and layer value is a native readback. vertexCount keeps its existing outer-ring meaning (native pends[1]-1); coordCount is native poly.nCoords and includes hole rings and closing points, so the two are deliberately distinct for multi-ring slabs",
+        "notEchoed": [
+          "nVerts",
+          "nSubPolys",
+          "nArcs",
+          "structureRequest.mode"
+        ],
+        "schemaFlags": [
+          "boundaryReadbackPerformed",
+          "layerReadbackPerformed",
+          "geometryVerified=transaction outcome"
+        ]
+      },
+      {
+        "command": "EditBuildingElement",
+        "source": "post-edit native element + memo readback inside the editable transaction",
+        "actualFields": [
+          "elementGuid",
+          "actual.*"
+        ],
+        "derivedFields": [
+          "actual.baseZ",
+          "actual.topZ",
+          "actual.homeStoryLevel"
+        ],
+        "derivedFrom": "story level + native bottomOffset/level",
+        "notEchoed": [
+          "wallStructure.mode",
+          "changes (explicitly the requested change set, not a readback)"
+        ],
+        "schemaFlags": [
+          "verificationScope",
+          "boundaryReadbackPerformed (dry-run only)"
+        ]
+      },
+      {
+        "command": "BatchCreateElements",
+        "source": "VerifyBatchItem native element + memo readback inside each item undoable transaction",
+        "actualFields": [
+          "createdGuids",
+          "layerIndex",
+          "layerGuid",
+          "layerName"
+        ],
+        "derivedFields": [
+          "requestedCount",
+          "createdCount",
+          "failedCount"
+        ],
+        "derivedFrom": "in-memory transaction results",
+        "note": "layer identity is emitted from the resolved binding index, but VerifyBatchItem has already compared every created header.layer against it inside the item transaction; layerReadbackPerformed declares that evidence explicitly.",
+        "notEchoed": [
+          "dry-run items (BuildItemPreview, labelled previewSource=parsed-model)"
+        ],
+        "schemaFlags": [
+          "layerReadbackPerformed",
+          "error.apiErrorName"
+        ]
+      },
+      {
+        "command": "SetLayerBatch",
+        "source": "ACAPI_Element_GetHeader inside the undoable transaction",
+        "actualFields": [
+          "changes[].currentLayerIndex",
+          "readbackVerified",
+          "readbackPerformed"
+        ],
+        "derivedFields": [
+          "requestedCount",
+          "changedCount",
+          "unchangedCount",
+          "plannedLayerIndex"
+        ],
+        "derivedFrom": "preflight/plan (dry-run)",
+        "notEchoed": [
+          "dry-run readbackVerified=true (removed in OFF-03; dry-run reports inspectionDepth=preflight-only)"
+        ],
+        "schemaFlags": [
+          "firstCause.apiErrorName",
+          "error.apiErrorName"
+        ]
+      }
+    ]
+  },
   "descriptors": [
     {
       "name": "mepbridge.get_selected_element_details",
@@ -28,7 +272,15 @@
           "读取选择",
           "查询选中",
           "查询选中构件",
-          "读取选中构件"
+          "读取选中构件",
+          "读取选中构件参数",
+          "读取选中构件属性",
+          "读取当前选中构件参数",
+          "读取当前选中构件属性",
+          "选中构件参数",
+          "选中构件属性",
+          "查看选中构件参数",
+          "查看选中构件属性"
         ],
         "en": [
           "read selected",
@@ -1480,7 +1732,7 @@
     {
       "name": "mepbridge.get_available_sizes",
       "title": "MEPBridge get available pipe sizes",
-      "description": "Query available pipe sizes / diameter reference table for a given MEP domain (Piping by default).",
+      "description": "Query available pipe sizes / diameter reference table for a given MEP domain (Piping by default). Piping table/row omissions are reported through completeness and unknownReasons.",
       "featureArea": "MEP",
       "status": "runtime-validated",
       "executionKind": "mepbridge-addon-command",
@@ -1960,7 +2212,7 @@
     {
       "name": "mepbridge.get_mep_element_info",
       "title": "MEPBridge get MEP element info",
-      "description": "Read back MEP Routing Element info by GUID: domain, polyline, segments, referenceId, etc.",
+      "description": "Read back MEP Routing Element info by GUID: domain, polyline, segments, referenceId, etc. Returns bounded node/segment/rigid/elbow/transition/port topology with explicit completeness diagnostics and physical connection state.",
       "featureArea": "MEP",
       "status": "runtime-validated",
       "executionKind": "mepbridge-addon-command",
@@ -2169,7 +2421,7 @@
     {
       "name": "mepbridge.create_wall",
       "title": "MEPBridge create wall (architectural)",
-      "description": "Create a straight wall between two 2D points using native Archicad API (API_WallID). The start/end points define the wall CENTERLINE (reference line pinned to center since 2026-08-30 fix; the wall body spreads evenly to both sides). Explicit height is honored (top-link disabled, no story clamping). Architectural element, not MEP. Supports dryRun preview and confirmRequired execution. V2 H1.1 channel A (MEPBridge C++ preferred).",
+      "description": "Create a straight or circular-arc Wall with explicit reference line and Basic/Composite/Profile construction identities using native Archicad API. arcAngle is positive radians; reverse ordered start/end to place the arc on the opposite side. Construction fields fail closed on conflicts or missing project assets.",
       "featureArea": "Architecture",
       "status": "v2-h1",
       "executionKind": "mepbridge-addon-command",
@@ -2208,6 +2460,28 @@
         ]
       },
       "paramExtractors": {
+        "relativeTopStory": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32767,
+          "description": "Wall top story relative to home story; 0 unlinks; omitted preserves host default."
+        },
+        "topOffset": {
+          "type": "number",
+          "description": "Offset from effective non-zero top-linked story in meters."
+        },
+        "layerGuid": {
+          "type": "string",
+          "description": "OFF-03/OFF-07: existing target layer GUID; mutually exclusive with layerName. Locked/not-owned layers are rejected before any write; success reports the ACTUAL native layer identity."
+        },
+        "layerName": {
+          "type": "string",
+          "description": "OFF-03/OFF-07: existing target layer name; must resolve to exactly one layer."
+        },
+        "absoluteZ": {
+          "type": "number",
+          "description": "ELEM-3 sugar: absolute Z in project meters; resolves to the highest story whose level <= absoluteZ; mutually exclusive with floorIndex."
+        },
         "start": {
           "type": "point2d",
           "description": "Wall start point {x,y} in meters (Archicad model coords)"
@@ -2234,7 +2508,7 @@
         },
         "profileGuid": {
           "type": "string",
-          "description": "Complex profile attribute GUID (from GetProfiles). When set, applies API_ProfileStructure + profileAttr, overriding rectangular thickness. Optional, backward compatible."
+          "description": "Existing complex-profile attribute GUID; Profile only and mutually exclusive with Basic/Composite fields."
         },
         "properties": {
           "type": "keyValuePairs",
@@ -2242,11 +2516,40 @@
         },
         "refLinePosition": {
           "type": "string",
-          "description": "Reference line position: center, outside, inside"
+          "enum": [
+            "center",
+            "outside",
+            "inside",
+            "coreCenter",
+            "coreOutside",
+            "coreInside"
+          ],
+          "description": "Reference-line position; core* requires Composite. Basic/Composite retain center default. Profile creation uses its origin: omit or outside only; conflicting explicit positions reject before dryRun."
         },
         "refLineOffset": {
           "type": "number",
-          "description": "Reference line offset in meters"
+          "description": "Reference line offset in meters. Profile creation accepts omitted/zero only; Basic/Composite center/coreCenter force zero."
+        },
+        "arcAngle": {
+          "type": "number",
+          "description": "Positive wall arc angle in radians (0, 2*pi); reverse ordered start/end for the opposite side."
+        },
+        "structureType": {
+          "type": "string",
+          "values": [
+            "Basic",
+            "Composite",
+            "Profile"
+          ],
+          "description": "Construction mode; must match the supplied identity fields."
+        },
+        "buildingMaterialIndex": {
+          "type": "integer",
+          "description": "Existing project Building Material index; Basic only."
+        },
+        "compositeIndex": {
+          "type": "integer",
+          "description": "Existing project Composite index; Composite only."
         }
       },
       "commandJson": {
@@ -2276,7 +2579,7 @@
     {
       "name": "mepbridge.create_column",
       "title": "MEPBridge create column (architectural)",
-      "description": "Create a vertical column at a 2D position using native Archicad API (API_ColumnID). Supports height, rotation, and floorIndex (V18-NAT-02 guarded against 16-bit short overflow with in-transaction readback).",
+      "description": "Create a single-segment Column with explicit Basic rectangular/circular section, Building Material index, core anchor and rotation, or an existing Profile GUID. WS-A writes are transactionally read back; multi-segment defaults fail closed.",
       "featureArea": "Architecture",
       "status": "v2-h1",
       "executionKind": "mepbridge-addon-command",
@@ -2310,6 +2613,14 @@
         ]
       },
       "paramExtractors": {
+        "layerGuid": {
+          "type": "string",
+          "description": "OFF-03/OFF-07: existing target layer GUID; mutually exclusive with layerName. Locked/not-owned layers are rejected before any write; success reports the ACTUAL native layer identity."
+        },
+        "layerName": {
+          "type": "string",
+          "description": "OFF-03/OFF-07: existing target layer name; must resolve to exactly one layer."
+        },
         "position": {
           "type": "point2d",
           "description": "Column position {x,y} in meters"
@@ -2330,9 +2641,45 @@
           "type": "integer",
           "description": "Target home story index (V18-NAT-02: guarded against 16-bit short overflow and verified inside transaction; omitted means active story)"
         },
+        "bottomOffset": {
+          "type": "number",
+          "description": "OFF-04: column base offset from the home story level in meters; negative allowed. Orthogonal to floorIndex/absoluteZ; omitted keeps the host default. Success reports actual bottomOffset/baseZ/topZ."
+        },
+        "absoluteZ": {
+          "type": "number",
+          "description": "OFF-04: absolute Z in meters, resolved to a home story; mutually exclusive with floorIndex. Combined with bottomOffset for the native column base."
+        },
         "properties": {
           "type": "keyValuePairs",
           "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new Column inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
+        },
+        "structureType": {
+          "type": "string",
+          "values": [
+            "Basic",
+            "Profile"
+          ],
+          "description": "WS-A section mode. Basic accepts dimensions/material; Profile requires profileGuid and conflicts with Basic fields."
+        },
+        "sectionWidth": {
+          "type": "number",
+          "description": "Basic rectangular section width in meters; create requires sectionDepth."
+        },
+        "sectionDepth": {
+          "type": "number",
+          "description": "Basic rectangular section depth in meters; create requires sectionWidth."
+        },
+        "sectionDiameter": {
+          "type": "number",
+          "description": "Basic circular section diameter in meters; mutually exclusive with sectionWidth/sectionDepth."
+        },
+        "buildingMaterialIndex": {
+          "type": "integer",
+          "description": "Positive Building Material attribute index from GetAttributes; missing indices fail closed."
+        },
+        "coreAnchor": {
+          "type": "integer",
+          "description": "Column 3x3 core anchor integer 0..8."
         }
       },
       "commandJson": {
@@ -2357,7 +2704,7 @@
     {
       "name": "mepbridge.create_beam",
       "title": "MEPBridge create beam (architectural)",
-      "description": "Create a straight beam between two 2D points using native Archicad API (API_BeamID). V2 H1.1 channel A. Optional topOffset exposure and transactional home-story/top-offset readback added 2026-10-08; new source batch pending build and dual-version validation.",
+      "description": "Create a single-segment Beam with explicit Basic rectangular/circular section, Building Material index, anchor/axis offset, or an existing Profile GUID. Section and geometry are read back in the creation transaction; multi-segment defaults fail closed.",
       "featureArea": "Architecture",
       "status": "code-complete-pending-runtime",
       "executionKind": "mepbridge-addon-command",
@@ -2389,6 +2736,14 @@
         ]
       },
       "paramExtractors": {
+        "layerGuid": {
+          "type": "string",
+          "description": "OFF-03/OFF-07: existing target layer GUID; mutually exclusive with layerName. Locked/not-owned layers are rejected before any write; success reports the ACTUAL native layer identity."
+        },
+        "layerName": {
+          "type": "string",
+          "description": "OFF-03/OFF-07: existing target layer name; must resolve to exactly one layer."
+        },
         "start": {
           "type": "point2d",
           "description": "Beam start point {x,y} in meters"
@@ -2408,6 +2763,46 @@
         "topOffset": {
           "type": "number",
           "description": "Optional finite beam-top offset relative to the home story, in meters; negative values allowed. Omit to retain Archicad tool defaults. Mutually exclusive with direct-API absoluteZ. New MCP exposure and strengthened readback pending AC28/AC29 validation."
+        },
+        "structureType": {
+          "type": "string",
+          "values": [
+            "Basic",
+            "Profile"
+          ],
+          "description": "WS-A section mode. Basic accepts dimensions/material; Profile requires profileGuid and conflicts with Basic fields."
+        },
+        "sectionWidth": {
+          "type": "number",
+          "description": "Basic rectangular section width in meters; create requires sectionDepth."
+        },
+        "sectionDepth": {
+          "type": "number",
+          "description": "Basic rectangular section depth in meters; create requires sectionWidth."
+        },
+        "sectionDiameter": {
+          "type": "number",
+          "description": "Basic circular section diameter in meters; mutually exclusive with sectionWidth/sectionDepth."
+        },
+        "buildingMaterialIndex": {
+          "type": "integer",
+          "description": "Positive Building Material attribute index from GetAttributes; missing indices fail closed."
+        },
+        "anchorPoint": {
+          "type": "integer",
+          "description": "Beam 3x3 anchor point integer 0..8."
+        },
+        "axisOffset": {
+          "type": "number",
+          "description": "Beam reference-axis offset from section center in meters."
+        },
+        "floorIndex": {
+          "type": "integer",
+          "description": "OFF-04: target home story index; omitted means the active story. Mutually exclusive with absoluteZ."
+        },
+        "absoluteZ": {
+          "type": "number",
+          "description": "OFF-04: absolute Z for the beam top in meters; resolved to a home story and a native level offset. Mutually exclusive with floorIndex and topOffset."
         }
       },
       "commandJson": {
@@ -2435,7 +2830,7 @@
     {
       "name": "mepbridge.create_slab",
       "title": "MEPBridge create slab (architectural)",
-      "description": "Create a slab from a polygon outline using native Archicad API (API_SlabID). Requires at least 3 vertices. V2 H1.1 channel A.",
+      "description": "Create a Slab from a legacy simple polygon or canonical boundary with holes and curved edges. Basic/Composite construction uses stable project attribute indices and fails closed on conflicts.",
       "featureArea": "Architecture",
       "status": "v2-h1",
       "executionKind": "mepbridge-addon-command",
@@ -2472,6 +2867,14 @@
         ]
       },
       "paramExtractors": {
+        "layerGuid": {
+          "type": "string",
+          "description": "OFF-03/OFF-07: existing target layer GUID; mutually exclusive with layerName. Locked/not-owned layers are rejected before any write; success reports the ACTUAL native layer identity."
+        },
+        "layerName": {
+          "type": "string",
+          "description": "OFF-03/OFF-07: existing target layer name; must resolve to exactly one layer."
+        },
         "polygon": {
           "type": "point2dList",
           "description": "Polygon vertices [{x,y}] in meters, at least 3 points"
@@ -2491,6 +2894,26 @@
         "properties": {
           "type": "keyValuePairs",
           "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new Slab inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
+        },
+        "boundary": {
+          "type": "object",
+          "description": "Canonical {outer:{vertices,arcs},holes:[...]} boundary; arcs use 0-based edgeIndex and signed arcAngle."
+        },
+        "structureType": {
+          "type": "string",
+          "values": [
+            "Basic",
+            "Composite"
+          ],
+          "description": "Slab construction mode."
+        },
+        "buildingMaterialIndex": {
+          "type": "integer",
+          "description": "Existing Building Material index; Basic only."
+        },
+        "compositeIndex": {
+          "type": "integer",
+          "description": "Existing Composite index; Composite only."
         }
       },
       "commandJson": {
@@ -3180,7 +3603,7 @@
     {
       "name": "mepbridge.create_object",
       "title": "MEPBridge create object (architectural)",
-      "description": "Create a placeable GSM Object at a position. Supports exact project-library resolution by stable main GUID/name and Object Favorites; ambiguous or stale selectors fail explicitly. Source and offline contract complete; AC28/AC29 APX rebuild and runtime readback pending. 2026-10-08: absoluteZ home-story guard and actual floor readback amended; this new source batch is not yet compiled or runtime-validated.",
+      "description": "Create a placeable GSM Object at a position. Supports exact project-library resolution by stable main GUID/name and Object Favorites; ambiguous or stale selectors fail explicitly. Source and offline contract complete; AC28/AC29 APX rebuild and runtime readback pending. 2026-10-08: absoluteZ home-story guard and actual floor readback amended; this new source batch is not yet compiled or runtime-validated. Supports bounded create-time writable scalar GDL overrides with native type/readback checks.",
       "featureArea": "Architecture",
       "status": "code-complete-pending-runtime",
       "executionKind": "mepbridge-addon-command",
@@ -3242,6 +3665,10 @@
         "properties": {
           "type": "keyValuePairs",
           "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new Object (GSM) inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
+        },
+        "parameterOverrides": {
+          "type": "array",
+          "description": "Create-time scalar GDL overrides [{name, expectedType, value}]. Arrays, dictionaries, hidden/disabled/script-controlled and asset types fail closed."
         }
       },
       "commandJson": {
@@ -3270,7 +3697,7 @@
     {
       "name": "mepbridge.create_lamp",
       "title": "MEPBridge create lamp (architectural)",
-      "description": "Create a lamp/light fixture at a position. API_LampID (= API_ObjectType typedef). V2 channel A. Transactional identity/home-story/position/requested-angle readback added 2026-10-08; new source batch pending build and dual-version validation. absoluteZ selects home story only, not exact insertion Z.",
+      "description": "Create a lamp/light fixture at a position. API_LampID (= API_ObjectType typedef). V2 channel A. Transactional identity/home-story/position/requested-angle readback added 2026-10-08; new source batch pending build and dual-version validation. absoluteZ selects home story only, not exact insertion Z. OFF-11 (2026-11-10 maintainer deferral): create-time GDL scalar overrides are DEFERRED_NOT_COMMITTED_V020; CreateLamp rejects the entire request on presence of parameterOverrides BEFORE any native call (LAMP_GDL_OVERRIDE_DEFERRED_V020, modelState=NOT_DISPATCHED, modelModified=false). Basic CreateLamp and CreateObject scalar overrides are unchanged; 95 registered tools unchanged.",
       "featureArea": "Architecture",
       "status": "code-complete-pending-runtime",
       "executionKind": "mepbridge-addon-command",
@@ -3325,6 +3752,10 @@
         "properties": {
           "type": "keyValuePairs",
           "description": "Optional create-time property assignment (V017-WS-7): items of {propertyGuid | groupName + propertyName, valueString}. Applied to the new Lamp inside the same undoable creation transaction - if any property fails, the whole creation rolls back and nothing is left behind. Success echoes appliedProperties read back from the model."
+        },
+        "parameterOverrides": {
+          "type": "array",
+          "description": "OFF-11 DEFERRED_NOT_COMMITTED_V020: CreateLamp rejects the entire request on PRESENCE of this field before any native call (empty / null / wrong-typed / mixed / dryRun included); error LAMP_GDL_OVERRIDE_DEFERRED_V020 with modelState=NOT_DISPATCHED and modelModified=false. Kept visible so callers see the deferred entry instead of silently writing; this tool no longer accepts create-time overrides. CreateObject scalar overrides are unchanged."
         }
       },
       "commandJson": {
@@ -3778,7 +4209,7 @@
     {
       "name": "mepbridge.solve_connections",
       "title": "MEPBridge solve pipe connections (merge/tee/cross detection)",
-      "description": "Detect and optionally apply logical connections between MEP piping routes at shared points. Supports merge (2 routes), tee (3 routes), cross (4 routes, dry-run only). LLM uses this to connect independently-created pipe segments into a network. V2 MEP core.",
+      "description": "Read-only candidate analysis between MEP Piping routes at shared points. apply omitted/false preserves analysis. In v0.2.0, experimental apply=true rejects the entire request with MEP_CONNECTION_APPLY_DEFERRED_V020 before any model write, regardless of crossMode or candidate count. crossMode=place remains unsupported; candidate analysis does not assert physical connectivity.",
       "featureArea": "MEP",
       "status": "runtime-validated",
       "executionKind": "mepbridge-addon-command",
@@ -3831,7 +4262,7 @@
         },
         "apply": {
           "type": "boolean",
-          "description": "If true, apply merge/tee connections; if false (default), dry-run detect only"
+          "description": "Default/false is read-only analysis. apply=true rejects with MEP_CONNECTION_APPLY_DEFERRED_V020 in v0.2.0, irrespective of crossMode or candidate count."
         },
         "crossMode": {
           "type": "string",
@@ -4394,7 +4825,7 @@
     {
       "name": "mepbridge.move_elements",
       "title": "MEPBridge move elements by GUID",
-      "description": "Move MEP routing elements by explicit GUID list with delta offset (mm). Requires confirmRequired=true. LLM uses this when it has specific route GUIDs (not current selection) and needs precise positional adjustment. Alternative to MoveSelectedElements for GUID-targeted automation.",
+      "description": "Move MEP routing elements by explicit GUID list with delta offset (mm), under existing confirmation and validation. In v0.2.0, presence of nodeGuid or position rejects the entire request with MEP_NODE_MOVE_DEFERRED_V020 (empty/partial/mixed input included), without whole-route fallback. Legacy route delta validation and WHOLE_ROUTE_MOVE_QUALIFICATION_REQUIRED remain unchanged; other movers are unaffected.",
       "featureArea": "MEP",
       "status": "runtime-validated",
       "executionKind": "mepbridge-addon-command",
@@ -4439,6 +4870,14 @@
         "confirmRequired": {
           "type": "boolean",
           "description": "Must be true (required by C++ schema)"
+        },
+        "nodeGuid": {
+          "type": "string",
+          "description": "Deferred in v0.2.0: presence rejects the entire request with MEP_NODE_MOVE_DEFERRED_V020; no legacy-route fallback."
+        },
+        "position": {
+          "type": "point3d",
+          "description": "Deferred in v0.2.0: presence rejects the entire request with MEP_NODE_MOVE_DEFERRED_V020; no legacy-route fallback."
         }
       },
       "commandJson": {
@@ -4637,6 +5076,10 @@
         "level": {
           "type": "number",
           "description": "Reference level in meters (optional, Slab/Roof)"
+        },
+        "boundary": {
+          "type": "object",
+          "description": "Canonical Slab replacement boundary with holes/arcs; mutually exclusive with polygon."
         }
       },
       "commandJson": {
@@ -4712,13 +5155,21 @@
         ]
       },
       "paramExtractors": {
+        "layerGuid": {
+          "type": "string",
+          "description": "OFF-03/OFF-07: root-level existing target layer GUID applied to the whole batch; mutually exclusive with layerName; verified per item inside the item transaction."
+        },
+        "layerName": {
+          "type": "string",
+          "description": "OFF-03/OFF-07: root-level existing target layer name; must resolve to exactly one layer."
+        },
         "elementType": {
           "type": "string",
           "description": "Element type: Wall|Column|Beam|Slab|Roof|Morph (all items must be same type)"
         },
         "items": {
           "type": "raw",
-          "description": "Array of element specs: Wall/Beam items need {start,end}, Column items need {position}, Slab/Roof/Morph items need {polygon} (min 2, max 500)"
+          "description": "Array of element specs (min 1, max 500). OFF-06 full single/batch parity: Column {position,height,rotationAngle,coreAnchor,bottomOffset,structureType,sectionWidth,sectionDepth,sectionDiameter,buildingMaterialIndex,profileGuid,floorIndex}; Wall {start,end,thickness,height,relativeTopStory,topOffset (top-link only),bottomOffset,arcAngle,structureType,buildingMaterialIndex,compositeIndex,profileGuid,refLinePosition,refLineOffset,floorIndex}; Beam {start,end,topOffset,anchorPoint,axisOffset,structureType,sectionWidth,sectionDepth,sectionDiameter,buildingMaterialIndex,profileGuid,floorIndex,absoluteZ}; Slab {polygon|boundary (canonical outer/holes/arcs),thickness,level,structureType,buildingMaterialIndex,compositeIndex,floorIndex}. Each item is verified from the NATIVE element/memo inside its own undoable transaction; the success response declares layerReadbackPerformed. Profile Wall creation uses the profile origin: refLinePosition omitted/outside and refLineOffset omitted/zero only; conflicts reject the whole batch before dryRun and either strategy."
         },
         "atomic": {
           "type": "boolean",
@@ -4947,7 +5398,7 @@
     {
       "name": "mepbridge.get_element_geometry",
       "title": "MEPBridge get element precise geometry (read)",
-      "description": "Get precise geometry of a single element by GUID. Returns type-specific fields: Wall→start/end/thickness/height/bottomOffset/baseZ/length, Column→position/height/rotationAngle(radians)/bottomOffset/baseZ, Beam→start/end/length, Slab→polygon/thickness/level, Roof→polygon/thickness/baseLevel/roofClass and PlaneRoof pitchAngle, Door/Window→width/height/owner, Mesh→vertices/elevation statistics, Morph→vertices/edges/polygons/poly-edges/normals. Stair also returns baseLevel relative to its home story plus absoluteBaseLevel and homeStoryLevel. P4-5. The v0.1.6 Wall/Roof/Column fields are code-complete pending V16-BUILD-01 recompile and runtime validation.",
+      "description": "Get precise geometry and bounded read-only elementState scope of a single element by GUID. elementState reports direct group/hotlink-instance presence, header-lock presence, separate editability/access filters, and layer lock/hidden state without inferring that every non-editable element is locked. Returns type-specific fields: Wall→start/end/thickness/height/bottomOffset/baseZ/length, Column→position/height/rotationAngle(radians)/bottomOffset/baseZ, Beam→start/end/length, Slab→polygon/thickness/level, Roof→polygon/thickness/baseLevel/roofClass and PlaneRoof pitchAngle, Door/Window→width/height/owner, Mesh→vertices/elevation statistics, Morph→vertices/edges/polygons/poly-edges/normals. Stair also returns baseLevel relative to its home story plus absoluteBaseLevel and homeStoryLevel. P4-5. The v0.1.6 Wall/Roof/Column fields are code-complete pending V16-BUILD-01 recompile and runtime validation. Read consistency is fail-closed: full Get A/C must match exactly, including full type tuple, scope and modification stamp. Fast Header B must match too, except the measured AC30 Skylight full-SKYL/fast-Generic subtype pair with null class and all other header fields equal. Bounded Skylight owner/anchor/size/library/marker and Railing node/path checks remain strict; editability/access and layer changes reject. readStability distinguishes strict equality from the qualified AC30 Skylight representation pair. No exception for other types, arbitrary subtypes or AC28/29; no automatic retry. These bounded checks do not qualify exact host projection, cuts or editing.",
       "featureArea": "Architecture",
       "status": "runtime-schema-smoke",
       "executionKind": "mepbridge-addon-command",
@@ -4997,6 +5448,22 @@
         "elementGuid": {
           "type": "string",
           "description": "GUID of the element to query (required)"
+        },
+        "includeOpeningDiagnostics": {
+          "type": "boolean",
+          "description": "Optional read-only Door/Window deep diagnostics: instance GDL scalars, target library defaults, native opening quantities and bounded host 3D cut mesh. Default false; raw observations do not prove script or full cut equivalence."
+        },
+        "headerOnly": {
+          "type": "boolean",
+          "description": "Optional exact GUID header-only diagnostic. Default false. True double-reads native headers only, never full element, memo or assets; does not prove geometry or ownership. Conflicts with includeOpeningDiagnostics=true."
+        },
+        "curtainWallMemberType": {
+          "type": "string",
+          "enum": [
+            "Frame",
+            "Panel"
+          ],
+          "description": "Optional exact native Curtain Wall member core diagnostic: Frame or Panel. Header-bracketed double core reads only; no memo, geometry, owner traversal or ownership claim. Conflicts with headerOnly=true and includeOpeningDiagnostics=true. Omitted preserves existing geometry reads."
         }
       },
       "commandJson": {
@@ -5115,7 +5582,7 @@
     {
       "name": "mepbridge.change_mep_route_properties",
       "title": "MEPBridge change MEP route properties (medium-mutation)",
-      "description": "Modify properties of an existing MEP route by GUID. Supports mepSystemIndex/mepSystemName. Uses RoutingElement::Modify API. Does not modify cross-section (diameter), waypoints, or offsetFromHomeStory — those require RoutingSegment/Node level APIs (future). P4-8.",
+      "description": "Modify an existing MEP route system via mepSystemIndex/mepSystemName; existing system-only modification and dry-run remain available. offsetFromHomeStory remains unsupported. In v0.2.0, presence of segmentGuid, preferenceTableGuid or referenceId rejects the entire request with MEP_SEGMENT_SPEC_DEFERRED_V020, including dryRun=true and mixed system fields. GetAvailableSizes/GetMEPElementInfo read-only diagnostics remain available.",
       "featureArea": "Architecture",
       "status": "runtime-schema-smoke",
       "executionKind": "mepbridge-addon-command",
@@ -5166,7 +5633,19 @@
         },
         "offsetFromHomeStory": {
           "type": "number",
-          "description": "New offset from home story in meters"
+          "description": "Unsupported; node movement is also deferred in v0.2.0. No offset alternative is provided."
+        },
+        "segmentGuid": {
+          "type": "string",
+          "description": "Deferred in v0.2.0: presence rejects the entire request with MEP_SEGMENT_SPEC_DEFERRED_V020, including dry-run and mixed system fields."
+        },
+        "preferenceTableGuid": {
+          "type": "string",
+          "description": "Deferred in v0.2.0: presence rejects the entire request with MEP_SEGMENT_SPEC_DEFERRED_V020, including dry-run and mixed system fields."
+        },
+        "referenceId": {
+          "type": "integer",
+          "description": "Deferred in v0.2.0: presence rejects the entire request with MEP_SEGMENT_SPEC_DEFERRED_V020, including dry-run and mixed system fields."
         }
       },
       "commandJson": {
@@ -6448,7 +6927,7 @@
     {
       "name": "mepbridge.set_layer_batch",
       "title": "MEPBridge set layer for multiple elements",
-      "description": "Move a batch of elements to a target layer (by layerGuid or layerName), maximum 500 per call. Records each change's previous layer, applies the batch in one undoable command, then readbacks every changed element to verify its new layer. Mutation: actual change requires confirmRequired=true. Stage-2 semantic enhancement.",
+      "description": "Move a batch of elements to a target layer (by layerGuid or layerName), maximum 500 per call. Records each change's previous layer and verifies every changed element's new layer from the NATIVE element INSIDE the same undoable transaction (OFF-03/OFF-07); a mismatch rolls the whole batch back. dry-run reports inspectionDepth=preflight-only and never claims readbackVerified. Mutation: actual change requires confirmRequired=true. Stage-2 semantic enhancement.",
       "featureArea": "Project",
       "status": "runtime-schema-smoke",
       "executionKind": "mepbridge-addon-command",
@@ -6627,7 +7106,7 @@
     {
       "name": "mepbridge.get_gsm_object_catalog",
       "title": "MEPBridge get project GSM object catalog",
-      "description": "Read-only catalog of placeable GSM Object library parts currently registered in the project. Supports optional case-insensitive substring filtering. The main GUID is the stable identity; libraryPartIndex is session diagnostics only. Registered and usable since v0.1.5 (git tag v0.1.5 includes InstallCommand<GetGsmObjectCatalogCommand>; live dryRun returns real library-part GUID/name/index — FB-G2M metadata correction 2026-09-24).",
+      "description": "Read-only catalog of placeable project library parts. Optional libraryPartType selects the exact native Object, Door, or Window subtype; omission preserves Object-only behavior. On AC30 the catalog uses LibraryManager and stable GSM main GUID/subtype identity; libraryPartIndex is returned only when a safe current-session legacy index exists, with legacyIndexAvailable stating availability. Opening type is never inferred from its name.",
       "featureArea": "Project",
       "status": "runtime-validated",
       "executionKind": "mepbridge-addon-command",
@@ -6663,6 +7142,19 @@
         "maxResults": {
           "type": "integer",
           "description": "Maximum results (1-500, default 200)."
+        },
+        "libraryPartType": {
+          "type": "string",
+          "values": [
+            "Object",
+            "Door",
+            "Window"
+          ],
+          "description": "Exact native GSM subtype. Defaults to Object when omitted; AC30 classifies through built-in subtype roots and never accepts Object-type name hits as Door or Window."
+        },
+        "includeLibraryDefaults": {
+          "type": "boolean",
+          "description": "Optional bounded read-only SDK default parameters for safe current-session library indices. No parameter session, migration, or script equivalence assertion."
         }
       },
       "commandJson": {
@@ -6748,7 +7240,7 @@
     {
       "name": "mepbridge.edit_building_element",
       "title": "MEPBridge edit building element fields",
-      "description": "幕墙一条命令原位编辑：target=currentSelection 在APX内读取唯一选中父幕墙、修改并回读，无需外部几何预读；默认summary，resultDetail=full可取网格线。已有GUID调用兼容。 MACAI平台 existing-element edit: CurtainWall independent Scheme axes, existing CurtainWall height edits unsupported in v0.1.9 (rejected before writing; creation height unaffected), typed default/class/member settings, segment contour and named GDL parameters. Preserve parent/member ownership; source implementation requires native qualification, not all SDK fields are writable or qualified. geometryVerified is computed from requested/native supported-field readback and transaction outcome; not full topology equivalence or an owning batch commit certificate.",
+      "description": "幕墙一条命令原位编辑：target=currentSelection 在APX内读取唯一选中父幕墙、修改并回读，无需外部几何预读；默认summary，resultDetail=full可取网格线。已有GUID调用兼容。 MACAI平台 existing-element edit: CurtainWall independent Scheme axes, existing CurtainWall height edits unsupported in v0.2.0 (rejected before writing; creation height unaffected), typed default/class/member settings, segment contour and named GDL parameters. Preserve parent/member ownership; source implementation requires native qualification, not all SDK fields are writable or qualified. geometryVerified is computed from requested/native supported-field readback and transaction outcome; not full topology equivalence or an owning batch commit certificate. Beam Basic-to-Profile conversion supports effective centre anchorPoint 4 only; an omitted non-centre anchor is rejected in dry-run and actual writes before modification. Structured error context preserves originalAnchorPoint/effectiveAnchorPoint and suggestedParameters; suggestions are not equivalent automatic patches.",
       "featureArea": "Architecture",
       "status": "source-offline-fixed-pending-sdk-apx-live",
       "validationScopes": [
@@ -6807,6 +7299,14 @@
         ]
       },
       "paramExtractors": {
+        "layerGuid": {
+          "type": "string",
+          "description": "OFF-03/OFF-07: existing target layer GUID for the edited element; mutually exclusive with layerName. Source/target locked layers are rejected before any write; the response's actual object reports the NATIVE layer identity."
+        },
+        "layerName": {
+          "type": "string",
+          "description": "OFF-03/OFF-07: existing target layer name; must resolve to exactly one layer."
+        },
         "elementGuid": {
           "type": "string",
           "description": "GUID of the element to modify (alias: guid); omit only for root target=currentSelection"
@@ -6839,7 +7339,7 @@
               "height": {
                 "type": "number",
                 "exclusiveMinimum": 0,
-                "description": "Total height in meters for supported element types. Existing CurtainWall height edits are unsupported in v0.1.9 and rejected before writing; creation height is unaffected."
+                "description": "Total height in meters for supported element types. Existing CurtainWall height edits are unsupported in v0.2.0 and rejected before writing; creation height is unaffected."
               },
               "relativeTopStory": {
                 "type": "integer",
@@ -6849,11 +7349,11 @@
               },
               "topOffset": {
                 "type": "number",
-                "description": "Wall only: offset from the top-linked story in meters; requires an effective non-zero relativeTopStory"
+                "description": "Wall: top-linked story offset (needs non-zero relativeTopStory). Beam: top height relative to home story in meters."
               },
               "bottomOffset": {
                 "type": "number",
-                "description": "Wall only: base offset from the home story in meters"
+                "description": "Wall/Column: base offset from home story in meters; negative allowed."
               },
               "thickness": {
                 "type": "number",
@@ -9228,6 +9728,96 @@
                   "coords"
                 ],
                 "additionalProperties": false
+              },
+              "layerGuid": {
+                "type": "string",
+                "description": "Existing layer GUID; exclusive with layerName."
+              },
+              "layerName": {
+                "type": "string",
+                "description": "Unique existing layer name."
+              },
+              "structureType": {
+                "type": "string",
+                "enum": [
+                  "Basic",
+                  "Composite",
+                  "Profile"
+                ],
+                "description": "Column/Beam: Basic or existing Profile; Slab: Basic/Composite; Wall: Basic/Composite/Profile. Basic-to-Profile Beam edits require effective anchorPoint 4; omitted non-centre anchors are rejected before preview or writing."
+              },
+              "compositeIndex": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Wall Composite attribute index."
+              },
+              "profileGuid": {
+                "type": "string",
+                "description": "Wall existing complex-profile GUID."
+              },
+              "arcAngle": {
+                "type": "number",
+                "description": "Wall signed arc angle in radians."
+              },
+              "refLinePosition": {
+                "type": "string",
+                "enum": [
+                  "Center",
+                  "Outside",
+                  "Inside",
+                  "CoreCenter",
+                  "CoreOutside",
+                  "CoreInside"
+                ],
+                "description": "Wall reference-line position; Core* requires Composite target. Center/CoreCenter force zero offset."
+              },
+              "refLineOffset": {
+                "type": "number",
+                "description": "OFF-05 Wall reference-line offset in meters."
+              },
+              "boundary": {
+                "type": "object",
+                "description": "OFF-05 Slab canonical outer ring/holes/arcs; same transaction."
+              },
+              "sectionWidth": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Column/Beam Basic rectangular section width in meters."
+              },
+              "sectionDepth": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Column/Beam Basic rectangular section depth in meters."
+              },
+              "sectionDiameter": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Column/Beam Basic circular diameter in meters."
+              },
+              "buildingMaterialIndex": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Existing project Building Material index."
+              },
+              "rotationAngle": {
+                "type": "number",
+                "description": "Column axis rotation in radians."
+              },
+              "coreAnchor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 8,
+                "description": "Column 3x3 core anchor integer 0..8."
+              },
+              "anchorPoint": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 8,
+                "description": "Beam 3x3 anchor 0..8. Basic-to-Profile requires effective anchor 4 (explicit item overrides root; omitted preserves original). Non-centre conversion is rejected in preview and write; suggestedParameters never auto-applies."
+              },
+              "axisOffset": {
+                "type": "number",
+                "description": "Beam reference-axis offset from section center in meters."
               }
             },
             "additionalProperties": false,
@@ -9276,7 +9866,7 @@
               "height": {
                 "type": "number",
                 "exclusiveMinimum": 0,
-                "description": "Total height in meters for supported element types. Existing CurtainWall height edits are unsupported in v0.1.9 and rejected before writing; creation height is unaffected."
+                "description": "Total height in meters for supported element types. Existing CurtainWall height edits are unsupported in v0.2.0 and rejected before writing; creation height is unaffected."
               },
               "relativeTopStory": {
                 "type": "integer",
@@ -9286,11 +9876,11 @@
               },
               "topOffset": {
                 "type": "number",
-                "description": "Wall only: offset from the top-linked story in meters; requires an effective non-zero relativeTopStory"
+                "description": "Wall: top-linked story offset (needs non-zero relativeTopStory). Beam: top height relative to home story in meters."
               },
               "bottomOffset": {
                 "type": "number",
-                "description": "Wall only: base offset from the home story in meters"
+                "description": "Wall/Column: base offset from home story in meters; negative allowed."
               },
               "thickness": {
                 "type": "number",
@@ -11665,6 +12255,96 @@
                   "coords"
                 ],
                 "additionalProperties": false
+              },
+              "layerGuid": {
+                "type": "string",
+                "description": "Existing layer GUID; exclusive with layerName."
+              },
+              "layerName": {
+                "type": "string",
+                "description": "Unique existing layer name."
+              },
+              "structureType": {
+                "type": "string",
+                "enum": [
+                  "Basic",
+                  "Composite",
+                  "Profile"
+                ],
+                "description": "Column/Beam: Basic or existing Profile; Slab: Basic/Composite; Wall: Basic/Composite/Profile. Basic-to-Profile Beam edits require effective anchorPoint 4; omitted non-centre anchors are rejected before preview or writing."
+              },
+              "compositeIndex": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Wall Composite attribute index."
+              },
+              "profileGuid": {
+                "type": "string",
+                "description": "Wall existing complex-profile GUID."
+              },
+              "arcAngle": {
+                "type": "number",
+                "description": "Wall signed arc angle in radians."
+              },
+              "refLinePosition": {
+                "type": "string",
+                "enum": [
+                  "Center",
+                  "Outside",
+                  "Inside",
+                  "CoreCenter",
+                  "CoreOutside",
+                  "CoreInside"
+                ],
+                "description": "Wall reference-line position; Core* requires Composite target. Center/CoreCenter force zero offset."
+              },
+              "refLineOffset": {
+                "type": "number",
+                "description": "OFF-05 Wall reference-line offset in meters."
+              },
+              "boundary": {
+                "type": "object",
+                "description": "OFF-05 Slab canonical outer ring/holes/arcs; same transaction."
+              },
+              "sectionWidth": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Column/Beam Basic rectangular section width in meters."
+              },
+              "sectionDepth": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Column/Beam Basic rectangular section depth in meters."
+              },
+              "sectionDiameter": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Column/Beam Basic circular diameter in meters."
+              },
+              "buildingMaterialIndex": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Existing project Building Material index."
+              },
+              "rotationAngle": {
+                "type": "number",
+                "description": "Column axis rotation in radians."
+              },
+              "coreAnchor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 8,
+                "description": "Column 3x3 core anchor integer 0..8."
+              },
+              "anchorPoint": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 8,
+                "description": "Beam 3x3 anchor 0..8. Basic-to-Profile requires effective anchor 4 (explicit item overrides root; omitted preserves original). Non-centre conversion is rejected in preview and write; suggestedParameters never auto-applies."
+              },
+              "axisOffset": {
+                "type": "number",
+                "description": "Beam reference-axis offset from section center in meters."
               }
             },
             "additionalProperties": false,
@@ -11700,7 +12380,7 @@
         "height": {
           "type": "number",
           "exclusiveMinimum": 0,
-          "description": "Total height in meters for supported element types. Existing CurtainWall height edits are unsupported in v0.1.9 and rejected before writing; creation height is unaffected."
+          "description": "Total height in meters for supported element types. Existing CurtainWall height edits are unsupported in v0.2.0 and rejected before writing; creation height is unaffected."
         },
         "curtainWall": {
           "type": "object",
@@ -12745,7 +13425,7 @@
         },
         "level": {
           "type": "number",
-          "description": "Slab/Roof/Shell:  reference level relative to floor (alias:  elevation)"
+          "description": "Slab/Roof/Shell:  reference level relative to floor (alias:  elevation) W1 also supports finite Shell level with independent readback; Railing and Skylight edits remain qualification-gated."
         },
         "floorIndex": {
           "type": "integer",
@@ -14112,6 +14792,78 @@
             "full"
           ],
           "description": "CurtainWall response serialization only; all native verification remains enabled. Default summary for currentSelection, full for legacy GUID calls. Full includes gridLines; summary includes canonical schemes and checked line counts."
+        },
+        "structureType": {
+          "type": "string",
+          "values": [
+            "Basic",
+            "Profile"
+          ],
+          "description": "Column/Beam: Basic or existing Profile; Slab: Basic/Composite; Wall: Basic/Composite/Profile. Basic-to-Profile Beam edits require effective anchorPoint 4; omitted non-centre anchors are rejected before preview or writing."
+        },
+        "sectionWidth": {
+          "type": "number",
+          "description": "Basic rectangular section width in meters; create requires sectionDepth."
+        },
+        "sectionDepth": {
+          "type": "number",
+          "description": "Basic rectangular section depth in meters; create requires sectionWidth."
+        },
+        "sectionDiameter": {
+          "type": "number",
+          "description": "Basic circular section diameter in meters; mutually exclusive with sectionWidth/sectionDepth."
+        },
+        "buildingMaterialIndex": {
+          "type": "integer",
+          "description": "Positive Building Material attribute index from GetAttributes; missing indices fail closed."
+        },
+        "rotationAngle": {
+          "type": "number",
+          "description": "Column axis rotation in radians."
+        },
+        "coreAnchor": {
+          "type": "integer",
+          "description": "Column 3x3 core anchor integer 0..8."
+        },
+        "anchorPoint": {
+          "type": "integer",
+          "description": "Beam 3x3 anchor 0..8. Basic-to-Profile requires effective anchor 4 (explicit item overrides root; omitted preserves original). Non-centre conversion is rejected in preview and write; suggestedParameters never auto-applies."
+        },
+        "axisOffset": {
+          "type": "number",
+          "description": "Beam reference-axis offset from section center in meters."
+        },
+        "arcAngle": {
+          "type": "number",
+          "description": "Wall positive arc angle in radians (0, 2*pi); reverse ordered start/end for the opposite side."
+        },
+        "compositeIndex": {
+          "type": "integer",
+          "description": "Wall existing Composite index; Composite mode only."
+        },
+        "profileGuid": {
+          "type": "string",
+          "description": "Wall existing complex-profile GUID; Profile mode only."
+        },
+        "refLinePosition": {
+          "type": "string",
+          "enum": [
+            "Center",
+            "Outside",
+            "Inside",
+            "CoreCenter",
+            "CoreOutside",
+            "CoreInside"
+          ],
+          "description": "Wall reference-line position; Core* requires Composite target. Center/CoreCenter force zero offset."
+        },
+        "refLineOffset": {
+          "type": "number",
+          "description": "OFF-05 Wall reference-line offset in meters."
+        },
+        "boundary": {
+          "type": "object",
+          "description": "OFF-05 Slab canonical outer ring/holes/arcs; same transaction."
         }
       },
       "commandJson": {
@@ -14516,7 +15268,7 @@
     {
       "name": "mepbridge.read_drafting_elements",
       "title": "MEPBridge read 2D drafting elements",
-      "description": "Read-only extraction of 2D lines, polylines, arcs, circles, text, hatches, and drawing memos from the active floor plan, worksheet, or detail window. Supports layer filtering, bounding box filtering, pagination, and SP-1 channel probing for CAD reverse modeling.",
+      "description": "Read-only extraction of 2D lines, polylines, arcs, circles, text, hatches, and drawing memos from the active floor plan, worksheet, or detail window. Supports layer filtering, bounding box filtering, pagination, and SP-1 channel probing for CAD reverse modeling. OFF-08: its output can be fed to the adapter-side pure planning module ai-adapter/2d-basic-orchestration.js (GEN-2D-BASIC-ORCHESTRATION: closure/dedupe/self-intersection, basic rule types, explicit L/U/T decomposition, recomputable transform+residual, native spec+target layer, 1mm bounds comparison, sourceGUID/clientID mapping). That module is zero-write, requires manual review, is NOT a full 2D auto-recognition system, and never creates layers.",
       "featureArea": "Architecture",
       "status": "code-complete-pending-runtime",
       "executionKind": "mepbridge-addon-command",
