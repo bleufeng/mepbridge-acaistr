@@ -31,7 +31,7 @@ Natural-language tasks and extensible user templates pass through safety orchest
 
 ## Release Scope & Evolution Milestones
 
-- Version: `v0.2.0` (**built and packaged for Windows x64; not yet published**). The [v0.1.9 installation release](https://github.com/bleufeng/mepbridge-acaistr/releases/tag/v0.1.9) remains available.
+- Version: `v0.2.0` (**published 2026-11-27 for Windows x64**). Download the [v0.2.0 installation release](https://github.com/bleufeng/mepbridge-acaistr/releases/tag/v0.2.0); the [v0.1.9 installation release](https://github.com/bleufeng/mepbridge-acaistr/releases/tag/v0.1.9) remains available.
 - **Current qualification boundary**: Archicad 30 passed native acceptance for the selected v0.2.0 scope, including core building workflows and fixed-grid curtain-wall editing. Archicad 28/29 builds are complete and backed by reference evidence; full native acceptance was not run on either version. No macOS build is included; macOS support is deferred. Editing the height of an existing curtain wall remains unsupported.
 - **Capability Scale Evolution**: Grew from ~20 APIs in v0.1.0 and 80+ in v0.1.6 to **162 official atomic API capabilities** today;
 - **Transaction Safety Evolution**: Upgraded from raw calls without rollback to unified RAII guards and a **99.8% transaction rollback guard**;
